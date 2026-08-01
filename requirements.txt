@@ -2,3 +2,7 @@
 silero-vad
 numpy
 sounddevice
+torch
+
+faster-whisper
+hf-transfer
