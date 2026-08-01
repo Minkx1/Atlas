@@ -1,15 +1,7 @@
+# Newt
 
-# {project_name}
-
-
-{project_description}
-
+**Newt** is a voice assistant written in Python.
 
 ## Credits
 
-
 Made by *Minkx1*
-
-
-{data}
-

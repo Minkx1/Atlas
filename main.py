@@ -1,7 +1,11 @@
 # main.py
 
-def main() -> None:
-  print("Hello World!")
+import src as newt
+
+
+def main():
+    pass
+
 
 if __name__ == "__main__":
-  main()
+    main()
