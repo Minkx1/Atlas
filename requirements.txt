@@ -1,0 +1,4 @@
+# Silero Voice Activity Detection
+silero-vad
+numpy
+sounddevice
