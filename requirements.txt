@@ -6,3 +6,4 @@ torch
 
 faster-whisper
 hf-transfer
+sherpa-onnx

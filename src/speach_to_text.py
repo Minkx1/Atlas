@@ -8,6 +8,7 @@ import queue
 import sys
 import threading
 import time
+from collections import deque
 from pathlib import Path
 from typing import Literal
 
@@ -49,7 +50,7 @@ class KeyWordSpotter:
             joiner=joiner,
             keywords_file=keywords_file,
             num_threads=num_threads,
-            # score_threshold=score_threshold,
+            keywords_threshold=score_threshold,
             feature_dim=80,
         )
         self.stream = self.kws.create_stream()
@@ -140,6 +141,9 @@ class Listener:
 
         # Buffer for accumulating audio chunks while the user is speaking
         self.speech_buffer = []
+
+        # deque saving ~400 ms before VAD detected smth
+        self.preroll_buffer = deque(maxlen=12)
         self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = "SLEEPING"
 
         self.awake_timeout = 10.0  # time in s, when assistant waits for commands
@@ -155,8 +159,8 @@ class Listener:
         chunk_np = indata.squeeze(1)
         chunk_torch = torch.from_numpy(chunk_np)
 
-        # checking VAD
-        speech_dict = self.vad_iterator(chunk_torch)
+        self.preroll_buffer.append(chunk_np.copy())  # updating preroll
+        speech_dict = self.vad_iterator(chunk_torch)  # checking VAD
 
         if speech_dict:
             if "start" in speech_dict:
@@ -164,9 +168,12 @@ class Listener:
             elif "end" in speech_dict:
                 self.is_speaking = False
 
-        if (
-            self.state == "SLEEPING" and self.is_speaking
-        ):  # VAD detectes voice -> KWS recognizes keyword
+        # VAD logs
+        vad_status = "Voice detected!   " if self.is_speaking else "No voice detected."
+        sys.stdout.write(f"\r[VAD]: {vad_status} | State: {self.state}      ")
+        sys.stdout.flush()
+
+        if self.state == "SLEEPING":
             detected_keyword = self.kws.process_chunk(chunk_np)
             if detected_keyword:
                 print(f"\n[!] Wake word detected: '{detected_keyword}'")
@@ -174,7 +181,8 @@ class Listener:
 
                 self.state = "AWAKE"
                 self.awake_deadline = time.time() + self.awake_timeout
-                self.speech_buffer = [chunk_np.copy()]
+                self.kws.reset()
+                # self.speech_buffer = [chunk_np.copy()]
 
         elif self.state == "AWAKE":
             if time.time() > self.awake_deadline:
@@ -187,7 +195,7 @@ class Listener:
                 sys.stdout.write("[@] Recording command...                \r")
                 sys.stdout.flush()
                 self.state = "RECORDING"
-                self.speech_buffer = [chunk_np.copy()]
+                self.speech_buffer = list(self.preroll_buffer)
 
         elif self.state == "RECORDING":
             self.speech_buffer.append(chunk_np.copy())
