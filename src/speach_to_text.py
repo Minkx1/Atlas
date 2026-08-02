@@ -138,7 +138,9 @@ class Listener:
             if time.time() > self.awake_deadline:
                 self.state = "SLEEPING"
                 self.kws.reset()
-                AssistantUI.print_state_change("SLEEPING", "Timeout (10s)")
+                AssistantUI.print_state_change(
+                    "SLEEPING", f"Timeout ({int(cfg.awake_timeout)}s)"
+                )
                 return
 
             if speech_dict and "start" in speech_dict:

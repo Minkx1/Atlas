@@ -1,17 +1,16 @@
 # config.py
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
-#                 #
-#  ===  STT  ===  #
-#                 #
+import tomllib
 
 
 @dataclass
 class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
-    blocksize: int = 512  # 512 семплів = 32 мс аудіо
+    blocksize: int = 512
     dtype: str = "float32"
 
 
@@ -28,7 +27,7 @@ class VADConfig:
     threshold: float = 0.5
     min_silence_duration_ms: int = 600
     speech_pad_ms: int = 60
-    preroll_blocks: int = 12  # 12 * 32 =~400 ms preroll before speaking
+    preroll_blocks: int = 12
 
 
 @dataclass
@@ -39,23 +38,16 @@ class WhisperConfig:
     compute_type: str = "int8"
     beam_size: int = 5
     cpu_threads: int = 6
-
     language: str = "en"
     initial_prompt: str = (
-        "English language, speech to an assistant. "
-        "Terms: Newt, Python, Linux, C++, code, programming, Arch, Cachy, terminal."
+        "English language, speech to an assistant. Terms: Newt, Python."
     )
-    # language: str = "uk"
-    # initial_prompt: str = (
-    #     "Українська мова, розмова з Асистентом. "
-    #     "Терміни: Newt, Python, Linux, C++, код, прога, програмування, Arch, Cachy."
-    # )
 
 
 @dataclass
 class AppConfig:
-    awake_timeout: float = 10.0  # How many seconds does the assistant wait for a command after the wake word
-    min_command_ms: float = 600.0  # Minimal phrase size (random sounds protection)
+    awake_timeout: float = 10.0
+    min_command_ms: float = 600.0
 
     audio: AudioConfig = field(default_factory=AudioConfig)
     kws: KWSConfig = field(default_factory=KWSConfig)
@@ -63,4 +55,24 @@ class AppConfig:
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
 
 
-cfg = AppConfig()
+def load_config(config_path: str = "data/config.toml") -> AppConfig:
+    path = Path(config_path)
+    if not path.exists():
+        print(f"[WARN] Config {config_path} not found. Using defaults.")
+        return AppConfig()
+
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+
+    return AppConfig(
+        awake_timeout=data.get("app", {}).get("awake_timeout", 10.0),
+        min_command_ms=data.get("app", {}).get("min_command_ms", 600.0),
+        audio=AudioConfig(**data.get("audio", {})),
+        kws=KWSConfig(**data.get("kws", {})),
+        vad=VADConfig(**data.get("vad", {})),
+        whisper=WhisperConfig(**data.get("whisper", {})),
+    )
+
+
+# Global object
+cfg = load_config()
