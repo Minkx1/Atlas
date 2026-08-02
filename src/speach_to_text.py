@@ -5,7 +5,6 @@
 
 import os
 import queue
-import sys
 import threading
 import time
 from collections import deque
@@ -19,48 +18,38 @@ import torch
 from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
+from .config import cfg
+from .ui import AssistantUI
+
 # makes downloading Whisper models from HF faster
 os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
 
 class KeyWordSpotter:
-    def __init__(
-        self,
-        model_dir: str = "./data/sherpa_onnx_kws",
-        keywords_file: str = "keywords.txt",
-        num_threads: int = 2,
-        score_threshold: float = 0.25,
-    ):
-        path = Path(model_dir)
+    def __init__(self):
+        path = Path(cfg.kws.model_dir)
         tokens = str(path / "tokens.txt")
         encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
         decoder = str(path / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx")
         joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
         if not os.path.exists(tokens):
-            raise FileNotFoundError(
-                f"No Sherpa-ONNX model file found in directory: {model_dir}"
-            )
+            raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
-        print("[KWS] Loading Sherpa-ONNX KeyWordSpotter model...", flush=True)
         self.kws = sherpa_onnx.KeywordSpotter(
             tokens=tokens,
             encoder=encoder,
             decoder=decoder,
             joiner=joiner,
-            keywords_file=keywords_file,
-            num_threads=num_threads,
-            keywords_threshold=score_threshold,
+            keywords_file=cfg.kws.keywords_file,
+            num_threads=cfg.kws.num_threads,
+            keywords_threshold=cfg.kws.score_threshold,
             feature_dim=80,
         )
         self.stream = self.kws.create_stream()
-        print("[KWS] WakeWord ready!", flush=True)
 
-    def process_chunk(
-        self, chunk_np: np.ndarray, sample_rate: int = 16000
-    ) -> str | None:
-        """Takes audio chunk and compares with keywords.txt, returning spotted word if so."""
-        self.stream.accept_waveform(sample_rate, chunk_np)
+    def process_chunk(self, chunk_np: np.ndarray) -> str | None:
+        self.stream.accept_waveform(cfg.audio.sample_rate, chunk_np)
         while self.kws.is_ready(self.stream):
             self.kws.decode_stream(self.stream)
             result = self.kws.get_result(self.stream)
@@ -71,46 +60,30 @@ class KeyWordSpotter:
         return None
 
     def reset(self):
-        """Resets stream for a new recognition."""
         self.stream = self.kws.create_stream()
 
 
 class SpeechToText:
-    def __init__(
-        self,
-        model_size: Literal["small", "small.en", "medium", "large-v3"] = "small",
-        device: Literal["cpu", "cuda"] = "cpu",
-        compute_type="int8",
-        transcribe_beam_size: int = 5,
-        language: str = "en",
-        initial_prompt: str = "English language, speach to an assistant. Termins: Newt, Python, Linux, C++, code, programming.",
-    ):
-        self.trans_beam_size = transcribe_beam_size
-        self.lang = language
-        self.init_prompt = initial_prompt
-
-        print(f"[{device.upper()}] Loading Whisper ({model_size})...", flush=True)
+    def __init__(self):
+        w = cfg.whisper
         self.model = WhisperModel(
-            model_size,
-            device=device,
-            compute_type=compute_type,
-            cpu_threads=6,
+            w.model_size,
+            device=w.device,
+            compute_type=w.compute_type,
+            cpu_threads=w.cpu_threads,
             num_workers=1,
-            download_root="./data/whisper_models_cache",
+            download_root=w.download_root,
         )
-        print("Loading complete!", flush=True)
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
-        # beam_size=1 gives max speed, but less accurate results
-        # language="uk" boosts speed
+        w = cfg.whisper
         start_time = time.perf_counter()
-
         segments, _ = self.model.transcribe(
             audio=audio_array,
-            beam_size=self.trans_beam_size,
-            language=self.lang,
-            initial_prompt=self.init_prompt,
-            condition_on_previous_text=False,  # Обов'язково для коротких команд!
+            beam_size=w.beam_size,
+            language=w.language,
+            initial_prompt=w.initial_prompt,
+            condition_on_previous_text=False,
         )
         text = " ".join([segment.text for segment in segments]).strip()
         return text, int((time.perf_counter() - start_time) * 1000)
@@ -124,34 +97,22 @@ class Listener:
         keywords_file: str = "keywords.txt",
     ):
         self.stt = stt_model
-        self.kws = KeyWordSpotter(
-            model_dir=kws_model_dir,
-            keywords_file=keywords_file,
-            score_threshold=0.25,
-        )
+        self.kws = KeyWordSpotter()
 
         self.vad_model = load_silero_vad()
         self.vad_iterator = VADIterator(
             self.vad_model,
-            threshold=0.5,
-            min_silence_duration_ms=600,
-            sampling_rate=16000,
-            speech_pad_ms=60,
+            threshold=cfg.vad.threshold,
+            min_silence_duration_ms=cfg.vad.min_silence_duration_ms,
+            sampling_rate=cfg.audio.sample_rate,
+            speech_pad_ms=cfg.vad.speech_pad_ms,
         )
 
-        # Buffer for accumulating audio chunks while the user is speaking
-        self.speech_buffer = []
-
-        # deque saving ~400 ms before VAD detected smth
-        self.preroll_buffer = deque(maxlen=12)
+        self.speech_buffer = []  # Buffer for accumulating audio chunks while the user is speaking
+        self.preroll_buffer = deque(maxlen=cfg.vad.preroll_blocks)
         self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = "SLEEPING"
 
-        self.awake_timeout = 10.0  # time in s, when assistant waits for commands
-        self.awake_deadline = 0.0  # timestamp, when assistant goes to sleep
-
-        self.is_speaking = False
-
-        # queue for passing audio chunks to the STT worker thread
+        self.awake_deadline = 0.0
         self.audio_queue = queue.Queue()
 
     def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
@@ -162,40 +123,29 @@ class Listener:
         self.preroll_buffer.append(chunk_np.copy())  # updating preroll
         speech_dict = self.vad_iterator(chunk_torch)  # checking VAD
 
-        if speech_dict:
-            if "start" in speech_dict:
-                self.is_speaking = True
-            elif "end" in speech_dict:
-                self.is_speaking = False
-
-        # VAD logs
-        vad_status = "Voice detected!   " if self.is_speaking else "No voice detected."
-        sys.stdout.write(f"\r[VAD]: {vad_status} | State: {self.state}      ")
-        sys.stdout.flush()
-
         if self.state == "SLEEPING":
             detected_keyword = self.kws.process_chunk(chunk_np)
             if detected_keyword:
-                print(f"\n[!] Wake word detected: '{detected_keyword}'")
-                print("[*] Assistant AWAKE! Listening for commands...")
-
                 self.state = "AWAKE"
-                self.awake_deadline = time.time() + self.awake_timeout
+                self.awake_deadline = time.time() + cfg.awake_timeout
                 self.kws.reset()
-                # self.speech_buffer = [chunk_np.copy()]
+
+                AssistantUI.print_state_change(
+                    self.state, f"Wake word: '{detected_keyword}'"
+                )
 
         elif self.state == "AWAKE":
             if time.time() > self.awake_deadline:
-                print("\n[zZz] 10s timeout. Going back to SLEEPING...     ")
                 self.state = "SLEEPING"
                 self.kws.reset()
+                AssistantUI.print_state_change("SLEEPING", "Timeout (10s)")
                 return
 
             if speech_dict and "start" in speech_dict:
-                sys.stdout.write("[@] Recording command...                \r")
-                sys.stdout.flush()
                 self.state = "RECORDING"
+                AssistantUI.print_state_change("RECORDING")
                 self.speech_buffer = list(self.preroll_buffer)
+                # self.speech_buffer = [c.copy() for c in self.preroll_buffer]
 
         elif self.state == "RECORDING":
             self.speech_buffer.append(chunk_np.copy())
@@ -203,16 +153,17 @@ class Listener:
             if speech_dict and "end" in speech_dict:  # VAD detected end of speach
                 if self.speech_buffer:
                     full_audio = np.concatenate(self.speech_buffer)
-                    listening_time_ms: float = (len(full_audio) / 16000) * 1000.0
+                    listen_ms: float = (
+                        len(full_audio) / cfg.audio.sample_rate
+                    ) * 1000.0
 
                     # random sound protection
-                    if listening_time_ms > 600:
-                        self.audio_queue.put((full_audio.copy(), listening_time_ms))
+                    if listen_ms > cfg.min_command_ms:
+                        self.audio_queue.put((full_audio.copy(), listen_ms))
 
                 self.speech_buffer = []
                 self.state = "AWAKE"
-                self.awake_deadline = time.time() + self.awake_timeout
-                print("\n[*] Command sent! Awake for next 10s...")
+                self.awake_deadline = time.time() + cfg.awake_timeout
 
     def _stt_worker(self):
         """Different thread awaits audio array in queue and then processes it"""
@@ -221,20 +172,12 @@ class Listener:
             if item is None:
                 break
 
-            audio_array, listening_time_ms = item
+            audio_array, listen_ms = item
+            text, recog_ms = self.stt.transcribe(audio_array)
+            rtf = recog_ms / listen_ms
 
-            sys.stdout.write("\r[#] Processing...               \r")
-            sys.stdout.flush()
-
-            text, recognition_time_ms = self.stt.transcribe(audio_array)
-            rtf = recognition_time_ms / listening_time_ms
             if text:
-                print(f"\n[:] You said: >> {text} <<\n")
-                print(
-                    f"⏱️  Listening time: {listening_time_ms:.0f} ms | "
-                    f"Recognition time: {recognition_time_ms:.0f} ms | "
-                    f"RTF: {rtf:.2f}x"
-                )
+                AssistantUI.print_transcription(text, listen_ms, recog_ms, rtf)
 
             self.audio_queue.task_done()
 
@@ -242,24 +185,22 @@ class Listener:
         # Starting background Whisper thread
         stt_thread = threading.Thread(target=self._stt_worker, daemon=True)
         stt_thread.start()
-
-        print("\n" + "=" * 50)
-        print(" Ready to speak?")
-        print(" Press Ctrl+C to quit.")
-        print("=" * 50 + "\n")
+        AssistantUI.print_banner()
 
         try:
             with sd.InputStream(
-                samplerate=16000,
-                channels=1,
-                blocksize=512,
-                dtype="float32",
+                samplerate=cfg.audio.sample_rate,
+                channels=cfg.audio.channels,
+                blocksize=cfg.audio.blocksize,
+                dtype=cfg.audio.dtype,
                 callback=self._audio_callback,
             ):
                 while True:
                     sd.sleep(100)
         except KeyboardInterrupt:
-            print("\nStopping...")
+            from .ui import console
+
+            console.print("\n[dim]Stopping assistant...[/dim]")
         finally:
             self.audio_queue.put(None)  # Ending worker thread
             stt_thread.join()

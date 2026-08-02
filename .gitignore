@@ -7,5 +7,4 @@ dist/
 .vscode/
 .idea/
 
-whisper_models_cache/
-sherpa_onnx_kws/
+data/models/
