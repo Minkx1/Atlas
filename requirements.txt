@@ -9,3 +9,5 @@ hf-transfer
 sherpa-onnx
 
 rich
+
+psutil
