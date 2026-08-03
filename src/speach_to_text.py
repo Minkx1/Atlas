@@ -5,8 +5,6 @@
 
 import os
 import queue
-import subprocess
-import sys
 import threading
 import time
 from collections import deque
@@ -17,6 +15,7 @@ import numpy as np
 import sherpa_onnx
 import sounddevice as sd
 import torch
+from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
@@ -25,6 +24,7 @@ from .profiler import profiler
 from .ui import AssistantUI
 
 # makes downloading Whisper models from HF faster
+load_dotenv()  # loads HF_TOKEN from .env file.
 os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
 # # limiting ONNX Runtime CPU Usage in Sleaping Mode
@@ -44,7 +44,7 @@ class KeyWordSpotter:
         joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
         if not os.path.exists(tokens):
-            print(f"No Sherpa model in: {path}. Donwloading...")
+            print(f"[WARN] No Sherpa model in: {path}. Donwloading...")
             self._download_sherpa_onnx_model(path)
             # raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
@@ -123,6 +123,12 @@ class KeyWordSpotter:
 class Whisper:
     def __init__(self):
         w = cfg.whisper
+        model_dir: Path = DATA_DIR / w.download_root
+
+        if not model_dir.exists():
+            print(
+                f"[WARN] No Faster-Whisper model found in {model_dir}. Downloading..."
+            )
 
         self.model = WhisperModel(
             w.model_size,
@@ -130,7 +136,7 @@ class Whisper:
             compute_type=w.compute_type,
             cpu_threads=w.cpu_threads,
             num_workers=1,
-            download_root=f"{DATA_DIR / w.download_root}",
+            download_root=str(model_dir),
         )
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:

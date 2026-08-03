@@ -5,6 +5,7 @@
 ## Instalation[dev]
 
 **_Firstly_, clone repo:**
+
   ```shell
   git clone https://github.com/Minkx1/Newt.git
   
@@ -12,28 +13,35 @@
   ```
 
 **_Secondly_, prepare Python runtime environment:**
+
 * Run:
+
   ```shell
   python -m venv .venv
   ```
   
 * Ativate VirtualEnv with command:
   
-  _Windows_: 
+  _Windows_:
+
   ```shell
-  .venv/Scripts/Acticate.ps1
+  .venv/Scripts/Activate.ps1
   ```
+
   _Linux_:
+
   ```shell
   source .venv/bin/activate
   ```
 
 * Install requirements:
+  
   ```shell
   pip install -r requirements.txt
   ```
 
 **_Thirdly_, run `main.py` script and wait for all models to install themselves:**
-  ```
+
+  ```shell
   python main.py
   ```

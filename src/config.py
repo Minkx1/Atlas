@@ -54,6 +54,17 @@ class WhisperConfig:
 
 
 @dataclass
+class TTSConfig:
+    model_path: str = "models/piper/en_US-lessac-medium.onnx"
+    use_cuda: bool = False
+    volume: float = 0.5
+    length_scale: float = 2.0  # twice as slow
+    noise_scale: float = 1.0  # more audio variation
+    noise_w_scale: float = 1.0  # more speaking variation
+    normalize_audio: bool = False  # use raw audio from voice
+
+
+@dataclass
 class AppConfig:
     awake_timeout: float = 10.0
     min_command_ms: float = 600.0
@@ -62,6 +73,7 @@ class AppConfig:
 
     audio: AudioConfig = field(default_factory=AudioConfig)
     kws: KWSConfig = field(default_factory=KWSConfig)
+    tts: TTSConfig = field(default_factory=TTSConfig)
     vad: VADConfig = field(default_factory=VADConfig)
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
 
@@ -82,6 +94,7 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
         stt_pipeline_mode=data.get("app", {}).get("stt_pipeline_mode", "KWS"),
         audio=AudioConfig(**data.get("audio", {})),
         kws=KWSConfig(**data.get("kws", {})),
+        tts=TTSConfig(**data.get("tts", {})),
         vad=VADConfig(**data.get("vad", {})),
         whisper=WhisperConfig(**data.get("whisper", {})),
     )

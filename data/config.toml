@@ -6,7 +6,7 @@
 awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
 min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
 profiler_debug = true  # Show profiler debug: CPU and RAM Usage per each state
-stt_pipeline_mode = "DIRECT"  # Mode of pipeline. If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
+stt_pipeline_mode = "KWS"  # Mode of pipeline. If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
 
 [audio]
 sample_rate = 16000
@@ -28,6 +28,15 @@ speech_pad_ms = 60
 # ~400 ms preroll before speach (12 blocks * 32 ms)
 preroll_blocks = 6
 
+[tts]
+model_path = "models/piper/en_US-lessac-medium.onnx"
+use_cuda = false
+volume = 0.5
+length_scale = 2.0  # twice as slow
+noise_scale = 1.0  # more audio variation
+noise_w_scale = 1.0  # more speaking variation
+normalize_audio = false  # use raw audio from voice
+
 [whisper]
 model_size = "small" # "small", "small.$lang", "medium", "large-v3"
 device = "cpu"        # "cpu" or "cuda"
@@ -42,4 +51,4 @@ initial_prompt = "English language, speech to an assistant. Terms: Newt, Python,
 
 # --- UK preset  ---
 # language = "uk"
-# initial_prompt = "Українська мова, розмова з Асистентом. Терміни: Newt, Python, Linux, C++, код, прога, програмування, Arch, Cachy, термінал"
+# initial_prompt = "Українська мова. Терміни: Newt, Python, Linux, C++, код, прога, програмування"

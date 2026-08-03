@@ -3,11 +3,10 @@ silero-vad
 numpy
 sounddevice
 torch
-
 faster-whisper
 hf-transfer
 sherpa-onnx
-
 rich
-
 psutil
+python-dotenv
+piper-tts
