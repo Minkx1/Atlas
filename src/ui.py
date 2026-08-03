@@ -4,12 +4,21 @@ from datetime import datetime
 from rich.console import Console
 from rich.panel import Panel
 
+from .config import cfg
+from .profiler import ResourceProfiler
 from .utils import __version__
 
 console = Console()
 
 
 class AssistantUI:
+    @staticmethod
+    def _resource_badge() -> str:
+        if not cfg.profiler_debug:
+            return ""
+        cpu, ram = ResourceProfiler.get_instant_stats()
+        return f"[dim]RAM: {ram:.0f}MB │ CPU: {cpu:.1f}%[/dim]"
+
     @staticmethod
     def print_banner():
         console.print(
@@ -22,7 +31,7 @@ class AssistantUI:
 
     @staticmethod
     def print_state_change(state: str, detail: str = ""):
-        time_str = datetime.now().strftime("%H:%M:%S")
+        time_str = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
         if state == "AWAKE":
             console.print(
                 f"[dim][{time_str}][/dim] [bold green]✦ AWAKE[/bold green]    [dim]{detail}[/dim]"
@@ -45,6 +54,19 @@ class AssistantUI:
             f"[bold magenta]╰─ [/bold magenta] [dim]{listen_ms:.0f} ms audio  │  "
             f"{recog_ms:.0f} ms STT  │  RTF:[/dim] [bold green]{rtf:.2f}x[/bold green]"
         )
+        console.print()
+
+    @staticmethod
+    def print_benchmark_report(summary: dict[str, dict[str, float]]):
+        if not cfg.profiler_debug:
+            return
+        console.print("\n[bold cyan]─── Resource  Summary ───[/bold cyan]")
+        for state, stats in summary.items():
+            console.print(
+                f" • [bold]{state:<10}[/bold] -> "
+                f"Avg CPU: [yellow]{stats['avg_cpu']}%[/yellow] │ "
+                f"Peak RAM: [green]{stats['peak_ram_mb']} MB[/green]"
+            )
         console.print()
 
     @staticmethod

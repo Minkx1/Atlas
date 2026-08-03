@@ -4,10 +4,10 @@
 
 [app]
 # How many seconds the assistant waits for a command after the wake word
-awake_timeout = 20.0
+awake_timeout = 10.0
 # Minimum phrase length in ms (protection against accidental sounds/clicks)
 min_command_ms = 600.0
-
+profiler_debug = true
 [audio]
 sample_rate = 16000
 channels = 1

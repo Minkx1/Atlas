@@ -48,6 +48,7 @@ class WhisperConfig:
 class AppConfig:
     awake_timeout: float = 10.0
     min_command_ms: float = 600.0
+    profiler_debug: bool = False
 
     audio: AudioConfig = field(default_factory=AudioConfig)
     kws: KWSConfig = field(default_factory=KWSConfig)
@@ -67,6 +68,7 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
     return AppConfig(
         awake_timeout=data.get("app", {}).get("awake_timeout", 10.0),
         min_command_ms=data.get("app", {}).get("min_command_ms", 600.0),
+        profiler_debug=data.get("app", {}).get("profiler_debug", False),
         audio=AudioConfig(**data.get("audio", {})),
         kws=KWSConfig(**data.get("kws", {})),
         vad=VADConfig(**data.get("vad", {})),

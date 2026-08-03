@@ -19,6 +19,7 @@ from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
 from .config import cfg
+from .profiler import profiler
 from .ui import AssistantUI
 
 # makes downloading Whisper models from HF faster
@@ -34,6 +35,7 @@ class KeyWordSpotter:
         joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
         if not os.path.exists(tokens):
+            self._download_sherpa_onnx_model(Path(cfg.kws.model_dir))
             raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
         self.kws = sherpa_onnx.KeywordSpotter(
@@ -48,7 +50,12 @@ class KeyWordSpotter:
         )
         self.stream = self.kws.create_stream()
 
+    @staticmethod
+    def _download_sherpa_onnx_model(model_path: Path):
+        
+
     def process_chunk(self, chunk_np: np.ndarray) -> str | None:
+        """Processes audio chunk. If keyword was spotted: returns it. Else: returns None."""
         self.stream.accept_waveform(cfg.audio.sample_rate, chunk_np)
         while self.kws.is_ready(self.stream):
             self.kws.decode_stream(self.stream)
@@ -63,7 +70,7 @@ class KeyWordSpotter:
         self.stream = self.kws.create_stream()
 
 
-class SpeechToText:
+class Whisper:
     def __init__(self):
         w = cfg.whisper
         self.model = WhisperModel(
@@ -76,6 +83,7 @@ class SpeechToText:
         )
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
+        """Turns Spech(audio array) into a text. Returns (text, time_to_process)."""
         w = cfg.whisper
         start_time = time.perf_counter()
         segments, _ = self.model.transcribe(
@@ -92,7 +100,7 @@ class SpeechToText:
 class Listener:
     def __init__(
         self,
-        stt_model: SpeechToText,
+        stt_model: Whisper,
         kws_model_dir: str = "./data/sherpa_onnx_kws",
         keywords_file: str = "keywords.txt",
     ):
@@ -111,6 +119,7 @@ class Listener:
         self.speech_buffer = []  # Buffer for accumulating audio chunks while the user is speaking
         self.preroll_buffer = deque(maxlen=cfg.vad.preroll_blocks)
         self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = "SLEEPING"
+        profiler.set_state("SLEEPING")
 
         self.awake_deadline = 0.0
         self.audio_queue = queue.Queue()
@@ -127,6 +136,8 @@ class Listener:
             detected_keyword = self.kws.process_chunk(chunk_np)
             if detected_keyword:
                 self.state = "AWAKE"
+                profiler.set_state("AWAKE")
+
                 self.awake_deadline = time.time() + cfg.awake_timeout
                 self.kws.reset()
 
@@ -137,6 +148,7 @@ class Listener:
         elif self.state == "AWAKE":
             if time.time() > self.awake_deadline:
                 self.state = "SLEEPING"
+                profiler.set_state("SLEEPING")
                 self.kws.reset()
                 AssistantUI.print_state_change(
                     "SLEEPING", f"Timeout ({int(cfg.awake_timeout)}s)"
@@ -145,6 +157,7 @@ class Listener:
 
             if speech_dict and "start" in speech_dict:
                 self.state = "RECORDING"
+                profiler.set_state("RECORDING")
                 AssistantUI.print_state_change("RECORDING")
                 self.speech_buffer = list(self.preroll_buffer)
                 # self.speech_buffer = [c.copy() for c in self.preroll_buffer]
@@ -165,6 +178,7 @@ class Listener:
 
                 self.speech_buffer = []
                 self.state = "AWAKE"
+                profiler.set_state("AWAKE")
                 self.awake_deadline = time.time() + cfg.awake_timeout
 
     def _stt_worker(self):
@@ -184,6 +198,8 @@ class Listener:
             self.audio_queue.task_done()
 
     def start(self):
+        if cfg.profiler_debug:
+            profiler.start()
         # Starting background Whisper thread
         stt_thread = threading.Thread(target=self._stt_worker, daemon=True)
         stt_thread.start()
@@ -206,3 +222,7 @@ class Listener:
         finally:
             self.audio_queue.put(None)  # Ending worker thread
             stt_thread.join()
+
+            if cfg.profiler_debug:
+                profiler.stop()
+                AssistantUI.print_benchmark_report(profiler.get_summary())
