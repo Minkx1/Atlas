@@ -31,8 +31,8 @@ preroll_blocks = 6
 [tts]
 model_path = "models/piper/en_US-lessac-medium.onnx"
 use_cuda = false
-volume = 0.5
-length_scale = 2.0  # twice as slow
+volume = 1.0
+length_scale = 1.0  # twice as slow
 noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice

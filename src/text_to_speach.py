@@ -77,7 +77,11 @@ class TextToSpeech:
         """Async Text-To-Speech (non-blocking for asyncio loop)"""
         await asyncio.to_thread(self._synthesize_and_play_blocking, text)
 
+    def speak_sync(self, text: str) -> None:
+        self._synthesize_and_play_blocking(text)
+
 
 if __name__ == "__main__":
     tts = TextToSpeech()
-    asyncio.run(tts.speak("Hello World!"))
+    msg = input("> ") or "Hello World!"
+    tts.speak_sync(msg)

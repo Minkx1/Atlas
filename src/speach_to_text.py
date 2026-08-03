@@ -8,6 +8,7 @@ import queue
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -19,9 +20,14 @@ from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
-from .config import DATA_DIR, cfg
-from .profiler import profiler
-from .ui import AssistantUI
+if __name__ == "__main__":
+    from config import DATA_DIR, cfg
+    from profiler import profiler
+    from ui import AssistantUI
+else:
+    from .config import DATA_DIR, cfg
+    from .profiler import profiler
+    from .ui import AssistantUI
 
 # makes downloading Whisper models from HF faster
 load_dotenv()  # loads HF_TOKEN from .env file.
@@ -183,6 +189,8 @@ class Listener:
         self.awake_deadline = 0.0
         self.audio_queue = queue.Queue()
 
+        self._text_operator: Callable[[str], None] | None = None
+
     def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
         # ID array
         chunk_np = indata.squeeze(1)
@@ -257,6 +265,8 @@ class Listener:
             rtf = recog_ms / listen_ms
 
             if text:
+                if self._text_operator:
+                    self._text_operator(text)
                 AssistantUI.print_transcription(text, listen_ms, recog_ms, rtf)
 
             self.audio_queue.task_done()
@@ -290,3 +300,6 @@ class Listener:
             if cfg.profiler_debug:
                 profiler.stop()
                 AssistantUI.print_benchmark_report(profiler.get_summary())
+
+    def register_text_operator(self, func: Callable[[str], None]):
+        self._text_operator = func
