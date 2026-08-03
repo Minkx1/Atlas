@@ -53,8 +53,7 @@ class ResourceProfiler:
             state_data = self.metrics[self.current_state]
 
             state_data.cpu_samples.append(cpu)
-            if ram_mb > state_data.ram_peak_mb:
-                state_data.ram_peak_mb = ram_mb
+            state_data.ram_peak_mb = max(ram_mb, state_data.ram_peak_mb)
 
             time.sleep(self.interval)
 

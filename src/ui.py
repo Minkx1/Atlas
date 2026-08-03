@@ -24,7 +24,7 @@ class AssistantUI:
         console.print(
             Panel.fit(
                 f"[bold cyan]🦎 Newt Voice Assistant[/bold cyan] [dim]• v{__version__}[/dim]\n"
-                "[dim]Listening for wake word... Press [bold]Ctrl+C[/bold] to exit.[/dim]",
+                "[dim]Listening for keywords... Press [bold]Ctrl+C[/bold] to exit.[/dim]",
                 border_style="cyan",
             )
         )

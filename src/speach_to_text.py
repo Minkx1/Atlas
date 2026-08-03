@@ -1,10 +1,12 @@
 #
 # speech_to_text.py
-# SoundDevice.InputStream[microphone] -> Voice Activity Detector[Silero VAD] -> KeyWordSpotter[Sherpa ONNX KWS] -> STT[faster-whisper] -> "result text"
+# SoundDevice.InputStream[microphone] -> KeyWordSpotter[Sherpa ONNX KWS] -> Voice Activity Detector[Silero VAD] -> STT[faster-whisper] -> "recognized text"
 #
 
 import os
 import queue
+import subprocess
+import sys
 import threading
 import time
 from collections import deque
@@ -18,41 +20,89 @@ import torch
 from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
-from .config import cfg
+from .config import DATA_DIR, cfg
 from .profiler import profiler
 from .ui import AssistantUI
 
 # makes downloading Whisper models from HF faster
 os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
+# # limiting ONNX Runtime CPU Usage in Sleaping Mode
+# os.environ["OMP_NUM_THREADS"] = "1"
+# os.environ["MKL_NUM_THREADS"] = "1"
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+# os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 
 class KeyWordSpotter:
     def __init__(self):
-        path = Path(cfg.kws.model_dir)
+        path: Path = DATA_DIR / cfg.kws.model_dir
         tokens = str(path / "tokens.txt")
         encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
         decoder = str(path / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx")
         joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
         if not os.path.exists(tokens):
-            self._download_sherpa_onnx_model(Path(cfg.kws.model_dir))
-            raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
+            print(f"No Sherpa model in: {path}. Donwloading...")
+            self._download_sherpa_onnx_model(path)
+            # raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
         self.kws = sherpa_onnx.KeywordSpotter(
             tokens=tokens,
             encoder=encoder,
             decoder=decoder,
             joiner=joiner,
-            keywords_file=cfg.kws.keywords_file,
+            keywords_file=f"{DATA_DIR / cfg.kws.keywords_file}",
             num_threads=cfg.kws.num_threads,
             keywords_threshold=cfg.kws.score_threshold,
             feature_dim=80,
         )
-        self.stream = self.kws.create_stream()
+
+        # self.stream = self.kws.create_stream()
+        self.reset()
 
     @staticmethod
     def _download_sherpa_onnx_model(model_path: Path):
-        
+        import shutil
+        import tarfile
+        import urllib.request
+        from urllib.error import URLError
+
+        url = (
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
+            "kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2"
+        )
+        archive_name = "sherpa_kws_temp.tar.bz2"
+        archive_path = model_path.parent / archive_name
+        extracted_folder_name = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+        extracted_path = model_path.parent / extracted_folder_name
+
+        try:
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+
+            print(f"[INFO] Downloading Sherpa-ONNX KWS model from {url}...")
+            urllib.request.urlretrieve(url, archive_path)
+
+            print("[INFO] Extracting model archive...")
+            with tarfile.open(archive_path, "r:bz2") as tar:
+                tar.extractall(path=model_path.parent)
+
+            if model_path.exists():
+                shutil.rmtree(model_path)
+            extracted_path.rename(model_path)
+
+            print(f"[INFO] Model successfully installed to {model_path}")
+
+        except (URLError, tarfile.TarError, OSError) as e:
+            if extracted_path.exists():
+                shutil.rmtree(extracted_path, ignore_errors=True)
+            raise RuntimeError(
+                f"[!] Failed to download or extract Sherpa-ONNX model: {e}"
+            ) from e
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()
 
     def process_chunk(self, chunk_np: np.ndarray) -> str | None:
         """Processes audio chunk. If keyword was spotted: returns it. Else: returns None."""
@@ -73,13 +123,14 @@ class KeyWordSpotter:
 class Whisper:
     def __init__(self):
         w = cfg.whisper
+
         self.model = WhisperModel(
             w.model_size,
             device=w.device,
             compute_type=w.compute_type,
             cpu_threads=w.cpu_threads,
             num_workers=1,
-            download_root=w.download_root,
+            download_root=f"{DATA_DIR / w.download_root}",
         )
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
@@ -98,14 +149,14 @@ class Whisper:
 
 
 class Listener:
-    def __init__(
-        self,
-        stt_model: Whisper,
-        kws_model_dir: str = "./data/sherpa_onnx_kws",
-        keywords_file: str = "keywords.txt",
-    ):
+    def __init__(self, stt_model: Whisper, kws_model: KeyWordSpotter | None = None):
+        self.MODE: Literal["KWS", "DIRECT"] = cfg.stt_pipeline_mode
+
         self.stt = stt_model
-        self.kws = KeyWordSpotter()
+        self.kws = kws_model
+
+        if self.kws:
+            self.MODE = "KWS"
 
         self.vad_model = load_silero_vad()
         self.vad_iterator = VADIterator(
@@ -118,8 +169,10 @@ class Listener:
 
         self.speech_buffer = []  # Buffer for accumulating audio chunks while the user is speaking
         self.preroll_buffer = deque(maxlen=cfg.vad.preroll_blocks)
-        self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = "SLEEPING"
-        profiler.set_state("SLEEPING")
+        self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = (
+            "SLEEPING" if self.MODE == "KWS" else "AWAKE"
+        )
+        profiler.set_state(self.state)
 
         self.awake_deadline = 0.0
         self.audio_queue = queue.Queue()
@@ -133,6 +186,11 @@ class Listener:
         speech_dict = self.vad_iterator(chunk_torch)  # checking VAD
 
         if self.state == "SLEEPING":
+            # kws exists
+            if not isinstance(self.kws, KeyWordSpotter):
+                raise SystemError(
+                    "[!] ERROR: Listener.state is 'SLEEPING' but KWS was not initialized."
+                )
             detected_keyword = self.kws.process_chunk(chunk_np)
             if detected_keyword:
                 self.state = "AWAKE"
@@ -142,11 +200,11 @@ class Listener:
                 self.kws.reset()
 
                 AssistantUI.print_state_change(
-                    self.state, f"Wake word: '{detected_keyword}'"
+                    self.state, f"Keyword: '{detected_keyword}'"
                 )
 
         elif self.state == "AWAKE":
-            if time.time() > self.awake_deadline:
+            if (self.kws) and time.time() > self.awake_deadline:
                 self.state = "SLEEPING"
                 profiler.set_state("SLEEPING")
                 self.kws.reset()

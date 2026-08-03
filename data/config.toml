@@ -3,11 +3,11 @@
 # ==========================================
 
 [app]
-# How many seconds the assistant waits for a command after the wake word
-awake_timeout = 10.0
-# Minimum phrase length in ms (protection against accidental sounds/clicks)
-min_command_ms = 600.0
-profiler_debug = true
+awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
+min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
+profiler_debug = true  # Show profiler debug: CPU and RAM Usage per each state
+stt_pipeline_mode = "DIRECT"  # Mode of pipeline. If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
+
 [audio]
 sample_rate = 16000
 channels = 1
@@ -16,9 +16,9 @@ blocksize = 512
 dtype = "float32"
 
 [kws]
-model_dir = "./data/models/sherpa_onnx_kws"
+model_dir = "models/sherpa_onnx_kws"
 keywords_file = "keywords.txt"
-num_threads = 2
+num_threads = 1
 score_threshold = 0.12
 
 [vad]
@@ -26,12 +26,12 @@ threshold = 0.5
 min_silence_duration_ms = 600
 speech_pad_ms = 60
 # ~400 ms preroll before speach (12 blocks * 32 ms)
-preroll_blocks = 12
+preroll_blocks = 6
 
 [whisper]
 model_size = "small" # "small", "small.$lang", "medium", "large-v3"
 device = "cpu"        # "cpu" or "cuda"
-download_root = "./data/models/whisper_models_cache"
+download_root = "models/whisper_models_cache"
 compute_type = "int8"
 beam_size = 5
 cpu_threads = 6
