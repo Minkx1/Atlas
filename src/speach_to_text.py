@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+import rich
 import sherpa_onnx
 import sounddevice as sd
 import torch
@@ -21,6 +22,7 @@ from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
 if __name__ == "__main__":
+    MAIN = True
     from config import DATA_DIR, cfg
     from profiler import profiler
     from ui import AssistantUI
@@ -33,12 +35,17 @@ else:
 load_dotenv()  # loads HF_TOKEN from .env file.
 os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
-# # limiting ONNX Runtime CPU Usage in Sleaping Mode
+# # limiting ONNX Runtime CPU Usage in Sleaping Mode # Note: Makes faster-whisper slow as hell
 # os.environ["OMP_NUM_THREADS"] = "1"
 # os.environ["MKL_NUM_THREADS"] = "1"
 # os.environ["OPENBLAS_NUM_THREADS"] = "1"
 # os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 # os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+
+def print(msg: str, end="\n", force=False):
+    if cfg.profiler or force:
+        rich.print(msg, end=end)
 
 
 class KeyWordSpotter:
@@ -87,10 +94,10 @@ class KeyWordSpotter:
         try:
             model_path.parent.mkdir(parents=True, exist_ok=True)
 
-            print(f"[INFO] Downloading Sherpa-ONNX KWS model from {url}...")
+            print(f"[I] Downloading Sherpa-ONNX KWS model from {url}...")
             urllib.request.urlretrieve(url, archive_path)
 
-            print("[INFO] Extracting model archive...")
+            print("[I] Extracting model archive...")
             with tarfile.open(archive_path, "r:bz2") as tar:
                 tar.extractall(path=model_path.parent)
 
@@ -98,7 +105,7 @@ class KeyWordSpotter:
                 shutil.rmtree(model_path)
             extracted_path.rename(model_path)
 
-            print(f"[INFO] Model successfully installed to {model_path}")
+            print(f"[I] Model successfully installed to {model_path}")
 
         except (URLError, tarfile.TarError, OSError) as e:
             if extracted_path.exists():
@@ -128,13 +135,11 @@ class KeyWordSpotter:
 
 class Whisper:
     def __init__(self):
-        w = cfg.whisper
+        w = cfg.stt
         model_dir: Path = DATA_DIR / w.download_root
 
         if not model_dir.exists():
-            print(
-                f"[WARN] No Faster-Whisper model found in {model_dir}. Downloading..."
-            )
+            print(f"[I] No Faster-Whisper model found in {model_dir}. Downloading...")
 
         self.model = WhisperModel(
             w.model_size,
@@ -147,7 +152,7 @@ class Whisper:
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
         """Turns Spech(audio array) into a text. Returns (text, time_to_process)."""
-        w = cfg.whisper
+        w = cfg.stt
         start_time = time.perf_counter()
         segments, _ = self.model.transcribe(
             audio=audio_array,
@@ -162,7 +167,7 @@ class Whisper:
 
 class Listener:
     def __init__(self, stt_model: Whisper, kws_model: KeyWordSpotter | None = None):
-        self.MODE: Literal["KWS", "DIRECT"] = cfg.stt_pipeline_mode
+        self.MODE: Literal["KWS", "DIRECT"] = cfg.stt.pipeline_mode
 
         self.stt = stt_model
         self.kws = kws_model
@@ -210,7 +215,7 @@ class Listener:
                 self.state = "AWAKE"
                 profiler.set_state("AWAKE")
 
-                self.awake_deadline = time.time() + cfg.awake_timeout
+                self.awake_deadline = time.time() + cfg.stt.awake_timeout
                 self.kws.reset()
 
                 AssistantUI.print_state_change(
@@ -223,7 +228,7 @@ class Listener:
                 profiler.set_state("SLEEPING")
                 self.kws.reset()
                 AssistantUI.print_state_change(
-                    "SLEEPING", f"Timeout ({int(cfg.awake_timeout)}s)"
+                    "SLEEPING", f"Timeout ({int(cfg.stt.awake_timeout)}s)"
                 )
                 return
 
@@ -245,13 +250,13 @@ class Listener:
                     ) * 1000.0
 
                     # random sound protection
-                    if listen_ms > cfg.min_command_ms:
+                    if listen_ms > cfg.stt.min_command_ms:
                         self.audio_queue.put((full_audio.copy(), listen_ms))
 
                 self.speech_buffer = []
                 self.state = "AWAKE"
                 profiler.set_state("AWAKE")
-                self.awake_deadline = time.time() + cfg.awake_timeout
+                self.awake_deadline = time.time() + cfg.stt.awake_timeout
 
     def _stt_worker(self):
         """Different thread awaits audio array in queue and then processes it"""
@@ -272,7 +277,7 @@ class Listener:
             self.audio_queue.task_done()
 
     def start(self):
-        if cfg.profiler_debug:
+        if cfg.profiler:
             profiler.start()
         # Starting background Whisper thread
         stt_thread = threading.Thread(target=self._stt_worker, daemon=True)
@@ -290,14 +295,12 @@ class Listener:
                 while True:
                     sd.sleep(100)
         except KeyboardInterrupt:
-            from .ui import console
-
-            console.print("\n[dim]Stopping assistant...[/dim]")
+            print("\n[dim]Stopping assistant...[/dim]")
         finally:
             self.audio_queue.put(None)  # Ending worker thread
             stt_thread.join()
 
-            if cfg.profiler_debug:
+            if cfg.profiler:
                 profiler.stop()
                 AssistantUI.print_benchmark_report(profiler.get_summary())
 

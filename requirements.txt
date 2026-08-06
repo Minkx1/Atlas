@@ -10,3 +10,4 @@ rich
 psutil
 python-dotenv
 piper-tts
+llama-cpp-python

@@ -3,10 +3,8 @@
 # ==========================================
 
 [app]
-awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
-min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
-profiler_debug = true  # Show profiler debug: CPU and RAM Usage per each state
-stt_pipeline_mode = "KWS"  # Mode of pipeline. If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
+name = "Pidaras"
+profiler = false  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
 
 [audio]
 sample_rate = 16000
@@ -14,6 +12,14 @@ channels = 1
 # 512 -> 32 ms in 1 audio chunk
 blocksize = 512
 dtype = "float32"
+
+[llm]
+model_path = "models/LLM/Gemma-2B-Uncensored-Q4_K_M.gguf"
+initial_prompt = "You are an AI Voice Assistant 'Newt'. Answer briefly and concisely in English."
+context_tokens = 2048
+max_msg_tokens = 512
+temperature = 0.7
+
 
 [kws]
 model_dir = "models/sherpa_onnx_kws"
@@ -37,13 +43,17 @@ noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice
 
-[whisper]
+[stt]
 model_size = "small" # "small", "small.$lang", "medium", "large-v3"
 device = "cpu"        # "cpu" or "cuda"
 download_root = "models/whisper_models_cache"
 compute_type = "int8"
 beam_size = 5
 cpu_threads = 6
+
+awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
+min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
+pipeline_mode = "KWS"  # If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
 
 # --- EN Preset ---
 language = "en"

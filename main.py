@@ -4,7 +4,9 @@ import src as newt
 
 
 def main():
-    match newt.cfg.stt_pipeline_mode:
+    llm = newt.LLM()
+
+    match newt.cfg.stt.pipeline_mode:
         case "KWS":
             kws = newt.KeyWordSpotter()
             stt = newt.Whisper()
@@ -12,6 +14,8 @@ def main():
         case "DIRECT":
             stt = newt.Whisper()
             listener = newt.Listener(stt)
+
+    listener.register_text_operator(newt.operate)
 
     listener.start()
 

@@ -40,13 +40,18 @@ class VADConfig:
 
 
 @dataclass
-class WhisperConfig:
+class STTConfig:
     model_size: Literal["small", "small.en", "medium", "large-v3"] = "medium"
     device: Literal["cpu", "cuda"] = "cpu"
     download_root: str = "models/whisper_models_cache"
     compute_type: str = "int8"
     beam_size: int = 5
     cpu_threads: int = 6
+
+    awake_timeout: float = 10.0
+    min_command_ms: float = 600.0
+    pipeline_mode: Literal["KWS", "DIRECT"] = "KWS"
+
     language: str = "en"
     initial_prompt: str = (
         "English language, speech to an assistant. Terms: Newt, Python."
@@ -65,22 +70,31 @@ class TTSConfig:
 
 
 @dataclass
+class LLMConfig:
+    model_path: str = "models/llm/gemma2_2b."
+    initial_prompt: str = "You are an AI Voice Assistant 'Newt'. Answer briefly and concisely in English. "
+    context_tokens: int = 2048
+    max_msg_tokens: int = 512
+    temperature: float = 0.7
+
+
+@dataclass
 class AppConfig:
-    awake_timeout: float = 10.0
-    min_command_ms: float = 600.0
-    profiler_debug: bool = False
-    stt_pipeline_mode: Literal["KWS", "DIRECT"] = "KWS"
+    name: str = "Newt"
+    profiler: bool = False
 
     audio: AudioConfig = field(default_factory=AudioConfig)
+    llm: LLMConfig = field(default_factory=LLMConfig)
     kws: KWSConfig = field(default_factory=KWSConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     vad: VADConfig = field(default_factory=VADConfig)
-    whisper: WhisperConfig = field(default_factory=WhisperConfig)
+    stt: STTConfig = field(default_factory=STTConfig)
 
 
 def load_config(config_path: str = "data/config.toml") -> AppConfig:
     path = Path(config_path)
     if not path.exists():
+        # TODO: add automatic default config generation
         print(f"[WARN] Config {config_path} not found. Using defaults.")
         return AppConfig()
 
@@ -88,17 +102,14 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
         data = tomllib.load(f)
 
     return AppConfig(
-        awake_timeout=data.get("app", {}).get("awake_timeout", 10.0),
-        min_command_ms=data.get("app", {}).get("min_command_ms", 600.0),
-        profiler_debug=data.get("app", {}).get("profiler_debug", False),
-        stt_pipeline_mode=data.get("app", {}).get("stt_pipeline_mode", "KWS"),
         audio=AudioConfig(**data.get("audio", {})),
+        llm=LLMConfig(**data.get("llm", {})),
         kws=KWSConfig(**data.get("kws", {})),
         tts=TTSConfig(**data.get("tts", {})),
         vad=VADConfig(**data.get("vad", {})),
-        whisper=WhisperConfig(**data.get("whisper", {})),
+        stt=STTConfig(**data.get("stt", {})),
     )
 
 
-# Global object
+# Global config object
 cfg = load_config()

@@ -18,6 +18,11 @@ else:
     from .config import DATA_DIR, cfg
 
 
+def print(msg: str, end="\n", force=False):
+    if cfg.profiler or force:
+        sys.stdout.write(msg + end)
+
+
 class TextToSpeech:
     def __init__(self) -> None:
         s = cfg.tts
