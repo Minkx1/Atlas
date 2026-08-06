@@ -60,7 +60,7 @@ class TextToSpeech:
         except Exception as e:  # noqa: BLE001
             print(f"[!] Error during downloading PiperTTS model({name}): {e}")
         else:
-            print(f"[V] PiperTTS model({name}) was downloaded succesfully.")
+            print(f"[$] PiperTTS model({name}) was downloaded succesfully.")
 
     def _synthesize_and_play_blocking(self, text: str) -> None:
         """Synchronicaly creates and plays sound in bg"""

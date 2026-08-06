@@ -3,8 +3,8 @@
 # ==========================================
 
 [app]
-name = "Pidaras"
-profiler = false  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
+name = "Newt"
+profiler = true  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
 
 [audio]
 sample_rate = 16000
@@ -14,7 +14,8 @@ blocksize = 512
 dtype = "float32"
 
 [llm]
-model_path = "models/LLM/Gemma-2B-Uncensored-Q4_K_M.gguf"
+model_path = "models/LLM/qwen2.5-3b-instruct-q4_k_m.gguf"
+# initial_prompt = "Ти голосовий асистент 'Newt'(Ньют). Відопвідай лаконічно й точно, Українською мовою."
 initial_prompt = "You are an AI Voice Assistant 'Newt'. Answer briefly and concisely in English."
 context_tokens = 2048
 max_msg_tokens = 512
@@ -59,6 +60,6 @@ pipeline_mode = "KWS"  # If you dont need KWS, you can use 'DIRECT' pipeline and
 language = "en"
 initial_prompt = "English language, speech to an assistant. Terms: Newt, Python, C++, code, programming, Arch, Cachy, terminal."
 
-# --- UK preset  ---
+# # --- UK preset  ---
 # language = "uk"
 # initial_prompt = "Українська мова. Терміни: Newt, Python, Linux, C++, код, прога, програмування"

@@ -95,13 +95,17 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
     path = Path(config_path)
     if not path.exists():
         # TODO: add automatic default config generation
-        print(f"[WARN] Config {config_path} not found. Using defaults.")
+        # print(f"[I] Config {config_path} not found. Creating 'config.toml' with defaults.")
         return AppConfig()
 
     with open(path, "rb") as f:
         data = tomllib.load(f)
 
+    app: dict = data.get("app", {})
+
     return AppConfig(
+        name=app.get("name", "Newt"),
+        profiler=app.get("profiler", False),
         audio=AudioConfig(**data.get("audio", {})),
         llm=LLMConfig(**data.get("llm", {})),
         kws=KWSConfig(**data.get("kws", {})),

@@ -24,10 +24,12 @@ from silero_vad import VADIterator, load_silero_vad
 if __name__ == "__main__":
     MAIN = True
     from config import DATA_DIR, cfg
+    from op_center import Operator
     from profiler import profiler
     from ui import AssistantUI
 else:
     from .config import DATA_DIR, cfg
+    from .op_center import Operator
     from .profiler import profiler
     from .ui import AssistantUI
 
@@ -194,9 +196,15 @@ class Listener:
         self.awake_deadline = 0.0
         self.audio_queue = queue.Queue()
 
+        self.is_busy = False
+
         self._text_operator: Callable[[str], None] | None = None
 
     def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
+        if self.is_busy:  # if assistant is generating response or speaking
+            self.awake_deadline = time.time() + cfg.stt.awake_timeout
+            return
+
         # ID array
         chunk_np = indata.squeeze(1)
         chunk_torch = torch.from_numpy(chunk_np)
@@ -270,15 +278,26 @@ class Listener:
             rtf = recog_ms / listen_ms
 
             if text:
-                if self._text_operator:
-                    self._text_operator(text)
                 AssistantUI.print_transcription(text, listen_ms, recog_ms, rtf)
+
+                self.is_busy = True
+                try:
+                    if self._text_operator:
+                        self._text_operator(text)
+                finally:
+                    self.is_busy = False
+                    self.awake_deadline = time.time() + cfg.stt.awake_timeout
+                    profiler.set_state("AWAKE")
 
             self.audio_queue.task_done()
 
-    def start(self):
+    def start(self, operator: Operator):
         if cfg.profiler:
             profiler.start()
+
+        if not self._text_operator:
+            self.register_text_operator(operator.operate)
+
         # Starting background Whisper thread
         stt_thread = threading.Thread(target=self._stt_worker, daemon=True)
         stt_thread.start()
@@ -300,6 +319,7 @@ class Listener:
             self.audio_queue.put(None)  # Ending worker thread
             stt_thread.join()
 
+            operator.close()
             if cfg.profiler:
                 profiler.stop()
                 AssistantUI.print_benchmark_report(profiler.get_summary())

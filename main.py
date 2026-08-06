@@ -4,7 +4,7 @@ import src as newt
 
 
 def main():
-    llm = newt.LLM()
+    op = newt.Operator()
 
     match newt.cfg.stt.pipeline_mode:
         case "KWS":
@@ -15,9 +15,7 @@ def main():
             stt = newt.Whisper()
             listener = newt.Listener(stt)
 
-    listener.register_text_operator(newt.operate)
-
-    listener.start()
+    listener.start(op)
 
 
 if __name__ == "__main__":
