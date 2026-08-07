@@ -248,7 +248,7 @@ class Listener:
         elif self.state == "RECORDING":
             self.speech_buffer.append(chunk_np.copy())
 
-            if speech_dict and "end" in speech_dict:  # VAD detected end of speach
+            if speech_dict and "end" in speech_dict:  # VAD detected end of speech
                 if self.speech_buffer:
                     full_audio = np.concatenate(self.speech_buffer)
                     listen_ms: float = (

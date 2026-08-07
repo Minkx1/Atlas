@@ -68,7 +68,7 @@ class AssistantUI:
     ):
         if cfg.profiler:
             console.print(
-                f"\n[bold magenta]╭─ SpeachToText[/bold magenta] [dim]({AssistantUI._get_timestamp()})[/dim]"
+                f"\n[bold magenta]╭─ SpeechToText[/bold magenta] [dim]({AssistantUI._get_timestamp()})[/dim]"
             )
             console.print(
                 f'[bold magenta]├─[/bold magenta] [bold white]"{text}"[/bold white]'
@@ -82,13 +82,37 @@ class AssistantUI:
             console.print(f'\n[bold cyan][User]:[/bold cyan] [white]"{text}"[/white]')
 
     @staticmethod
+    def print_llm_chunk(text: str, is_first: bool = False):
+        if not text:
+            return
+
+        if cfg.profiler:
+            if is_first:
+                console.print(
+                    f"\n[bold yellow]╭─ LLM[/bold yellow] [dim]({AssistantUI._get_timestamp()})[/dim]"
+                )
+                console.print(
+                    '[bold yellow]├─[/bold yellow] [bold white]"[/bold white]', end=""
+                )
+            console.print(text, end=" ", style="bold white")
+        else:
+            if is_first:
+                console.print(
+                    f"\n[bold bright_green][{cfg.name}]:[/bold bright_green] ",
+                    end="",
+                )
+            console.print(text, end=" ", style="white")
+
+    @staticmethod
     def print_llm_response(
-        text: str,
+        text=None,
+        gen_ms: float = 0.0,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
-        gen_ms: float = 0.0,
     ):
         if cfg.profiler:
+            console.print('"', style="bold white")
+
             total_tokens = prompt_tokens + completion_tokens
             speed = (
                 (completion_tokens / (gen_ms / 1000.0))
@@ -96,31 +120,29 @@ class AssistantUI:
                 else 0.0
             )
 
+            if total_tokens > 0:
+                console.print(
+                    f"[bold yellow]├─[/bold yellow] [dim]Tokens: [white]{prompt_tokens}[/white] prompt + "
+                    f"[white]{completion_tokens}[/white] gen = [bold white]{total_tokens}[/bold white] total[/dim]"
+                )
+
             console.print(
-                f"\n[bold yellow]╭─ LLM[/bold yellow] [dim]({AssistantUI._get_timestamp()})[/dim]"
-            )
-            console.print(
-                f'[bold yellow]├─[/bold yellow] [bold white]"{text}"[/bold white]'
-            )
-            console.print(
-                f"[bold yellow]├─[/bold yellow] [dim]Tokens: [white]{prompt_tokens}[/white] prompt + "
-                f"[white]{completion_tokens}[/white] gen = [bold white]{total_tokens}[/bold white] total[/dim]"
-            )
-            console.print(
-                f"[bold yellow]╰─[/bold yellow] [dim]Gen Time: [white]{gen_ms:.0f} ms[/white] │ "
-                f"Speed: [bold green]{speed:.1f} tok/s[/bold green][/dim]"
+                f"[bold yellow]╰─[/bold yellow] [dim]Gen Time: [white]{gen_ms:.0f} ms[/white]"
+                + (
+                    f" │ Speed: [bold green]{speed:.1f} tok/s[/bold green][/dim]"
+                    if speed > 0
+                    else "[/dim]"
+                )
             )
         else:
-            console.print(
-                f'[bold bright_green][{cfg.name}]:[/bold bright_green] [white]"{text}"[/white]'
-            )
+            console.print()
 
     @staticmethod
     def print_tts_status(syn_ms: float = 0.0, audio_ms: float = 0.0, rtf: float = 0.0):
         if not cfg.profiler:
             return
 
-        console.print("[bold cyan]╭─ TextToSpeach[/bold cyan]")
+        console.print("[bold cyan]╭─ TextToSpeech[/bold cyan]")
         console.print(
             f"[bold cyan]╰─[/bold cyan] [dim]Synth Time: [white]{syn_ms:.0f} ms[/white] │ "
             f"Audio Duration: [white]{audio_ms:.0f} ms[/white] │ "

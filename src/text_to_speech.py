@@ -1,21 +1,15 @@
-#
-# This module contains logic of Natural Language Understanding and speech recognition
-#
-# Made by Minkx1 (Optimized for non-blocking asyncio & sounddevice)
-#
+# text_to_speech.py
 
-import asyncio
+import queue
 import subprocess
 import sys
+import threading
 
 import numpy as np
 import sounddevice as sd
 from piper import PiperVoice, SynthesisConfig
 
-if __name__ == "__main__":
-    from config import DATA_DIR, cfg
-else:
-    from .config import DATA_DIR, cfg
+from .config import DATA_DIR, cfg
 
 
 def print(msg: str, end="\n", force=False):
@@ -41,6 +35,11 @@ class TextToSpeech:
             normalize_audio=s.normalize_audio,  # use raw audio from voice
         )
 
+        self.chunk_queue: queue.Queue[str | None] = queue.Queue()
+        self.worker_thread = threading.Thread(
+            target=self._tts_worker, name="TTS_THREAD", daemon=True
+        )
+
     def _download_model(self):
         model_path = DATA_DIR / cfg.tts.model_path
         name = model_path.stem
@@ -62,31 +61,34 @@ class TextToSpeech:
         else:
             print(f"[$] PiperTTS model({name}) was downloaded succesfully.")
 
-    def _synthesize_and_play_blocking(self, text: str) -> None:
-        """Synchronicaly creates and plays sound in bg"""
-        if not text or not text.strip():
-            return
+    def _tts_worker(self):
+        """Background thread that gathers sentences(text chunks) from queue and voices them."""
+        while True:
+            text = self.chunk_queue.get()
+            if text is None:
+                self.chunk_queue.task_done()
+                break
 
-        try:
-            audio_chunks = list(self.voice.synthesize(text, self.syn_config))
-            audio_array = np.concatenate(
-                [chunk.audio_float_array for chunk in audio_chunks]
-            )
+            if text.strip():
+                try:
+                    audio_chunks = list(self.voice.synthesize(text, self.syn_config))
+                    audio_array = np.concatenate(
+                        [chunk.audio_float_array for chunk in audio_chunks]
+                    )
 
-            sd.play(audio_array, samplerate=audio_chunks[0].sample_rate)
-            sd.wait()
-        except Exception as e:  # noqa: BLE001
-            print(f"[!] Error occured during TTS synthesis: {e}")
+                    sd.play(audio_array, samplerate=audio_chunks[0].sample_rate)
+                    sd.wait()
+                except Exception as e:  # noqa: BLE001
+                    print(f"[!] Error occured during TTS synthesis: {e}")
 
-    async def speak(self, text: str) -> None:
-        """Async Text-To-Speech (non-blocking for asyncio loop)"""
-        await asyncio.to_thread(self._synthesize_and_play_blocking, text)
+            self.chunk_queue.task_done()
 
-    def speak_sync(self, text: str) -> None:
-        self._synthesize_and_play_blocking(text)
+    def start(self):
+        self.worker_thread.start()
 
+    def speak(self, text: str) -> None:
+        self.chunk_queue.put(text)
 
-if __name__ == "__main__":
-    tts = TextToSpeech()
-    msg = input("> ") or "Hello World!"
-    tts.speak_sync(msg)
+    def close(self):
+        self.chunk_queue.put(None)
+        self.worker_thread.join()
