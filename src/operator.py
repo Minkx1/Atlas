@@ -1,5 +1,5 @@
 #
-# op_center.py
+# operator.py
 # Center Of Operations: processes commands from STT
 #
 
@@ -8,23 +8,24 @@ import time
 
 import llama_cpp
 
-if __name__ == "__main__":
-    MAIN = True
-    from config import DATA_DIR, cfg
-    from profiler import profiler
-    from text_to_speach import TextToSpeech
-    from ui import AssistantUI
-else:
-    MAIN = False
-    from .config import DATA_DIR, cfg
-    from .profiler import profiler
-    from .text_to_speach import TextToSpeech
-    from .ui import AssistantUI
+from .config import DATA_DIR, cfg
+from .events import emit_event
+
+# Llama-cpp traceback fix
+_orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
+if _orig_llama_del:
+
+    def _silent_llama_del(self):
+        try:
+            _orig_llama_del(self)  # type: ignore
+        except (TypeError, AttributeError, NameError, ImportError):
+            pass
+
+    llama_cpp.Llama.__del__ = _silent_llama_del
 
 
 class Operator:
     def __init__(self) -> None:
-        self.tts = TextToSpeech()
         self.llm = LLM()
 
     def check_builtin_command(self, cmd: str) -> bool:
@@ -54,16 +55,26 @@ class Operator:
         if not text:
             return
 
-        profiler.set_state("PROCESSING")
+        emit_event("PROFILER_SET_STATE", "PROCESSING")
 
         try:
-            if not self.check_builtin_command(text):
-                if not self.check_user_command(text):
-                    # The command is not generic
-                    resp = self.llm.get_response(text)
-                    self.tts.speak_sync(resp.text)
+            if not (self.check_builtin_command(text) or self.check_user_command(text)):
+                # The command is not generic
+                resp = self.llm.get_response(text)
+                emit_event(
+                    "UI_LLM_RESPONSE",
+                    {
+                        "text": resp.text,
+                        "prompt_tokens": resp.prompt_tokens,
+                        "completion_tokens": resp.completion_tokens,
+                        "gen_ms": resp.gen_ms,
+                    },
+                )
+                # self.tts.speak_sync(resp.text)
         finally:
-            profiler.set_state("AWAKE")
+            emit_event("PROFILER_SET_STATE", "AWAKE")
+
+            emit_event("STT_RESUME")
 
     def close(self):
         self.llm.close()
@@ -101,7 +112,7 @@ class LLM:
     def get_response(self, message: str) -> _Response:
         start_time = time.perf_counter()
 
-        response = self.llama.create_chat_completion(
+        response = self.llama.create_chat_completion(  # type: ignore
             messages=[
                 {"role": "system", "content": self.initial_prompt},
                 {"role": "user", "content": message},
@@ -113,18 +124,11 @@ class LLM:
 
         gen_ms = time.perf_counter() - start_time
 
-        text: str = str(response["choices"][0]["message"]["content"])
+        text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
 
-        usage = response["usage"]
+        usage = response["usage"]  # type: ignore
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
-
-        AssistantUI.print_llm_response(
-            text=text,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            gen_ms=gen_ms,
-        )
 
         return _Response(
             text=text,
@@ -134,19 +138,13 @@ class LLM:
         )
 
     def close(self):
-        """Safe C++ context closing with Python 3.14 GC protection"""
-        if (
-            not getattr(self, "_is_closed", True)
-            and hasattr(self, "llama")
-            and self.llama is not None
-        ):
+        if hasattr(self, "llama") and self.llama is not None:
             try:
                 self.llama.close()
             except Exception:
                 pass
             finally:
                 self.llama = None
-                self._is_closed = True
 
     def __del__(self):
         self.close()

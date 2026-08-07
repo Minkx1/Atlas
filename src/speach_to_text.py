@@ -5,10 +5,10 @@
 
 import os
 import queue
+import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -21,17 +21,8 @@ from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
-if __name__ == "__main__":
-    MAIN = True
-    from config import DATA_DIR, cfg
-    from op_center import Operator
-    from profiler import profiler
-    from ui import AssistantUI
-else:
-    from .config import DATA_DIR, cfg
-    from .op_center import Operator
-    from .profiler import profiler
-    from .ui import AssistantUI
+from .config import DATA_DIR, cfg
+from .events import EventManager, emit_event
 
 # makes downloading Whisper models from HF faster
 load_dotenv()  # loads HF_TOKEN from .env file.
@@ -191,14 +182,14 @@ class Listener:
         self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = (
             "SLEEPING" if self.MODE == "KWS" else "AWAKE"
         )
-        profiler.set_state(self.state)
+        emit_event("PROFILER_SET_STATE", self.state)
 
         self.awake_deadline = 0.0
         self.audio_queue = queue.Queue()
 
         self.is_busy = False
 
-        self._text_operator: Callable[[str], None] | None = None
+        self.stt_thread = threading.Thread(target=self._stt_worker, daemon=True)
 
     def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
         if self.is_busy:  # if assistant is generating response or speaking
@@ -221,31 +212,38 @@ class Listener:
             detected_keyword = self.kws.process_chunk(chunk_np)
             if detected_keyword:
                 self.state = "AWAKE"
-                profiler.set_state("AWAKE")
+                emit_event("PROFILER_SET_STATE", "AWAKE")
 
                 self.awake_deadline = time.time() + cfg.stt.awake_timeout
                 self.kws.reset()
 
-                AssistantUI.print_state_change(
-                    self.state, f"Keyword: '{detected_keyword}'"
+                emit_event(
+                    "UI_STATE_CHANGE",
+                    {"state": self.state, "detail": f"Keyword: '{detected_keyword}'"},
                 )
 
         elif self.state == "AWAKE":
             if (self.kws) and time.time() > self.awake_deadline:
                 self.state = "SLEEPING"
-                profiler.set_state("SLEEPING")
+                emit_event("PROFILER_SET_STATE", self.state)
+
                 self.kws.reset()
-                AssistantUI.print_state_change(
-                    "SLEEPING", f"Timeout ({int(cfg.stt.awake_timeout)}s)"
+                emit_event(
+                    "UI_STATE_CHANGE",
+                    {
+                        "state": "SLEEPING",
+                        "detail": f"Timeout ({int(cfg.stt.awake_timeout)}s)",
+                    },
                 )
+
                 return
 
             if speech_dict and "start" in speech_dict:
                 self.state = "RECORDING"
-                profiler.set_state("RECORDING")
-                AssistantUI.print_state_change("RECORDING")
+                emit_event("PROFILER_SET_STATE", self.state)
+
+                emit_event("UI_STATE_CHANGE", {"state": self.state})
                 self.speech_buffer = list(self.preroll_buffer)
-                # self.speech_buffer = [c.copy() for c in self.preroll_buffer]
 
         elif self.state == "RECORDING":
             self.speech_buffer.append(chunk_np.copy())
@@ -263,7 +261,8 @@ class Listener:
 
                 self.speech_buffer = []
                 self.state = "AWAKE"
-                profiler.set_state("AWAKE")
+                emit_event("PROFILER_SET_STATE", self.state)
+
                 self.awake_deadline = time.time() + cfg.stt.awake_timeout
 
     def _stt_worker(self):
@@ -278,30 +277,46 @@ class Listener:
             rtf = recog_ms / listen_ms
 
             if text:
-                AssistantUI.print_transcription(text, listen_ms, recog_ms, rtf)
+                emit_event(
+                    "UI_TRANSCRIPTION",
+                    {
+                        "text": text,
+                        "listen_ms": listen_ms,
+                        "recog_ms": recog_ms,
+                        "rtf": rtf,
+                    },
+                )
+
+                emit_event(
+                    "STT_TRANSCRIBE", text
+                )  # This events shows that now transcribed text must be operated
+
+                em = EventManager.get_instace()
+                em.set_flag("stt_runtime", False)
 
                 self.is_busy = True
-                try:
-                    if self._text_operator:
-                        self._text_operator(text)
-                finally:
-                    self.is_busy = False
-                    self.awake_deadline = time.time() + cfg.stt.awake_timeout
-                    profiler.set_state("AWAKE")
+                # stt thread is blocked until the "stt_runtime" flag is not set
+                _ = em.wait_for("stt_runtime")
+
+                self.awake_deadline = time.time() + cfg.stt.awake_timeout
+                emit_event("PROFILER_SET_STATE", "AWAKE")
+
+                self.is_busy = False
 
             self.audio_queue.task_done()
 
-    def start(self, operator: Operator):
-        if cfg.profiler:
-            profiler.start()
+    def close(self):
+        self.audio_queue.put(None)  # Ending worker thread
+        self.stt_thread.join()
 
-        if not self._text_operator:
-            self.register_text_operator(operator.operate)
+        emit_event("STT_FINISH")
+
+    def start(self):
+        emit_event("PROFILER_START")
 
         # Starting background Whisper thread
-        stt_thread = threading.Thread(target=self._stt_worker, daemon=True)
-        stt_thread.start()
-        AssistantUI.print_banner()
+        self.stt_thread.start()
+        emit_event("UI_BANNER")
 
         try:
             with sd.InputStream(
@@ -313,16 +328,5 @@ class Listener:
             ):
                 while True:
                     sd.sleep(100)
-        except KeyboardInterrupt:
-            print("\n[dim]Stopping assistant...[/dim]")
         finally:
-            self.audio_queue.put(None)  # Ending worker thread
-            stt_thread.join()
-
-            operator.close()
-            if cfg.profiler:
-                profiler.stop()
-                AssistantUI.print_benchmark_report(profiler.get_summary())
-
-    def register_text_operator(self, func: Callable[[str], None]):
-        self._text_operator = func
+            self.close()

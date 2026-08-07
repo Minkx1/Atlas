@@ -14,9 +14,9 @@ blocksize = 512
 dtype = "float32"
 
 [llm]
-model_path = "models/LLM/qwen2.5-3b-instruct-q4_k_m.gguf"
+model_path = "models/llm_models/qwen2.5-3b-instruct-q4_k_m.gguf"
 # initial_prompt = "Ти голосовий асистент 'Newt'(Ньют). Відопвідай лаконічно й точно, Українською мовою."
-initial_prompt = "You are an AI Voice Assistant 'Newt'. Answer briefly and concisely in English."
+initial_prompt = "You are an AI Voice Assistant 'Newt'. Answer in English."
 context_tokens = 2048
 max_msg_tokens = 512
 temperature = 0.7
@@ -37,6 +37,7 @@ preroll_blocks = 6
 
 [tts]
 model_path = "models/piper/en_US-lessac-medium.onnx"
+# model_path = "models/piper/uk_UA-ukrainian_tts-medium.onnx"
 use_cuda = false
 volume = 1.0
 length_scale = 1.0  # twice as slow
@@ -47,14 +48,14 @@ normalize_audio = false  # use raw audio from voice
 [stt]
 model_size = "small" # "small", "small.$lang", "medium", "large-v3"
 device = "cpu"        # "cpu" or "cuda"
-download_root = "models/whisper_models_cache"
+download_root = "models/faster-whisper"
 compute_type = "int8"
 beam_size = 5
 cpu_threads = 6
 
 awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
 min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
-pipeline_mode = "KWS"  # If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
+pipeline_mode = "DIRECT"  # If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
 
 # --- EN Preset ---
 language = "en"

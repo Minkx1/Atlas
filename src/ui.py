@@ -7,12 +7,10 @@ from rich.panel import Panel
 if __name__ == "__main__":
     MAIN = True
     from config import cfg
-    from profiler import ResourceProfiler
     from utils import __version__
 else:
     MAIN = False
     from .config import cfg
-    from .profiler import ResourceProfiler
     from .utils import __version__
 
 console = Console()
@@ -21,7 +19,7 @@ console = Console()
 class AssistantUI:
     @staticmethod
     def _get_timestamp() -> str:
-        return datetime.now().strftime("%H:%M:%S")
+        return datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
 
     @staticmethod
     def _format_rtf(rtf: float) -> str:
