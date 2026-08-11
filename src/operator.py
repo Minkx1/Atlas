@@ -14,7 +14,7 @@ from pathlib import Path
 import llama_cpp
 
 from .config import DATA_DIR, cfg
-from .events import emit_event
+from .events import EventType, emit_event
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -108,13 +108,13 @@ class CommandOperator:
         for intent, triggers in self.trigers.items():
             if any(trigger in cmd_lower for trigger in triggers):
                 emit_event(
-                    "UI_STATE_CHANGE",
+                    EventType.UI_STATE_CHANGE,
                     {"state": "BUILTIN_CMD", "detail": f"Intent: {intent}"},
                 )
                 self._play_random_sound(intent)
 
                 if intent == "farewell":
-                    emit_event("OP_ASK_FINISH")
+                    emit_event(EventType.OP_ASK_FINISH)
                 return True
 
         return False
@@ -127,10 +127,10 @@ class CommandOperator:
             ]
             if sounds:
                 path = random.choice(sounds)
-                emit_event("TTS_PLAY_SOUND", path)
+                emit_event(EventType.TTS_PLAY_SOUND, path)
             else:
                 emit_event(
-                    "UI_STATE_CHANGE",
+                    EventType.UI_STATE_CHANGE,
                     {"state": "ERROR", "detail": f"No sounds in {category}"},
                 )
 
@@ -169,41 +169,44 @@ class Operator:
         if not text:
             return
 
-        emit_event("PROFILER_SET_STATE", "PROCESSING")
+        emit_event(EventType.PROFILER_SET_STATE, "PROCESSING")
         start_time = time.perf_counter()
         full_response_text = ""
 
         try:
             res = self.cmd_op.operate(text)
-            emit_event("OP_CMD_LEVEL", str(res))
+            emit_event(EventType.OP_CMD_LEVEL, str(res))
 
             if not res:
-                # The command is not generic
                 token_stream = self.llm.stream_response(text)
 
                 is_first_chunk = True
                 for sentence in _sentence_chunker(token_stream):
                     full_response_text += sentence + " "
 
-                    emit_event("TTS_SPEAK", sentence)
+                    emit_event(EventType.TTS_SPEAK, sentence)
 
                     emit_event(
-                        "UI_LLM_CHUNK", {"text": sentence, "is_first": is_first_chunk}
+                        EventType.UI_LLM_CHUNK,
+                        {"text": sentence, "is_first": is_first_chunk},
                     )
                     is_first_chunk = False
 
                 gen_ms = (time.perf_counter() - start_time) * 1000
                 emit_event(
-                    "UI_LLM_RESPONSE_DONE",
+                    EventType.UI_LLM_RESPONSE_DONE,
                     {
                         "text": full_response_text.strip(),
                         "gen_ms": gen_ms,
                     },
                 )
+                emit_event(EventType.LLM_RESPONSE, full_response_text.strip())
+                self.llm.history_add_response(full_response_text.strip())
 
         finally:
-            emit_event("PROFILER_SET_STATE", "AWAKE")
-            emit_event("OP_READY")
+            emit_event(EventType.PROFILER_SET_STATE, "AWAKE")
+            # TODO: add waiting for Event.TTS_READY
+            emit_event(EventType.OP_READY)
 
     def close(self):
         self.llm.close()
@@ -230,6 +233,10 @@ class LLM:
         self.max_tokens = l.max_msg_tokens
         self.temperature = l.temperature
 
+        self.history: list[dict[str, str]] = [
+            {"role": "system", "content": self.initial_prompt}
+        ]
+
         self.llama = llama_cpp.Llama(
             model_path=str(self.model_path),
             n_ctx=self.context_tokens,
@@ -238,14 +245,15 @@ class LLM:
             verbose=False,
         )
 
+    def history_add_response(self, text: str) -> None:
+        self.history.append({"role": "assistant", "content": text})
+
     def get_response(self, message: str) -> _Response:
+        self.history.append({"role": "user", "content": message})
         start_time = time.perf_counter()
 
         response = self.llama.create_chat_completion(  # type: ignore
-            messages=[
-                {"role": "system", "content": self.initial_prompt},
-                {"role": "user", "content": message},
-            ],
+            messages=[self.history],  # type: ignore
             max_tokens=self.max_tokens,
             temperature=self.temperature,
             repeat_penalty=1.1,  # Token repeatance protection
@@ -267,11 +275,10 @@ class LLM:
         )
 
     def stream_response(self, message: str):
+        self.history.append({"role": "user", "content": message})
+
         output = self.llama.create_chat_completion(  # type: ignore
-            messages=[
-                {"role": "system", "content": self.initial_prompt},
-                {"role": "user", "content": message},
-            ],
+            messages=self.history,  # type: ignore
             max_tokens=self.max_tokens,
             temperature=self.temperature,
             repeat_penalty=1.1,

@@ -119,7 +119,7 @@ class OPConfig:
 class AppConfig:
     name: str = "Newt"
     profiler: bool = False
-    debug_server: bool = False
+    log: bool = False
 
     audio: AudioConfig = field(default_factory=AudioConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -153,7 +153,7 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
     res = AppConfig(
         name=app.get("name", "Newt"),
         profiler=app.get("profiler", False),
-        debug_server=app.get("debug_server", False),
+        log=app.get("log", False),
         audio=AudioConfig(**data.get("audio", {})),
         llm=LLMConfig(**data.get("llm", {})),
         op=OPConfig(**data.get("op", {})),

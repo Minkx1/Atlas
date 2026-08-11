@@ -21,7 +21,7 @@ from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
 from .config import DATA_DIR, cfg
-from .events import EventManager, emit_event, wait_for
+from .events import EventType, emit_event, wait_for
 
 # makes downloading Whisper models from HF faster
 load_dotenv()  # loads HF_TOKEN from .env file.
@@ -174,9 +174,9 @@ class Listener:
         self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = (
             "SLEEPING" if self.MODE == "KWS" else "AWAKE"
         )
-        emit_event("STT_CHANGED_STATE", self.state)
+        emit_event(EventType.STT_CHANGED_STATE, self.state)
 
-        self.awake_deadline = 0.0  # flag showing when to gofrom AWAKE to SLEEPING mode.(if time.time() > self.awake_deadline)
+        self.awake_deadline = 0.0  # flag showing when to gofrom AWAKE to SLEEPING mode.(if time.monotonic() > self.awake_deadline)
         self.audio_queue = queue.Queue()
 
         self.is_busy = False
@@ -190,7 +190,9 @@ class Listener:
         """Function that is called every chunk of time(~32 ms default) and proccesses audio data(ndarray)"""
 
         if self.is_busy:  # if assistant is generating response or speaking
-            self.awake_deadline = time.time() + cfg.stt.awake_timeout  # updatesdeadline
+            self.awake_deadline = (
+                time.monotonic() + cfg.stt.awake_timeout
+            )  # updatesdeadline
             return
 
         # ID array
@@ -208,27 +210,27 @@ class Listener:
                 )
             detected_keyword = self.kws.process_chunk(chunk_np)
             if detected_keyword:
-                emit_event("STT_KEYWORD_DETECTED", detected_keyword)
+                emit_event(EventType.STT_KEYWORD_DETECTED, detected_keyword)
 
                 self.state = "AWAKE"
-                emit_event("STT_CHANGED_STATE", self.state)
+                emit_event(EventType.STT_CHANGED_STATE, self.state)
 
-                self.awake_deadline = time.time() + cfg.stt.awake_timeout
+                self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
                 self.kws.reset()
 
                 emit_event(
-                    "UI_STATE_CHANGE",
+                    EventType.UI_STATE_CHANGE,
                     {"state": self.state, "detail": f"Keyword: '{detected_keyword}'"},
                 )
 
         elif self.state == "AWAKE":
-            if (self.kws) and time.time() > self.awake_deadline:
+            if (self.kws) and time.monotonic() > self.awake_deadline:
                 self.state = "SLEEPING"
-                emit_event("STT_CHANGED_STATE", self.state)
+                emit_event(EventType.STT_CHANGED_STATE, self.state)
 
                 self.kws.reset()
                 emit_event(
-                    "UI_STATE_CHANGE",
+                    EventType.UI_STATE_CHANGE,
                     {
                         "state": "SLEEPING",
                         "detail": f"Timeout ({int(cfg.stt.awake_timeout)}s)",
@@ -239,9 +241,9 @@ class Listener:
 
             if speech_dict and "start" in speech_dict:
                 self.state = "RECORDING"
-                emit_event("STT_CHANGED_STATE", self.state)
+                emit_event(EventType.STT_CHANGED_STATE, self.state)
 
-                emit_event("UI_STATE_CHANGE", {"state": self.state})
+                emit_event(EventType.UI_STATE_CHANGE, {"state": self.state})
                 self.speech_buffer = list(self.preroll_buffer)
 
         elif self.state == "RECORDING":
@@ -260,9 +262,9 @@ class Listener:
 
                 self.speech_buffer = []
                 self.state = "AWAKE"
-                emit_event("PROFILER_SET_STATE", self.state)
+                emit_event(EventType.PROFILER_SET_STATE, self.state)
 
-                self.awake_deadline = time.time() + cfg.stt.awake_timeout
+                self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
 
     def _stt_worker(self):
         """Different thread awaits audio array in queue and then processes it"""
@@ -277,7 +279,7 @@ class Listener:
 
             if text:
                 emit_event(
-                    "UI_TRANSCRIPTION",
+                    EventType.UI_TRANSCRIPTION,
                     {
                         "text": text,
                         "listen_ms": listen_ms,
@@ -286,17 +288,15 @@ class Listener:
                     },
                 )
 
-                emit_event(
-                    "STT_TRANSCRIBED", text
-                )  # This events shows that STT transcribed text and now it can be operated
+                emit_event(EventType.STT_TRANSCRIBED, text)
                 self.is_busy = True
-                emit_event("STT_BUSY", self.is_busy)
+                emit_event(EventType.STT_BUSY, self.is_busy)
 
-                wait_for("STT_CONTINUE")
+                success = wait_for(EventType.STT_CONTINUE, timeout=15.0)
                 self.is_busy = False
 
-                self.awake_deadline = time.time() + cfg.stt.awake_timeout
-                emit_event("STT_CHANGED_STATE", "AWAKE")
+                self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
+                emit_event(EventType.STT_CHANGED_STATE, "AWAKE")
 
             self.audio_queue.task_done()
 
@@ -304,10 +304,10 @@ class Listener:
         self.audio_queue.put(None)  # Ending worker thread
         self.stt_worker_thread.join()
 
-        emit_event("STT_FINISH")
+        emit_event(EventType.STT_FINISH)
 
     def _main(self):
-        emit_event("PROFILER_START")
+        emit_event(EventType.PROFILER_START)
 
         self.stt_worker_thread.start()
 

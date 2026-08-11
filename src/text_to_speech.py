@@ -14,8 +14,10 @@ from playsound3 import playsound
 
 if __name__ == "__main__":
     from config import DATA_DIR, cfg
+    from events import EventType, emit_event, log
 else:
     from .config import DATA_DIR, cfg
+    from .events import EventType, emit_event, log
 
 
 def print(msg: str, end="\n", force=False):
@@ -45,17 +47,19 @@ class TextToSpeech:
         self.worker_thread = threading.Thread(
             target=self._tts_worker, name="TTS_THREAD", daemon=True
         )
+        self._busy = False
+        self._busy_lock = threading.Lock()
 
     def _download_model(self):
         model_path = DATA_DIR / cfg.tts.model_path
         name = model_path.stem
-        print(f"[I] Downloading PiperTTS model: {name}")
+        log(f"[I] Downloading PiperTTS model: {name}", "TTS")
 
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             subprocess.run(
-                [sys.executable, "-m", "piper.download_voices", name],
+                f"{sys.executable} -m piper.download_voices {name}",
                 cwd=model_path.parent,
                 shell=True,
                 stdout=sys.stdout,
@@ -63,9 +67,17 @@ class TextToSpeech:
                 check=True,
             )
         except Exception as e:  # noqa: BLE001
-            print(f"[!] Error during downloading PiperTTS model({name}): {e}")
+            log(
+                f"[!] Error during downloading PiperTTS model({name}): {e}",
+                "TTS",
+                "ERROR",
+            )
         else:
-            print(f"[$] PiperTTS model({name}) was downloaded succesfully.")
+            log(
+                f"[$] PiperTTS model({name}) was downloaded succesfully.",
+                "TTS",
+                "SUCCES",
+            )
 
     def _tts_worker(self):
         """Background thread that gathers sentences(text chunks) from queue and voices them."""
@@ -76,11 +88,39 @@ class TextToSpeech:
                 return
 
             if isinstance(value, Path):
-                self.play_audio(value)
+                self._set_busy(True)
+                try:
+                    self.play_audio(value)
+                finally:
+                    self._set_busy(False)
             elif isinstance(value, str):
-                self.tts(value)
+                self._set_busy(True)
+                try:
+                    self.tts(value)
+                finally:
+                    self._set_busy(False)
 
             self.queue.task_done()
+
+    def _set_busy(self, value: bool) -> None:
+        emit_event(EventType.TTS_BUSY) if value == True else emit_event(
+            EventType.TTS_FREE
+        )
+        with self._busy_lock:
+            self._busy = value
+
+    def is_busy(self) -> bool:
+        with self._busy_lock:
+            return self._busy
+
+    # def wait_until_idle(self, timeout: float | None = None) -> None:
+    #     deadline = None if timeout is None else time.monotonic() + timeout
+    #     while True:
+    #         if not self.is_busy():
+    #             return
+    #         if deadline is not None and time.monotonic() >= deadline:
+    #             return
+    #         time.sleep(0.01)
 
     def tts(self, text: str) -> None:
         if text.strip():
@@ -132,7 +172,7 @@ def _main():
         ("farewell/bye2.wav", "Farewell, sir."),
         ("farewell/bye3.wav", "Have a good day, sir."),
         ("thanks/thanks1.wav", "Thank you, sir."),
-        ("thanks/thanks2.wav", "I trully apreciate this, sir."),
+        ("thanks/thanks2.wav", "I truly apreciate this, sir."),
         ("sorry/sorry1.wav", "I am really sorry, sir."),
         ("sorry/sorry2.wav", "Please accept my apologies."),
         ("sorry/sorry3.wav", "My apologies, sir."),

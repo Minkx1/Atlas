@@ -5,7 +5,7 @@
 [app]
 name = "Newt"
 profiler = true  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
-debug_server = true
+log = true  # If true - all events will be logged and put into $DATA / logs /
 
 [op]
 cmd_trigers = "cmd_trigers.json"

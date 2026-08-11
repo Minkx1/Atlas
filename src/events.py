@@ -1,13 +1,15 @@
 # events.py
 
-import json
 import queue
-import socket
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
 from typing import Any
+
+from rich.console import Console
 
 
 @dataclass
@@ -15,6 +17,35 @@ class Event:
     name: str
     content: Any = None
     timestamp: float = 0
+
+
+class EventType(StrEnum):
+    TTS_SPEAK = "TTS_SPEAK"
+    TTS_PLAY_SOUND = "TTS_PLAY_SOUND"
+    TTS_BUSY = "TTS_BUSY"
+    TTS_FREE = "TTS_FREE"
+    STT_CHANGED_STATE = "STT_CHANGED_STATE"
+    STT_TRANSCRIBED = "STT_TRANSCRIBED"
+    STT_KEYWORD_DETECTED = "STT_KEYWORD_DETECTED"
+    STT_BUSY = "STT_BUSY"
+    STT_CONTINUE = "STT_CONTINUE"
+    STT_FINISH = "STT_FINISH"
+    OP_ASK_FINISH = "OP_ASK_FINISH"
+    OP_RECEIVE_CMD = "OP_RECEIVE_CMD"
+    OP_READY = "OP_READY"
+    OP_CMD_LEVEL = "OP_CMD_LEVEL"
+    UI_BANNER = "UI_BANNER"
+    UI_STATE_CHANGE = "UI_STATE_CHANGE"
+    UI_TRANSCRIPTION = "UI_TRANSCRIPTION"
+    UI_LLM_CHUNK = "UI_LLM_CHUNK"
+    UI_LLM_RESPONSE = "UI_LLM_RESPONSE"
+    UI_LLM_RESPONSE_DONE = "UI_LLM_RESPONSE_DONE"
+    PROFILER_START = "PROFILER_START"
+    PROFILER_SET_STATE = "PROFILER_SET_STATE"
+    PROFILER_FINISH = "PROFILER_FINISH"
+    DEBUG_LOG = "DEBUG_LOG"
+    LLM_RESPONSE = "LLM_RESPONSE"
+    WILDCARD = "*"
 
 
 class EventManager:
@@ -35,17 +66,18 @@ class EventManager:
         )
         self._dispatcher.start()
 
-    def emit(self, name: str | None, content: Any = None):
-        self.queue.put(Event(name, content, time.time()) if name else None)
+    def emit(self, event: EventType | None, content: Any = None):
+        self.queue.put(Event(event.value, content, time.time()) if event else None)
 
-    def subscribe(self, event_name: str, callback: Callable):
-        if event_name not in self.callbacks:
-            self.callbacks[event_name] = []
-        self.callbacks[event_name].append(callback)
+    def subscribe(self, event: EventType, callback: Callable[[Event], Any]):
+        if event.value not in self.callbacks:
+            self.callbacks[event.name] = []
+        self.callbacks[event.name].append(callback)
 
-    def unsubscribe(self, event_name: str, callback: Callable):
-        if event_name in self.callbacks and callback in self.callbacks[event_name]:
-            self.callbacks[event_name].remove(callback)
+    def unsubscribe(self, event: EventType, callback: Callable):
+        name = event.value
+        if name in self.callbacks and callback in self.callbacks[name]:
+            self.callbacks[name].remove(callback)
 
     def _dispatch_loop(self):
         while True:
@@ -56,18 +88,21 @@ class EventManager:
                 break
 
             callbacks_to_call = self.callbacks.get(event.name, [])
-            # event "*" is Any event that was mitted
-            callbacks_to_call = callbacks_to_call + self.callbacks.get("*", [])
+            callbacks_to_call += self.callbacks.get(EventType.WILDCARD.value, [])
 
             for callback in callbacks_to_call:
                 try:
                     callback(event)
-                except Exception as e:
-                    print(f"[!] Error in callback for {event.name}: {e}")
+                except Exception as exc:  # noqa: BLE001
+                    log(
+                        f"Error in callback for {event.name}: {exc}",
+                        source="EVENTS",
+                        level="ERROR",
+                    )
 
             self.queue.task_done()
 
-    def wait_for(self, event_name: str, timeout: float | None = None) -> Event | None:
+    def wait_for(self, event: EventType, timeout: float | None = None) -> Event | None:
         """Blocks thread until event is emitted."""
         wait_event = threading.Event()
         received_event = None
@@ -77,9 +112,9 @@ class EventManager:
             received_event = e
             wait_event.set()
 
-        self.subscribe(event_name, _unblock)
+        self.subscribe(event, _unblock)
         wait_event.wait(timeout)
-        self.unsubscribe(event_name, _unblock)
+        self.unsubscribe(event, _unblock)
 
         return received_event
 
@@ -87,58 +122,63 @@ class EventManager:
         self.queue.put(None)
 
 
-def emit_event(name: str | None, content: Any = None):
-    EventManager().emit(name, content)
+def emit_event(event: EventType | None, content: Any = None):
+    EventManager().emit(event, content)
 
 
-def wait_for(event_name: str, timeout: float | None = None) -> Event | None:
-    return EventManager().wait_for(event_name, timeout)
+def wait_for(event: EventType, timeout: float | None = None) -> Event | None:
+    return EventManager().wait_for(event, timeout)
 
 
-class DebugServer:
-    """Local server that streams events into other terminal.
+def log(message: str, source: str = "SYSTEM", level: str = "INFO"):
+    emit_event(
+        EventType.DEBUG_LOG,
+        {"message": str(message), "source": source, "level": level.upper()},
+    )
 
-    Run client with:
-    nc localhost 9999"""
 
-    def __init__(self, port=9999):
-        self.port = port
-        self.clients = []
-        self.server_thread = threading.Thread(
-            target=self._run_server, name="EVENT_DEBUG_SERVER", daemon=True
-        )
+class EventLogger:
+    def __init__(self):
+        from .config import DATA_DIR
 
-        EventManager().subscribe("*", self._broadcast_event)
+        self.logs_dir = DATA_DIR / "logs"
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.console = Console()
+        self._lock = threading.Lock()
+
+        # sub to all ('*') events
+        EventManager().subscribe(EventType.WILDCARD, self._log_event)
 
     def start(self):
-        self.server_thread.start()
+        pass
 
-    def _run_server(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind(("localhost", self.port))
-        server.listen(5)
+    def close(self):
+        pass
 
-        while True:
-            try:
-                client, addr = server.accept()
-                self.clients.append(client)
-            except Exception:
-                break
+    def _get_log_filepath(self, timestamp: float) -> Path:
+        date_str = time.strftime("%Y-%m-%d", time.localtime(timestamp))
+        return self.logs_dir / f"{date_str}.log"
 
-    def _broadcast_event(self, event: Event):
-        if not self.clients:
-            return
+    def _log_event(self, event: Event):
+        message_text = self._format_message(event)
+        # self.console.print(message_text)  # this prints into console, which right now is not needed.
+
+        log_file = self._get_log_filepath(event.timestamp)
+        with self._lock and open(log_file, "a", encoding="utf-8") as f:
+            f.write(message_text + "\n")
+
+    def _format_message(self, event: Event) -> str:
+        timestamp = time.strftime("%H:%M:%S", time.localtime(event.timestamp))
+
+        if event.name == EventType.DEBUG_LOG.value and isinstance(event.content, dict):
+            level = str(event.content.get("level", "INFO")).upper()
+            source = str(event.content.get("source", "SYSTEM"))
+            message = str(event.content.get("message", ""))
+            return f"[{timestamp}] [{source}] {level}: {message}"
 
         content_str = (
             str(event.content)[:100] + "..."
             if len(str(event.content)) > 100
             else str(event.content)
         )
-        msg = f"[{time.strftime('%H:%M:%S', time.localtime(event.timestamp))}] {event.name}: {content_str}\n"
-
-        for client in list(self.clients):
-            try:
-                client.send(msg.encode("utf-8"))
-            except Exception:
-                self.clients.remove(client)
+        return f"[{timestamp}] {event.name}: {content_str}"
