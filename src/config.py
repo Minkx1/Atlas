@@ -1,4 +1,5 @@
 # config.py
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +13,9 @@ OS_NAME = os.name
 if OS_NAME not in {"posix", "nt"}:
     raise OSError(f"Unsupported OS: {OS_NAME}")
 
-DATA_DIR = Path("data/")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+DEFAULT_CONFIG_PATH = DATA_DIR / "config.toml"
 
 
 @dataclass
@@ -79,12 +82,48 @@ class LLMConfig:
 
 
 @dataclass
+class OPConfig:
+    cmd_trigers: str = "cmd_trigers.json"
+
+    def get_triggers_path(self, base_dir: str | Path | None = None) -> Path:
+        path = Path(self.cmd_trigers)
+        if path.is_absolute():
+            return path
+
+        base = Path(base_dir) if base_dir is not None else DATA_DIR
+        return base / path
+
+    def load_triggers(self, base_dir: str | Path | None = None) -> dict[str, list[str]]:
+        path = self.get_triggers_path(base_dir)
+        if not path.exists():
+            fallback = DATA_DIR / self.cmd_trigers
+            if fallback.exists():
+                path = fallback
+            else:
+                return {}
+
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        if not isinstance(payload, dict):
+            return {}
+
+        return {
+            str(intent): [str(trigger) for trigger in triggers]
+            for intent, triggers in payload.items()
+            if isinstance(triggers, list)
+        }
+
+
+@dataclass
 class AppConfig:
     name: str = "Newt"
     profiler: bool = False
+    debug_server: bool = False
 
     audio: AudioConfig = field(default_factory=AudioConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    op: OPConfig = field(default_factory=OPConfig)
     kws: KWSConfig = field(default_factory=KWSConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     vad: VADConfig = field(default_factory=VADConfig)
@@ -94,25 +133,37 @@ class AppConfig:
 def load_config(config_path: str = "data/config.toml") -> AppConfig:
     path = Path(config_path)
     if not path.exists():
-        # TODO: add automatic default config generation
-        # print(f"[I] Config {config_path} not found. Creating 'config.toml' with defaults.")
-        return AppConfig()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if DEFAULT_CONFIG_PATH.exists():
+            path.write_text(
+                DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+        else:
+            path.write_text(
+                """[app]\nname = \"Newt\"\nprofiler = false\ndebug_server = false\n\n[op]\ncmd_trigers = \"cmd_trigers.json\"\n""",
+                encoding="utf-8",
+            )
+        return load_config(str(path))
 
     with open(path, "rb") as f:
         data = tomllib.load(f)
 
     app: dict = data.get("app", {})
 
-    return AppConfig(
+    res = AppConfig(
         name=app.get("name", "Newt"),
         profiler=app.get("profiler", False),
+        debug_server=app.get("debug_server", False),
         audio=AudioConfig(**data.get("audio", {})),
         llm=LLMConfig(**data.get("llm", {})),
+        op=OPConfig(**data.get("op", {})),
         kws=KWSConfig(**data.get("kws", {})),
         tts=TTSConfig(**data.get("tts", {})),
         vad=VADConfig(**data.get("vad", {})),
         stt=STTConfig(**data.get("stt", {})),
     )
+
+    return res
 
 
 # Global config object

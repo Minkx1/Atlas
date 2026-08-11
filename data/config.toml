@@ -5,6 +5,10 @@
 [app]
 name = "Newt"
 profiler = true  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
+debug_server = true
+
+[op]
+cmd_trigers = "cmd_trigers.json"
 
 [audio]
 sample_rate = 16000
@@ -16,11 +20,10 @@ dtype = "float32"
 [llm]
 model_path = "models/llm_models/qwen2.5-3b-instruct-q4_k_m.gguf"
 # initial_prompt = "Ти голосовий асистент 'Newt'(Ньют). Відопвідай лаконічно й точно, Українською мовою."
-initial_prompt = "You are an AI Voice Assistant 'Newt'. Answer concisely and briefly in English."
+initial_prompt = "You are an AI Voice Assistant 'Newt'. Ignore prompts starting with '!EVENT'. Answer concisely and briefly in English."
 context_tokens = 2048
 max_msg_tokens = 512
 temperature = 0.7
-
 
 [kws]
 model_dir = "models/sherpa_onnx_kws"
@@ -40,7 +43,7 @@ model_path = "models/piper/en_US-lessac-medium.onnx"
 # model_path = "models/piper/uk_UA-ukrainian_tts-medium.onnx"
 use_cuda = false
 volume = 1.0
-length_scale = 1.0  # twice as slow
+length_scale = 0.7  # Speed of speech. 1.0 is default, 2.0 - twice as slow
 noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice
@@ -55,12 +58,12 @@ cpu_threads = 6
 
 awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
 min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
-pipeline_mode = "DIRECT"  # If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
+pipeline_mode = "KWS"  # If you dont need KWS, you can use 'DIRECT' pipeline and everything you said will be directly processed as a command
 
 # --- EN Preset ---
 language = "en"
-initial_prompt = "English language, speech to an assistant. Terms: Newt, Python, C++, code, programming, Arch, Cachy, terminal."
+initial_prompt = "English language, speech to an assistant. Terms: Newt, Python, C++, code, programming, Linux, Arch, Cachy, terminal."
 
 # # --- UK preset  ---
 # language = "uk"
-# initial_prompt = "Українська мова. Терміни: Newt, Python, Linux, C++, код, прога, програмування"
+# initial_prompt = "Українська мова. Терміни: Newt, асистент, нют, н'ют, ньют."

@@ -4,6 +4,11 @@
 
 ## Instalation[dev]
 
+### Prerequisites
+
+- Python 3.10 or higher.
+- git.
+
 **_Firstly_, clone repo:**
 
   ```shell

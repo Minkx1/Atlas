@@ -4,7 +4,7 @@ import sys
 import threading
 
 from .config import cfg
-from .events import Event, EventManager
+from .events import DebugServer, EventManager, emit_event
 from .operator import Operator
 from .profiler import profiler
 from .speech_to_text import KeyWordSpotter, Listener, Whisper
@@ -14,10 +14,11 @@ from .ui import AssistantUI, console
 
 class Newt:
     def __init__(self) -> None:
-        self.events = EventManager.get_instace()
+        self.events = EventManager()
+        self.alive = True
 
-        # thrading.Event for blocking STT thread while LLM+TTS is working
-        self.events.set_flag("stt_runtime", True)
+        if cfg.debug_server:
+            self.debug_server = DebugServer()
 
         self.tts = TextToSpeech()
         self.operator = Operator()
@@ -30,65 +31,87 @@ class Newt:
                 stt = Whisper()
                 self.listener = Listener(stt)
 
-    def _parse_event(self, e: Event):
-        match e.type:
-            # TTS
-            case "TTS_SPEAK_CHUNK":
-                self.tts.speak(e.content)
+        self._setup_subscriptions()
 
-            case "STT_TRANSCRIBE":
-                # STT finished transribing text(e.content)
-                self.operator.submit(e.content)
-            case "STT_RESUME":
-                self.events.set_flag("stt_runtime", True)
-            case "STT_FINISH":
-                ...
-            # Profiler
-            case "PROFILER_START":
-                if cfg.profiler:
-                    profiler.start()
-            case "PROFILER_SET_STATE":
-                profiler.set_state(e.content)
-            case "PROFILER_FINISH":
-                if cfg.profiler:
-                    profiler.stop()
-                    AssistantUI.print_benchmark_report(profiler.get_summary())
+    def _setup_subscriptions(self):
+        # TTS
+        self.events.subscribe("TTS_SPEAK", lambda e: self.tts.speak(e.content))
+        self.events.subscribe(
+            "TTS_PLAY_SOUND", lambda e: self.tts.play_sound(e.content)
+        )
 
-            # UI
-            case "UI_BANNER":
-                AssistantUI.print_banner()
-            case "UI_STATE_CHANGE":
-                AssistantUI.print_state_change(**e.content)
-            case "UI_TRANSCRIPTION":
-                AssistantUI.print_transcription(**e.content)
-            case "UI_LLM_RESPONSE_DONE":
-                AssistantUI.print_llm_response(**e.content)
-            case "UI_LLM_CHUNK":
-                AssistantUI.print_llm_chunk(**e.content)
+        # STT
+        self.events.subscribe(
+            "STT_CHANGED_STATE", lambda e: emit_event("PROFILER_SET_STATE", e.content)
+        )
+        self.events.subscribe(
+            "STT_TRANSCRIBE", lambda e: emit_event("OP_RECEIVE_CMD", e.content)
+        )
+        self.events.subscribe(
+            "STT_KEYWORD_DETECTED",
+            lambda: emit_event("OP_RECEIVE_CMD", "!EVENT_KEYWORD_DETECTED"),
+        )
 
-            case _:
-                pass
+        # Operator
+        self.events.subscribe("OP_ASK_FINISH", lambda e: self._shutdown())
+        self.events.subscribe(
+            "OP_RECEIVE_CMD", lambda e: self.operator.submit(e.content)
+        )
+        self.events.subscribe("OP_READY", lambda e: emit_event("STT_CONTINUE"))
+
+        # UI
+        self.events.subscribe("UI_BANNER", lambda e: AssistantUI.print_banner())
+        self.events.subscribe(
+            "UI_STATE_CHANGE", lambda e: AssistantUI.print_state_change(**e.content)
+        )
+        self.events.subscribe(
+            "UI_TRANSCRIPTION", lambda e: AssistantUI.print_transcription(**e.content)
+        )
+        self.events.subscribe(
+            "UI_LLM_CHUNK", lambda e: AssistantUI.print_llm_chunk(**e.content)
+        )
+        self.events.subscribe(
+            "UI_LLM_RESPONSE", lambda e: AssistantUI.print_llm_response(**e.content)
+        )
+
+        # Profiler
+        def _prof_start():
+            if cfg.profiler:
+                profiler.start()
+
+        self.events.subscribe("PROFILER_START", lambda: _prof_start)
+        self.events.subscribe(
+            "PROFILER_SET_STATE", lambda e: profiler.set_state(e.content)
+        )
+        self.events.subscribe("PROFILER_FINISH", self._prof_finish)
+
+    def _shutdown(self):
+        self.alive = False
+
+    def _prof_finish(self):
+        if cfg.profiler:
+            profiler.stop()
+            AssistantUI.print_benchmark_report(profiler.get_summary())
 
     def close(self):
+        self._prof_finish()
         self.operator.close()
         self.tts.close()
         self.listener.close()
-
-    def _start_threads(self):
-        self.tts.start()
-        self.operator.start()
-        stt_thread = threading.Thread(
-            target=self.listener.start, name="STT_THREAD", daemon=True
-        )
-        stt_thread.start()
+        self.events.stop()
 
     def main(self):
-        self._start_threads()
+        if self.debug_server:
+            self.debug_server.start()
 
-        while True:
-            event = self.events.get_next_event()
-            self._parse_event(event)
-            self.events.queue.task_done()
+        self.tts.start()
+        self.operator.start()
+        self.listener.start()
+
+        emit_event("UI_BANNER")
+
+        while self.alive:
+            threading.Event().wait(1.0)
 
     def start(self):
         try:

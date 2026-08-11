@@ -5,9 +5,11 @@
 
 import os
 import queue
+import random
 import re
 import threading
 import time
+from pathlib import Path
 
 import llama_cpp
 
@@ -43,6 +45,99 @@ def _sentence_chunker(token_stream):
         yield buffer.strip()
 
 
+class CommandOperator:
+    class Command:
+        """Command class describes user commands: directories in directory commands/ containing file `command.toml`"""
+
+        def __init__(self, dir: Path, config: Path) -> None:
+            self.root = dir
+            self.config_path = config
+            # self.congig = self._parse_config(self.config)
+
+    def __init__(self) -> None:
+        self.history = []
+        self.trigers = {
+            "thanks": ["nice", "you are good", "you are amazing", "good job"],
+            "farewell": ["bye", "bye-bye", "bye bye", "good night", "goodbye"],
+            "sorry": [
+                "you are stupid",
+                "are you stupid",
+                "fuck you",
+                "you suck",
+                "you are a moron",
+                "wrong",
+                "you are wrong",
+            ],
+            "greet": ["hello", "hi", "nice to meet you"],
+        }
+        self._load_triggers_from_config()
+
+        self.load_user_commands()
+
+    def _load_triggers_from_config(self) -> None:
+        for intent, triggers in cfg.op.load_triggers().items():
+            self.trigers[intent] = triggers
+
+    def operate(self, cmd: str) -> str | None:
+        if self.exec_builtin(cmd):
+            return "builtin"
+        elif self.exec_user(cmd):
+            return "user"
+        else:
+            return None
+
+    def load_user_commands(self):
+        cmd_dir = DATA_DIR / "commands"
+
+        l: list[CommandOperator.Command] = []
+
+        for file in cmd_dir.iterdir():
+            if file.is_dir():
+                toml = file / "command.toml"
+                if toml.exists() and toml.is_file():
+                    l.append(CommandOperator.Command(cmd_dir, toml))
+
+    def exec_builtin(self, cmd: str) -> bool:
+        """Checks whether command is in a _builtin_ level and if so exutes it."""
+        if cmd == "!EVENT_KEYWORD_DETECTED":
+            self._play_random_sound("greet")
+            return True
+
+        cmd_lower = cmd.lower()
+
+        for intent, triggers in self.trigers.items():
+            if any(trigger in cmd_lower for trigger in triggers):
+                emit_event(
+                    "UI_STATE_CHANGE",
+                    {"state": "BUILTIN_CMD", "detail": f"Intent: {intent}"},
+                )
+                self._play_random_sound(intent)
+
+                if intent == "farewell":
+                    emit_event("OP_ASK_FINISH")
+                return True
+
+        return False
+
+    def _play_random_sound(self, category: str):
+        sound_dir = DATA_DIR / "sounds" / category
+        if sound_dir.exists() and sound_dir.is_dir():
+            sounds = [
+                ch for ch in sound_dir.iterdir() if ch.is_file() and ch.suffix == ".wav"
+            ]
+            if sounds:
+                path = random.choice(sounds)
+                emit_event("TTS_PLAY_SOUND", path)
+            else:
+                emit_event(
+                    "UI_STATE_CHANGE",
+                    {"state": "ERROR", "detail": f"No sounds in {category}"},
+                )
+
+    def exec_user(self, cmd: str) -> bool:
+        return False
+
+
 class Operator:
     def __init__(self) -> None:
         self.llm = LLM()
@@ -52,6 +147,8 @@ class Operator:
             target=self._operator_worker, name="OPERATOR_THREAD", daemon=True
         )
 
+        self.cmd_op = CommandOperator()
+
     def start(self):
         self.worker_thread.start()
 
@@ -60,23 +157,13 @@ class Operator:
 
     def _operator_worker(self):
         while True:
-            text = self.command_queue.get()
+            text = self.command_queue.get(block=True)
             if text is None:
                 self.command_queue.task_done()
                 break
 
             self._operate(text)
             self.command_queue.task_done()
-
-    def check_builtin_command(self, cmd: str) -> bool:
-        """Checks whether command is in a _builtin_ level and if so exutes it."""
-        # checking and executing builtin command logic
-        return False
-
-    def check_user_command(self, cmd: str) -> bool:
-        """Checks whether command is in a _user_ level and if so exutes it."""
-        # checking and executing user command logic
-        return False
 
     def _operate(self, text: str) -> None:
         if not text:
@@ -87,7 +174,10 @@ class Operator:
         full_response_text = ""
 
         try:
-            if not (self.check_builtin_command(text) or self.check_user_command(text)):
+            res = self.cmd_op.operate(text)
+            emit_event("OP_CMD_LEVEL", str(res))
+
+            if not res:
                 # The command is not generic
                 token_stream = self.llm.stream_response(text)
 
@@ -95,7 +185,7 @@ class Operator:
                 for sentence in _sentence_chunker(token_stream):
                     full_response_text += sentence + " "
 
-                    emit_event("TTS_SPEAK_CHUNK", sentence)
+                    emit_event("TTS_SPEAK", sentence)
 
                     emit_event(
                         "UI_LLM_CHUNK", {"text": sentence, "is_first": is_first_chunk}
@@ -113,8 +203,7 @@ class Operator:
 
         finally:
             emit_event("PROFILER_SET_STATE", "AWAKE")
-            emit_event("STT_RESUME")
-            emit_event("OPERATOR_FINISHED")
+            emit_event("OP_READY")
 
     def close(self):
         self.llm.close()

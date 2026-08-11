@@ -1,7 +1,0 @@
-[command]  # command metadata
-id = "greet"
-description = "Greets user when Keyword was said or when user says hello"
-
-
-[callback]
-general = ""
