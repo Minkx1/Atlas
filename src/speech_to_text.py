@@ -30,6 +30,9 @@ os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
 class VAD:
     def __init__(self) -> None:
+        self.is_speaking = False
+
+    def load(self):
         _start = time.perf_counter()
 
         self.model = load_silero_vad()
@@ -40,10 +43,6 @@ class VAD:
             sampling_rate=cfg.audio.sample_rate,
             speech_pad_ms=cfg.vad.speech_pad_ms,
         )
-
-        self.is_speaking = False
-
-        log("VAD model: LOADED.", "VAD", "SUCCESS")
         emit_event(EventType.VAD_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
 
     @staticmethod
@@ -56,6 +55,9 @@ class VAD:
 
     def process(self, audio_chunk: np.ndarray | torch.Tensor) -> str:
         """Returns state of speech: 'silence', 'start', 'speaking', 'end'."""
+        if not hasattr(self, "iterator"):
+            raise RuntimeError("VAD was used before vad.load()")
+
         chunk = self._normalize_chunk(audio_chunk)
 
         voice_dict = self.iterator(chunk)
@@ -85,12 +87,12 @@ class KeyWordSpotter:
 
     def __init__(self):
         path: Path = DATA_DIR / cfg.kws.model_dir
-        tokens = str(path / "tokens.txt")
-        encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
-        decoder = str(path / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx")
-        joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
+        self.tokens = str(path / "tokens.txt")
+        self.encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
+        self.decoder = str(path / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx")
+        self.joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
-        if not os.path.exists(tokens):
+        if not os.path.exists(self.tokens):
             log(
                 f"No Sherpa model in: {path}. Donwloading...",
                 source="KWS",
@@ -99,22 +101,21 @@ class KeyWordSpotter:
             self._download_sherpa_onnx_model(path)
             # raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
+    def load(self):
         _start = time.perf_counter()
         self.kws = sherpa_onnx.KeywordSpotter(
-            tokens=tokens,
-            encoder=encoder,
-            decoder=decoder,
-            joiner=joiner,
+            tokens=self.tokens,
+            encoder=self.encoder,
+            decoder=self.decoder,
+            joiner=self.joiner,
             keywords_file=f"{DATA_DIR / cfg.kws.keywords_file}",
             num_threads=cfg.kws.num_threads,
             keywords_threshold=cfg.kws.score_threshold,
             feature_dim=80,
         )
 
-        # self.stream = self.kws.create_stream()
-        self.reset()
+        self.stream = self.kws.create_stream()
 
-        log("KWS model: LOADED.", "KWS", "SUCCESS")
         emit_event(EventType.KWS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
 
     @staticmethod
@@ -161,6 +162,9 @@ class KeyWordSpotter:
 
     def process_chunk(self, chunk_np: np.ndarray) -> str | None:
         """Processes audio chunk. If keyword was spotted: returns it. Else: returns None."""
+        if not hasattr(self, "kws"):
+            raise RuntimeError("KWS was used before kws.load()")
+
         self.stream.accept_waveform(cfg.audio.sample_rate, chunk_np)
         while self.kws.is_ready(self.stream):
             self.kws.decode_stream(self.stream)
@@ -173,17 +177,21 @@ class KeyWordSpotter:
         return None
 
     def reset(self):
+        if not hasattr(self, "kws"):
+            raise RuntimeError("KWS was used before kws.load()")
         self.stream = self.kws.create_stream()
 
 
 class Whisper:
     def __init__(self):
         w = cfg.stt
-        model_dir: Path = DATA_DIR / w.download_root
+        self.model_dir: Path = DATA_DIR / w.download_root
 
-        if not model_dir.exists():
+    def load(self):
+        w = cfg.stt
+        if not self.model_dir.exists():
             log(
-                f"No Faster-Whisper model found in {model_dir}. Downloading...",
+                f"No Faster-Whisper model found in {self.model_dir}. Downloading...",
                 "Whisper",
                 "WARN",
             )
@@ -195,16 +203,18 @@ class Whisper:
             compute_type=w.compute_type,
             cpu_threads=w.cpu_threads,
             num_workers=1,
-            download_root=str(model_dir),
+            download_root=str(self.model_dir),
         )
 
-        log("Whisper model: LOADED.", "Whisper", "SUCCESS")
         emit_event(
             EventType.WHISPER_LOADED, f"{(time.perf_counter() - _start) * 1000}ms"
         )
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
         """Turns Spech(audio array) into a text. Returns (text, time_to_process)."""
+        if not hasattr(self, "model"):
+            raise RuntimeError("Whisper was used before whisper.load()")
+
         w = cfg.stt
         start_time = time.perf_counter()
         segments, _ = self.model.transcribe(
@@ -378,7 +388,7 @@ class Listener:
                 emit_event(EventType.STT_TRANSCRIBED, text)
                 self.pipeline.set_state(LState.WAITING)
 
-                success = wait_for(EventType.STT_CONTINUE, timeout=15.0)
+                success = wait_for(EventType.STT_CONTINUE)
                 if not success:
                     log(
                         "STT worker timed out(15s) waiting for STT_CONTINUE!",

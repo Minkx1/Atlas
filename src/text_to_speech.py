@@ -4,6 +4,7 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 import wave
 from pathlib import Path
 
@@ -20,21 +21,13 @@ else:
     from .events import EventType, emit_event, log
 
 
-def print(msg: str, end="\n", force=False):
-    if cfg.profiler or force:
-        sys.stdout.write(msg + end)
-
-
 class TextToSpeech:
     def __init__(self) -> None:
         s = cfg.tts
-        path = DATA_DIR / s.model_path
-        if not path.exists():
+        self.path = DATA_DIR / s.model_path
+        if not self.path.exists():
             self._download_model()
 
-        self.voice = PiperVoice.load(
-            path, use_cuda=s.use_cuda, download_dir=path.parent
-        )
         self.syn_config = SynthesisConfig(
             volume=s.volume,  # half as loud
             length_scale=s.length_scale,  # twice as slow
@@ -50,10 +43,17 @@ class TextToSpeech:
         self._busy = False
         self._busy_lock = threading.Lock()
 
+    def load(self):
+        _start = time.perf_counter()
+        self.voice = PiperVoice.load(
+            self.path, use_cuda=cfg.tts.use_cuda, download_dir=self.path.parent
+        )
+        emit_event(EventType.TTS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
+
     def _download_model(self):
         model_path = DATA_DIR / cfg.tts.model_path
         name = model_path.stem
-        log(f"[I] Downloading PiperTTS model: {name}", "TTS")
+        log(f"[I] Downloading PiperTTS model: {name}", "TTS", "INFO")
 
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -113,15 +113,6 @@ class TextToSpeech:
         with self._busy_lock:
             return self._busy
 
-    # def wait_until_idle(self, timeout: float | None = None) -> None:
-    #     deadline = None if timeout is None else time.monotonic() + timeout
-    #     while True:
-    #         if not self.is_busy():
-    #             return
-    #         if deadline is not None and time.monotonic() >= deadline:
-    #             return
-    #         time.sleep(0.01)
-
     def tts(self, text: str) -> None:
         if text.strip():
             try:
@@ -146,6 +137,9 @@ class TextToSpeech:
         playsound(path)
 
     def start(self):
+        if not hasattr(self, "voice"):
+            raise RuntimeError("TTS.start() was called before TTS.load()")
+
         self.worker_thread.start()
 
     def speak(self, text: str) -> None:

@@ -12,7 +12,7 @@ from .events import (
     EventType,
     emit_event,
 )
-from .operator import Operator
+from .operator import LLM, CommandOperator, Operator
 from .profiler import profiler
 from .speech_to_text import VAD, KeyWordSpotter, Listener, Whisper
 from .text_to_speech import TextToSpeech
@@ -32,7 +32,11 @@ class Newt:
         # main components
 
         self.tts = TextToSpeech()
-        self.operator = Operator()
+
+        self.cmd = CommandOperator()
+        self.llm = LLM()
+
+        self.operator = Operator(self.cmd, self.llm)
 
         # STT pipeline
 
@@ -42,6 +46,15 @@ class Newt:
         self.listener = Listener(self.vad, self.whisper, self.kws)
 
         self._setup_subscriptions()
+
+    def load_models(self):
+        self.tts.load()
+
+        self.llm.load()
+
+        self.vad.load()
+        self.kws.load()
+        self.whisper.load()
 
     def _setup_subscriptions(self):
         """Subscribe all nececessary callbacks for events."""
@@ -124,6 +137,8 @@ class Newt:
         self.events.flush_and_stop()
 
     def main(self):
+        self.load_models()
+
         self.tts.start()
         self.operator.start()
         self.listener.start()
