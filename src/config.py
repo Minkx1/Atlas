@@ -53,7 +53,6 @@ class STTConfig:
 
     awake_timeout: float = 10.0
     min_command_ms: float = 600.0
-    pipeline_mode: Literal["KWS", "DIRECT"] = "KWS"
 
     language: str = "en"
     initial_prompt: str = (

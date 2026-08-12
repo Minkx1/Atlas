@@ -24,12 +24,19 @@ class EventType(StrEnum):
     TTS_PLAY_SOUND = "TTS_PLAY_SOUND"
     TTS_BUSY = "TTS_BUSY"
     TTS_FREE = "TTS_FREE"
+
+    KWS_LOADED = "KWS_LOADED"
+    WHISPER_LOADED = "WHISPER_LOADED"
+    VAD_LOADED = "VAD_LOADED"
+
     STT_CHANGED_STATE = "STT_CHANGED_STATE"
     STT_TRANSCRIBED = "STT_TRANSCRIBED"
     STT_KEYWORD_DETECTED = "STT_KEYWORD_DETECTED"
     STT_BUSY = "STT_BUSY"
     STT_CONTINUE = "STT_CONTINUE"
+    STT_START = "STT_START"
     STT_FINISH = "STT_FINISH"
+
     OP_ASK_FINISH = "OP_ASK_FINISH"
     OP_RECEIVE_CMD = "OP_RECEIVE_CMD"
     OP_READY = "OP_READY"
@@ -71,8 +78,8 @@ class EventManager:
 
     def subscribe(self, event: EventType, callback: Callable[[Event], Any]):
         if event.value not in self.callbacks:
-            self.callbacks[event.name] = []
-        self.callbacks[event.name].append(callback)
+            self.callbacks[event.value] = []
+        self.callbacks[event.value].append(callback)
 
     def unsubscribe(self, event: EventType, callback: Callable):
         name = event.value
@@ -87,8 +94,9 @@ class EventManager:
                 self.queue.task_done()
                 break
 
-            callbacks_to_call = self.callbacks.get(event.name, [])
-            callbacks_to_call += self.callbacks.get(EventType.WILDCARD.value, [])
+            callbacks_to_call = self.callbacks.get(event.name, []) + self.callbacks.get(
+                EventType.WILDCARD.value, []
+            )
 
             for callback in callbacks_to_call:
                 try:
@@ -118,6 +126,18 @@ class EventManager:
 
         return received_event
 
+    def flush_and_stop(self, timeout: float = 2.0):
+        def _wait():
+            self.queue.join()
+            self.stop()
+
+        wait_thread = threading.Thread(target=_wait, daemon=True)
+        wait_thread.start()
+        wait_thread.join(timeout=timeout)
+
+        if wait_thread.is_alive():
+            self.stop()
+
     def stop(self):
         self.queue.put(None)
 
@@ -144,16 +164,9 @@ class EventLogger:
         self.logs_dir = DATA_DIR / "logs"
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
-        self._lock = threading.Lock()
 
         # sub to all ('*') events
         EventManager().subscribe(EventType.WILDCARD, self._log_event)
-
-    def start(self):
-        pass
-
-    def close(self):
-        pass
 
     def _get_log_filepath(self, timestamp: float) -> Path:
         date_str = time.strftime("%Y-%m-%d", time.localtime(timestamp))
@@ -161,10 +174,12 @@ class EventLogger:
 
     def _log_event(self, event: Event):
         message_text = self._format_message(event)
-        # self.console.print(message_text)  # this prints into console, which right now is not needed.
+        # self.console.print(
+        #     message_text
+        # )  # this prints into console, which right now is not needed.
 
         log_file = self._get_log_filepath(event.timestamp)
-        with self._lock and open(log_file, "a", encoding="utf-8") as f:
+        with open(log_file, "a", encoding="utf-8") as f:
             f.write(message_text + "\n")
 
     def _format_message(self, event: Event) -> str:

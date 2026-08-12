@@ -5,14 +5,14 @@
 
 import os
 import queue
-import threading
 import time
 from collections import deque
+from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from threading import Thread
 
 import numpy as np
-import rich
 import sherpa_onnx
 import sounddevice as sd
 import torch
@@ -21,19 +21,68 @@ from faster_whisper import WhisperModel
 from silero_vad import VADIterator, load_silero_vad
 
 from .config import DATA_DIR, cfg
-from .events import EventType, emit_event, wait_for
+from .events import EventType, emit_event, log, wait_for
 
 # makes downloading Whisper models from HF faster
 load_dotenv()  # loads HF_TOKEN from .env file.
 os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
 
-def print(msg: str, end="\n", force=False):
-    if cfg.profiler or force:
-        rich.print(msg, end=end)
+class VAD:
+    def __init__(self) -> None:
+        _start = time.perf_counter()
+
+        self.model = load_silero_vad()
+        self.iterator = VADIterator(
+            self.model,
+            threshold=cfg.vad.threshold,
+            min_silence_duration_ms=cfg.vad.min_silence_duration_ms,
+            sampling_rate=cfg.audio.sample_rate,
+            speech_pad_ms=cfg.vad.speech_pad_ms,
+        )
+
+        self.is_speaking = False
+
+        log("VAD model: LOADED.", "VAD", "SUCCESS")
+        emit_event(EventType.VAD_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
+
+    @staticmethod
+    def _normalize_chunk(audio_chunk: np.ndarray | torch.Tensor) -> torch.Tensor:
+        if isinstance(audio_chunk, np.ndarray):
+            return torch.from_numpy(
+                audio_chunk.squeeze(1) if audio_chunk.ndim > 1 else audio_chunk
+            )
+        return audio_chunk
+
+    def process(self, audio_chunk: np.ndarray | torch.Tensor) -> str:
+        """Returns state of speech: 'silence', 'start', 'speaking', 'end'."""
+        chunk = self._normalize_chunk(audio_chunk)
+
+        voice_dict = self.iterator(chunk)
+        if voice_dict:
+            if "start" in voice_dict:
+                self.is_speaking = True
+                return "start"
+            elif "end" in voice_dict:
+                self.is_speaking = False
+                return "end"
+
+        return "speaking" if self.is_speaking else "silence"
 
 
 class KeyWordSpotter:
+    """Sherpa-ONNX Keyword Spotter model.
+
+    Usage:
+    ```python
+    kws = KeyWordSpotter()
+
+    kw = kws.process_chunk(audio_chunk)
+    if kw:
+        print("Keyword was detected: " + kw)
+    ```
+    """
+
     def __init__(self):
         path: Path = DATA_DIR / cfg.kws.model_dir
         tokens = str(path / "tokens.txt")
@@ -42,10 +91,15 @@ class KeyWordSpotter:
         joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
         if not os.path.exists(tokens):
-            print(f"[WARN] No Sherpa model in: {path}. Donwloading...")
+            log(
+                f"No Sherpa model in: {path}. Donwloading...",
+                source="KWS",
+                level="WARN",
+            )
             self._download_sherpa_onnx_model(path)
             # raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
+        _start = time.perf_counter()
         self.kws = sherpa_onnx.KeywordSpotter(
             tokens=tokens,
             encoder=encoder,
@@ -59,6 +113,9 @@ class KeyWordSpotter:
 
         # self.stream = self.kws.create_stream()
         self.reset()
+
+        log("KWS model: LOADED.", "KWS", "SUCCESS")
+        emit_event(EventType.KWS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
 
     @staticmethod
     def _download_sherpa_onnx_model(model_path: Path):
@@ -111,6 +168,7 @@ class KeyWordSpotter:
             if result:
                 keyword = result.strip()
                 self.reset()
+                emit_event(EventType.STT_KEYWORD_DETECTED, keyword)
                 return keyword
         return None
 
@@ -124,8 +182,13 @@ class Whisper:
         model_dir: Path = DATA_DIR / w.download_root
 
         if not model_dir.exists():
-            print(f"[I] No Faster-Whisper model found in {model_dir}. Downloading...")
+            log(
+                f"No Faster-Whisper model found in {model_dir}. Downloading...",
+                "Whisper",
+                "WARN",
+            )
 
+        _start = time.perf_counter()
         self.model = WhisperModel(
             w.model_size,
             device=w.device,
@@ -133,6 +196,11 @@ class Whisper:
             cpu_threads=w.cpu_threads,
             num_workers=1,
             download_root=str(model_dir),
+        )
+
+        log("Whisper model: LOADED.", "Whisper", "SUCCESS")
+        emit_event(
+            EventType.WHISPER_LOADED, f"{(time.perf_counter() - _start) * 1000}ms"
         )
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
@@ -150,132 +218,151 @@ class Whisper:
         return text, int((time.perf_counter() - start_time) * 1000)
 
 
-class Listener:
-    def __init__(self, stt_model: Whisper, kws_model: KeyWordSpotter | None = None):
-        self.MODE: Literal["KWS", "DIRECT"] = cfg.stt.pipeline_mode
+class LState(StrEnum):
+    SLEEPING = "SLEEPING"
+    AWAKE = "AWAKE"
+    RECORDING = "RECORDING"
+    WAITING = "WAITING"
 
-        self.stt = stt_model
-        self.kws = kws_model
 
-        if self.kws:
-            self.MODE = "KWS"
+class AudioPipeline:
+    """Operates states & processes raw audio."""
 
-        self.vad_model = load_silero_vad()
-        self.vad_iterator = VADIterator(
-            self.vad_model,
-            threshold=cfg.vad.threshold,
-            min_silence_duration_ms=cfg.vad.min_silence_duration_ms,
-            sampling_rate=cfg.audio.sample_rate,
-            speech_pad_ms=cfg.vad.speech_pad_ms,
-        )
+    def __init__(
+        self,
+        vad: VAD,
+        kws: KeyWordSpotter,
+        on_audio_ready: Callable[[np.ndarray, float], None] | None = None,
+    ) -> None:
+        self.vad = vad
+        self.kws = kws
+        self.on_audio_ready = on_audio_ready
 
-        self.speech_buffer = []  # Buffer for accumulating audio chunks while the user is speaking
+        self.state = LState.SLEEPING
+        self.awake_deadline = 0.0
+
         self.preroll_buffer = deque(maxlen=cfg.vad.preroll_blocks)
-        self.state: Literal["SLEEPING", "AWAKE", "RECORDING"] = (
-            "SLEEPING" if self.MODE == "KWS" else "AWAKE"
-        )
-        emit_event(EventType.STT_CHANGED_STATE, self.state)
+        self.speech_buffer = []
 
-        self.awake_deadline = 0.0  # flag showing when to gofrom AWAKE to SLEEPING mode.(if time.monotonic() > self.awake_deadline)
-        self.audio_queue = queue.Queue()
+        self.update_deadline()
 
-        self.is_busy = False
+    def set_state(self, new_state: LState, detail: str | None = None) -> None:
+        if self.state != new_state:
+            self.state = new_state
+            emit_event(EventType.STT_CHANGED_STATE, new_state.value)
 
-        self.stt_worker_thread = threading.Thread(target=self._stt_worker, daemon=True)
-        self.stt_thread = threading.Thread(
-            target=self._main, name="STT_THREAD", daemon=True
-        )
+            payload = {"state": new_state.value}
+            if detail:
+                payload["detail"] = detail
+            emit_event(EventType.UI_STATE_CHANGE, payload)
 
-    def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
-        """Function that is called every chunk of time(~32 ms default) and proccesses audio data(ndarray)"""
+    def get_state(self) -> LState:
+        return self.state
 
-        if self.is_busy:  # if assistant is generating response or speaking
-            self.awake_deadline = (
-                time.monotonic() + cfg.stt.awake_timeout
-            )  # updatesdeadline
+    def update_deadline(self) -> None:
+        self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
+
+    def is_deadline_expired(self) -> bool:
+        return time.monotonic() > self.awake_deadline
+
+    def process(self, raw_chunk: np.ndarray) -> None:
+        chunk = raw_chunk.squeeze(1) if raw_chunk.ndim > 1 else raw_chunk
+
+        if self.state == LState.WAITING:
+            self.update_deadline()
             return
 
-        # ID array
-        chunk_np = indata.squeeze(1)
-        chunk_torch = torch.from_numpy(chunk_np)
+        self.preroll_buffer.append(chunk.copy())
 
-        self.preroll_buffer.append(chunk_np.copy())  # updating preroll
-        speech_dict = self.vad_iterator(chunk_torch)  # checking VAD
+        if self.state == LState.SLEEPING:
+            self._handle_sleeping(chunk)
+        elif self.state == LState.AWAKE:
+            self._handle_awake(chunk)
+        elif self.state == LState.RECORDING:
+            self._handle_recording(chunk)
 
-        if self.state == "SLEEPING":
-            # kws exists
-            if not isinstance(self.kws, KeyWordSpotter):
-                raise SystemError(
-                    "[!] ERROR: Listener.state is 'SLEEPING' but KWS was not initialized."
-                )
-            detected_keyword = self.kws.process_chunk(chunk_np)
-            if detected_keyword:
-                emit_event(EventType.STT_KEYWORD_DETECTED, detected_keyword)
+    def _handle_sleeping(self, chunk: np.ndarray) -> None:
+        detected_keyword = self.kws.process_chunk(chunk)
+        if detected_keyword:
+            self.update_deadline()
+            self.kws.reset()
+            self.set_state(LState.AWAKE, detail=f"Keyword: '{detected_keyword}'")
 
-                self.state = "AWAKE"
-                emit_event(EventType.STT_CHANGED_STATE, self.state)
+    def _handle_awake(self, chunk: np.ndarray) -> None:
+        if self.is_deadline_expired():
+            self.kws.reset()
+            self.set_state(
+                LState.SLEEPING, detail=f"Timeout ({int(cfg.stt.awake_timeout)}s)"
+            )
+            return
 
-                self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
-                self.kws.reset()
+        speech_state = self.vad.process(chunk)
+        if speech_state == "start":
+            self.speech_buffer = list(self.preroll_buffer)
+            self.set_state(LState.RECORDING)
 
-                emit_event(
-                    EventType.UI_STATE_CHANGE,
-                    {"state": self.state, "detail": f"Keyword: '{detected_keyword}'"},
-                )
+    def _handle_recording(self, chunk: np.ndarray) -> None:
+        self.speech_buffer.append(chunk.copy())
+        speech_state = self.vad.process(chunk)
 
-        elif self.state == "AWAKE":
-            if (self.kws) and time.monotonic() > self.awake_deadline:
-                self.state = "SLEEPING"
-                emit_event(EventType.STT_CHANGED_STATE, self.state)
+        if speech_state == "end":
+            if self.speech_buffer:
+                full_audio = np.concatenate(self.speech_buffer)
+                listen_ms = (len(full_audio) / cfg.audio.sample_rate) * 1000.0
 
-                self.kws.reset()
-                emit_event(
-                    EventType.UI_STATE_CHANGE,
-                    {
-                        "state": "SLEEPING",
-                        "detail": f"Timeout ({int(cfg.stt.awake_timeout)}s)",
-                    },
-                )
+                if listen_ms > cfg.stt.min_command_ms:
+                    if not self.on_audio_ready:
+                        log(
+                            "[!] AudioPipeline was registered, but `on_audio_ready` callback was not.",
+                            "AudioPipeline",
+                            "ERROR",
+                        )
+                        raise RuntimeError(
+                            "[!] AudioPipeline was registered, but `on_audio_ready` callback was not."
+                        )
+                    self.on_audio_ready(full_audio, listen_ms)
 
-                return
+            self.speech_buffer.clear()
+            self.update_deadline()
+            self.set_state(LState.AWAKE)
 
-            if speech_dict and "start" in speech_dict:
-                self.state = "RECORDING"
-                emit_event(EventType.STT_CHANGED_STATE, self.state)
 
-                emit_event(EventType.UI_STATE_CHANGE, {"state": self.state})
-                self.speech_buffer = list(self.preroll_buffer)
+class Listener:
+    def __init__(self, vad: VAD, whisper: Whisper, kws: KeyWordSpotter) -> None:
+        self.whisper = whisper
 
-        elif self.state == "RECORDING":
-            self.speech_buffer.append(chunk_np.copy())
+        self.vad = vad
+        self.kws = kws
+        self.pipeline = AudioPipeline(self.vad, self.kws, self._on_audio_recorded)
 
-            if speech_dict and "end" in speech_dict:  # VAD detected end of speech
-                if self.speech_buffer:
-                    full_audio = np.concatenate(self.speech_buffer)
-                    listen_ms: float = (
-                        len(full_audio) / cfg.audio.sample_rate
-                    ) * 1000.0
+        self.audio_input_thread = Thread(
+            target=self._audio_input, name="LISTENER_INPUT_THREAD", daemon=True
+        )
+        self.stt_worker_thread = Thread(
+            target=self._stt_worker, name="LISTENER_WORKER_THREAD", daemon=True
+        )
+        self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
-                    # random sound protection
-                    if listen_ms > cfg.stt.min_command_ms:
-                        self.audio_queue.put((full_audio.copy(), listen_ms))
+        self._running = False
 
-                self.speech_buffer = []
-                self.state = "AWAKE"
-                emit_event(EventType.PROFILER_SET_STATE, self.state)
+    def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
+        self.pipeline.process(indata)
 
-                self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
+    def _on_audio_recorded(self, full_audio: np.ndarray, listen_ms: float):
+        self.audio_queue.put((full_audio.copy(), listen_ms))
 
     def _stt_worker(self):
-        """Different thread awaits audio array in queue and then processes it"""
+        """Processes audio from audio_queue to text and emits event."""
         while True:
             item = self.audio_queue.get()
             if item is None:
                 break
 
             audio_array, listen_ms = item
-            text, recog_ms = self.stt.transcribe(audio_array)
+            text, recog_ms = self.whisper.transcribe(audio_array)
             rtf = recog_ms / listen_ms
+
+            text = text.strip()
 
             if text:
                 emit_event(
@@ -289,28 +376,21 @@ class Listener:
                 )
 
                 emit_event(EventType.STT_TRANSCRIBED, text)
-                self.is_busy = True
-                emit_event(EventType.STT_BUSY, self.is_busy)
+                self.pipeline.set_state(LState.WAITING)
 
                 success = wait_for(EventType.STT_CONTINUE, timeout=15.0)
-                self.is_busy = False
-
-                self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
-                emit_event(EventType.STT_CHANGED_STATE, "AWAKE")
+                if not success:
+                    log(
+                        "STT worker timed out(15s) waiting for STT_CONTINUE!",
+                        source="STT",
+                        level="WARN",
+                    )
+                self.pipeline.set_state(LState.AWAKE)
+                self.pipeline.update_deadline()
 
             self.audio_queue.task_done()
 
-    def close(self):
-        self.audio_queue.put(None)  # Ending worker thread
-        self.stt_worker_thread.join()
-
-        emit_event(EventType.STT_FINISH)
-
-    def _main(self):
-        emit_event(EventType.PROFILER_START)
-
-        self.stt_worker_thread.start()
-
+    def _audio_input(self):
         try:
             with sd.InputStream(
                 samplerate=cfg.audio.sample_rate,
@@ -319,10 +399,22 @@ class Listener:
                 dtype=cfg.audio.dtype,
                 callback=self._audio_callback,
             ):
-                while True:
+                while self._running:
                     sd.sleep(100)
-        finally:
-            self.close()
+        except Exception as e:  # noqa: BLE001
+            log(f"Microphone input error: {e}", "LISTENER", "ERROR")
 
     def start(self):
-        self.stt_thread.start()
+        self._running = True
+        emit_event(EventType.STT_START)
+
+        self.stt_worker_thread.start()
+        self.audio_input_thread.start()
+
+    def close(self):
+        self._running = False
+        self.audio_queue.put(None)
+
+        self.stt_worker_thread.join()
+        self.audio_input_thread.join()
+        emit_event(EventType.STT_FINISH)

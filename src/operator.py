@@ -294,7 +294,7 @@ class LLM:
         if hasattr(self, "llama") and self.llama is not None:
             try:
                 self.llama.close()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
             finally:
                 self.llama = None

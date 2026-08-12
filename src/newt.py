@@ -14,13 +14,14 @@ from .events import (
 )
 from .operator import Operator
 from .profiler import profiler
-from .speech_to_text import KeyWordSpotter, Listener, Whisper
+from .speech_to_text import VAD, KeyWordSpotter, Listener, Whisper
 from .text_to_speech import TextToSpeech
 from .ui import AssistantUI, console
 
 
 class Newt:
     def __init__(self) -> None:
+        # light components
         self.events = EventManager()
         self.alive = True
         self.logger = None
@@ -28,68 +29,63 @@ class Newt:
         if cfg.log:
             self.logger = EventLogger()
 
+        # main components
+
         self.tts = TextToSpeech()
         self.operator = Operator()
 
-        match cfg.stt.pipeline_mode:
-            case "KWS":
-                self.kws = KeyWordSpotter()
-                self.stt = Whisper()
-                self.listener = Listener(self.stt, self.kws)
-            case "DIRECT":
-                stt = Whisper()
-                self.listener = Listener(stt)
+        # STT pipeline
+
+        self.kws = KeyWordSpotter()
+        self.vad = VAD()
+        self.whisper = Whisper()
+        self.listener = Listener(self.vad, self.whisper, self.kws)
 
         self._setup_subscriptions()
 
     def _setup_subscriptions(self):
         """Subscribe all nececessary callbacks for events."""
-        event_manager = EventManager()
+        em = EventManager()
         app = self
 
         # TTS
-        event_manager.subscribe(EventType.TTS_SPEAK, lambda e: app.tts.speak(e.content))
-        event_manager.subscribe(
-            EventType.TTS_PLAY_SOUND, lambda e: app.tts.play_sound(e.content)
-        )
+        em.subscribe(EventType.TTS_SPEAK, lambda e: app.tts.speak(e.content))
+        em.subscribe(EventType.TTS_PLAY_SOUND, lambda e: app.tts.play_sound(e.content))
 
-        event_manager.subscribe(
+        em.subscribe(
             EventType.STT_CHANGED_STATE,
             lambda e: emit_event(EventType.PROFILER_SET_STATE, e.content),
         )
-        event_manager.subscribe(
+        em.subscribe(
             EventType.STT_TRANSCRIBED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, e.content),
         )
-        event_manager.subscribe(
+        em.subscribe(
             EventType.STT_KEYWORD_DETECTED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
         )
-
-        event_manager.subscribe(EventType.OP_ASK_FINISH, lambda e: app._shutdown())
-        event_manager.subscribe(
-            EventType.OP_RECEIVE_CMD, lambda e: app.operator.submit(e.content)
-        )
-        event_manager.subscribe(
-            EventType.OP_READY, lambda e: emit_event(EventType.STT_CONTINUE)
+        em.subscribe(
+            EventType.STT_START, lambda e: emit_event(EventType.PROFILER_START)
         )
 
-        event_manager.subscribe(
-            EventType.UI_BANNER, lambda e: AssistantUI.print_banner()
-        )
-        event_manager.subscribe(
+        em.subscribe(EventType.OP_ASK_FINISH, lambda e: app._shutdown())
+        em.subscribe(EventType.OP_RECEIVE_CMD, lambda e: app.operator.submit(e.content))
+        em.subscribe(EventType.OP_READY, lambda e: emit_event(EventType.STT_CONTINUE))
+
+        em.subscribe(EventType.UI_BANNER, lambda e: AssistantUI.print_banner())
+        em.subscribe(
             EventType.UI_STATE_CHANGE,
             lambda e: AssistantUI.print_state_change(**e.content),
         )
-        event_manager.subscribe(
+        em.subscribe(
             EventType.UI_TRANSCRIPTION,
             lambda e: AssistantUI.print_transcription(**e.content),
         )
-        event_manager.subscribe(
+        em.subscribe(
             EventType.UI_LLM_CHUNK,
             lambda e: AssistantUI.print_llm_chunk(**e.content),
         )
-        event_manager.subscribe(
+        em.subscribe(
             EventType.UI_LLM_RESPONSE,
             lambda e: AssistantUI.print_llm_response(**e.content),
         )
@@ -98,12 +94,12 @@ class Newt:
             if cfg.profiler:
                 profiler.start()
 
-        event_manager.subscribe(EventType.PROFILER_START, lambda e: _prof_start(e))
-        event_manager.subscribe(
+        em.subscribe(EventType.PROFILER_START, lambda e: _prof_start(e))
+        em.subscribe(
             EventType.PROFILER_SET_STATE,
             lambda e: profiler.set_state(e.content),
         )
-        event_manager.subscribe(EventType.PROFILER_FINISH, app._prof_finish)
+        em.subscribe(EventType.PROFILER_FINISH, app._prof_finish)
 
     def _shutdown(self):
         self.alive = False
@@ -114,16 +110,18 @@ class Newt:
             AssistantUI.print_benchmark_report(profiler.get_summary())
 
     def close(self):
-        self._prof_finish()
+        emit_event(EventType.PROFILER_FINISH)
+
         if getattr(self, "operator", None):
             self.operator.close()
         if getattr(self, "tts", None):
             self.tts.close()
         if getattr(self, "listener", None):
             self.listener.close()
-        self.events.stop()
 
         self._shutdown()
+
+        self.events.flush_and_stop()
 
     def main(self):
         self.tts.start()

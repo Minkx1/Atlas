@@ -1,6 +1,7 @@
 # main.py
 
-import src
+from src import Newt
 
 if __name__ == "__main__":
-    src.Newt().start()
+    newt = Newt()
+    newt.start()
