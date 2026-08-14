@@ -1,5 +1,6 @@
 # text_to_speech.py
 
+import json
 import queue
 import subprocess
 import sys
@@ -12,6 +13,7 @@ import numpy as np
 import sounddevice as sd
 from piper import PiperVoice, SynthesisConfig
 from playsound3 import playsound
+from pydub import AudioSegment
 
 if __name__ == "__main__":
     from config import DATA_DIR, cfg
@@ -49,6 +51,11 @@ class TextToSpeech:
             self.path, use_cuda=cfg.tts.use_cuda, download_dir=self.path.parent
         )
         self._generate_basic_sounds()
+        log(
+            f"TTS model loaded in {(time.perf_counter() - _start) * 1000:.0f}ms",
+            "TTS",
+            "SUCCESS",
+        )
         emit_event(EventType.TTS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
 
     def _download_model(self):
@@ -129,20 +136,35 @@ class TextToSpeech:
                     "ERROR",
                 )
 
-    def _text_to_wav(self, text: str, wav_file_path: Path) -> None:
-        if text.strip():
-            try:
-                wav_file_path.parent.mkdir(exist_ok=True, parents=True)
-                log(f"Writing WAV: {wav_file_path.name}", "TTS", "DEBUG")
-                with wave.open(f"{wav_file_path}", "wb") as f:
-                    self.voice.synthesize_wav(text, f, self.syn_config)
-                log(f"WAV written: {wav_file_path.name}", "TTS", "DEBUG")
-            except Exception as e:  # noqa: BLE001
-                log(
-                    f"Error writing WAV {wav_file_path.name}: {type(e).__name__}: {e}",
-                    "TTS",
-                    "ERROR",
-                )
+    def _text_to_wav(self, text: str, output_path: Path) -> None:
+        if not text.strip():
+            return
+
+        try:
+            output_path.parent.mkdir(exist_ok=True, parents=True)
+            wav_file: Path = output_path.with_suffix(".wav")
+
+            with wave.open(str(wav_file), "wb") as f:
+                self.voice.synthesize_wav(text, f, self.syn_config)
+
+            # converting with pydub
+            if output_path.suffix.lower() == ".mp3":
+                log(f"Compressing to MP3: {output_path.name}", "TTS", "DEBUG")
+
+                audio_mp3 = AudioSegment.from_wav(str(wav_file))
+                audio_mp3.export(str(output_path), format="mp3", bitrate="128k")
+
+                wav_file.unlink()  # Видаляємо WAV
+            else:
+                if wav_file != output_path:
+                    wav_file.rename(output_path)
+
+        except Exception as e:
+            log(
+                f"Error generating audio {output_path.name}: {type(e).__name__}: {e}",
+                "TTS",
+                "ERROR",
+            )
 
     @staticmethod
     def play_audio(path: Path) -> None:
@@ -186,31 +208,43 @@ class TextToSpeech:
         self.queue.put(None)
         self.worker_thread.join()
 
-    def _generate_basic_sounds(self):
-        log("Checking builtin sounds...", "TTS", "INFO")
-        sounds_dir = DATA_DIR / "sounds"
+    def _get_current_state(self) -> dict:
+        """Returns structured dict of current TTS settings and formatted sounds."""
+        c = cfg.tts
+        state = {
+            "settings": {
+                "name": cfg.name,
+                "username": cfg.username,
+                "model_path": c.model_path,
+                "use_cuda": c.use_cuda,
+                "volume": c.volume,
+                "length_scale": c.length_scale,
+                "noise_scale": c.noise_scale,
+                "noise_w_scale": c.noise_w_scale,
+                "normalize_audio": c.normalize_audio,
+            },
+            "sounds": {},
+        }
 
         builtin_cmds = cfg.op.load_builtin_commands() or {}
 
-        for data in builtin_cmds.values():
-            sounds_list: list[dict[str, str]] = data.get("sounds", [])  # type: ignore
+        for intent, data in builtin_cmds.items():
+            formatted_sounds = []
+            sounds_val: list[dict[str, str]] = data.get("sounds", [])  # type: ignore
 
-            for sound_obj in sounds_list:
-                path_str = sound_obj.get("path")
-                text_template = sound_obj.get("text")
+            for sound_obj in sounds_val:
+                path_str = sound_obj.get("path", "")
+                text_template = sound_obj.get("text", "")
 
                 if not path_str or not text_template:
                     continue
 
-                full_path = sounds_dir / path_str
-
-                # if full_path.exists():
-                #     continue
-
                 try:
+                    # KeyError occurs if template has {unknown_key}
                     formatted_text = text_template.format(
-                        username=cfg.username, name=cfg.name
+                        name=cfg.name, username=cfg.username
                     )
+                    formatted_sounds.append({"path": path_str, "text": formatted_text})
                 except KeyError as e:
                     log(
                         f"Missing config key {e} for string '{text_template}'",
@@ -219,12 +253,60 @@ class TextToSpeech:
                     )
                     continue
 
-                log(f"Generating missing sound: {path_str}", "TTS", "INFO")
+            if formatted_sounds:
+                state["sounds"][intent] = formatted_sounds
+
+        return state
+
+    def _generate_basic_sounds(self):
+        log("Checking builtin sounds...", "TTS", "INFO")
+        _RE_GENERATE_ALL = False
+
+        sounds_dir = DATA_DIR / "sounds"
+        sounds_dir.mkdir(parents=True, exist_ok=True)
+        manifest_file = sounds_dir / "manifest.json"
+
+        current_state = self._get_current_state()
+        old_state = {"settings": {}, "sounds": {}}
+        if manifest_file.exists():
+            try:
+                with open(
+                    manifest_file, "r", encoding="utf-8"
+                ) as f:  # Тільки utf-8! :)
+                    old_state = json.load(f)
+            except json.JSONDecodeError:
+                log("Manifest file is corrupted. Regenerating all.", "TTS", "WARNING")
+
+        re_generate_all = old_state.get("settings") != current_state["settings"]
+
+        if re_generate_all:
+            log("TTS settings changed. All sounds will be regenerated.", "TTS", "INFO")
+
+        for intent, sounds_list in current_state["sounds"].items():
+            old_intent_sounds = old_state.get("sounds", {}).get(intent, [])
+
+            for sound_obj in sounds_list:
+                path_str = sound_obj["path"]
+                formatted_text = sound_obj["text"]
+                full_path = sounds_dir / path_str
+
+                if (
+                    not re_generate_all
+                    and full_path.exists()
+                    and sound_obj in old_intent_sounds
+                ):
+                    continue
+
+                log(f"Generating sound: {path_str}", "TTS", "INFO")
                 self._text_to_wav(formatted_text.strip(), full_path)
+
+        # Updating manifest
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            json.dump(current_state, f, indent=4)
+
+        log("Builtin sounds check complete.", "TTS", "INFO")
 
 
 if __name__ == "__main__":
     tts = TextToSpeech()
     tts.load()
-    # tts = TextToSpeech.play_audio(Path("data/sounds/greet/greet1.wav"))
-    # playsound("data/sounds/greet/greet1.wav")

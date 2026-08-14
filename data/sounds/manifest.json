@@ -1,0 +1,139 @@
+{
+    "settings": {
+        "name": "Newt",
+        "username": "sir",
+        "model_path": "models/piper/en_US-lessac-medium.onnx",
+        "use_cuda": false,
+        "volume": 1.0,
+        "length_scale": 0.75,
+        "noise_scale": 1.0,
+        "noise_w_scale": 1.0,
+        "normalize_audio": false
+    },
+    "sounds": {
+        "greet": [
+            {
+                "path": "greet/greet1.wav",
+                "text": "Good Evening, sir"
+            },
+            {
+                "path": "greet/greet2.wav",
+                "text": "Welcome back, sir"
+            },
+            {
+                "path": "greet/greet3.wav",
+                "text": "Greetings, sir"
+            },
+            {
+                "path": "greet/greet4.wav",
+                "text": "Hello! How can I help you, sir?"
+            },
+            {
+                "path": "greet/greet5.wav",
+                "text": "Hi there! Nice to talk to you again."
+            },
+            {
+                "path": "greet/greet6.wav",
+                "text": "Hey sir, I am ready when you are."
+            }
+        ],
+        "farewell": [
+            {
+                "path": "farewell/bye1.wav",
+                "text": "Goodbye, sir."
+            },
+            {
+                "path": "farewell/bye2.wav",
+                "text": "Farewell, sir."
+            },
+            {
+                "path": "farewell/bye3.wav",
+                "text": "Have a good day, sir."
+            },
+            {
+                "path": "farewell/bye4.wav",
+                "text": "See you soon, sir!"
+            },
+            {
+                "path": "farewell/bye5.wav",
+                "text": "Take care! Talk to you later."
+            },
+            {
+                "path": "farewell/bye6.wav",
+                "text": "Goodbye! Let me know if you need anything else."
+            }
+        ],
+        "sleep": [
+            {
+                "path": "sleep/sleep1.wav",
+                "text": "Going to sleep."
+            },
+            {
+                "path": "sleep/sleep2.wav",
+                "text": "Ok, going quite."
+            }
+        ],
+        "thanks": [
+            {
+                "path": "thanks/thanks1.wav",
+                "text": "Thank you, sir."
+            },
+            {
+                "path": "thanks/thanks2.wav",
+                "text": "I truly appreciate this, sir."
+            },
+            {
+                "path": "thanks/thanks3.wav",
+                "text": "You are very welcome!"
+            },
+            {
+                "path": "thanks/thanks4.wav",
+                "text": "Happy to help, sir."
+            },
+            {
+                "path": "thanks/thanks5.wav",
+                "text": "Anytime! Glad I could be useful."
+            },
+            {
+                "path": "thanks/thanks6.wav",
+                "text": "Don't mention it, happy to be of service!"
+            }
+        ],
+        "sorry": [
+            {
+                "path": "sorry/sorry1.wav",
+                "text": "I am really sorry, sir."
+            },
+            {
+                "path": "sorry/sorry2.wav",
+                "text": "Please accept my apologies."
+            },
+            {
+                "path": "sorry/sorry3.wav",
+                "text": "My apologies, sir."
+            },
+            {
+                "path": "sorry/sorry4.wav",
+                "text": "I am sorry for the confusion. I will try to do better."
+            },
+            {
+                "path": "sorry/sorry5.wav",
+                "text": "Oops, my bad. Let me fix that for you."
+            },
+            {
+                "path": "sorry/sorry6.wav",
+                "text": "I apologize, sir. Still learning every day."
+            }
+        ],
+        "whoami": [
+            {
+                "path": "whoami/whoami1.wav",
+                "text": "I am Newt, your Voice Assistant."
+            },
+            {
+                "path": "whoami/whoami2.wav",
+                "text": "My name is Newt. I am your personal assistant."
+            }
+        ]
+    }
+}

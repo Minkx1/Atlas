@@ -15,6 +15,7 @@ sherpa-onnx
 # TTS
 piper-tts
 playsound3
+pydub
 
 # OP
 llama-cpp-python

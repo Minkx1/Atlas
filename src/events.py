@@ -157,7 +157,7 @@ def wait_for(event: EventType, timeout: float | None = None) -> Event | None:
     return EventManager().wait_for(event, timeout)
 
 
-def log(message: str, source: str = "SYSTEM", level: str = "INFO"):
+def log(message: str, source: str = "SYSTEM", level: str = "DEBUG"):
     emit_event(
         EventType.DEBUG_LOG,
         {"message": str(message), "source": source, "level": level.upper()},

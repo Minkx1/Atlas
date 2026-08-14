@@ -45,7 +45,7 @@ class VAD:
                 speech_pad_ms=cfg.vad.speech_pad_ms,
             )
             elapsed = (time.perf_counter() - _start) * 1000
-            log(f"VAD model loaded in {elapsed:.0f}ms", "VAD", "INFO")
+            log(f"VAD model loaded in {elapsed:.0f}ms", "VAD", "SUCCESS")
             emit_event(EventType.VAD_LOADED, f"{elapsed}ms")
         except Exception as e:  # noqa: BLE001
             log(
@@ -127,7 +127,7 @@ class KeyWordSpotter:
 
             self.stream = self.kws.create_stream()
             elapsed = (time.perf_counter() - _start) * 1000
-            log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "INFO")
+            log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "SUCCESS")
             emit_event(EventType.KWS_LOADED, f"{elapsed}ms")
         except Exception as e:  # noqa: BLE001
             log(
@@ -228,7 +228,7 @@ class Whisper:
                 download_root=str(self.model_dir),
             )
             elapsed = (time.perf_counter() - _start) * 1000
-            log(f"Whisper model loaded in {elapsed:.0f}ms", "STT", "INFO")
+            log(f"Whisper model loaded in {elapsed:.0f}ms", "STT", "SUCCESS")
             emit_event(EventType.WHISPER_LOADED, f"{elapsed}ms")
         except Exception as e:  # noqa: BLE001
             log(

@@ -81,11 +81,6 @@ class CommandOperator:
                     self.triggers[intent] = data["triggers"]  # type: ignore
 
                 sounds = data.get("sounds", [])
-                log(
-                    f"Intent '{intent}' loaded: {len(data.get('triggers', []))} triggers, {len(sounds)} sounds.",
-                    "OP",
-                    "DEBUG",
-                )
             else:
                 log(
                     f"Warning: Data for intent '{intent}' is not a dict. Type: {type(data)}",

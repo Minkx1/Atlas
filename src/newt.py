@@ -57,19 +57,14 @@ class Newt:
         try:
             log("Starting model loading...", "NEWT", "INFO")
             self.tts.load()
-            log("TTS model loaded.", "NEWT", "DEBUG")
 
             self.llm.load()
-            log("LLM model loaded.", "NEWT", "DEBUG")
 
             self.vad.load()
-            log("VAD model loaded.", "NEWT", "DEBUG")
             self.kws.load()
-            log("KWS model loaded.", "NEWT", "DEBUG")
             self.whisper.load()
-            log("Whisper model loaded.", "NEWT", "DEBUG")
 
-            log("All models loaded successfully.", "NEWT", "INFO")
+            log("All models loaded successfully.", "NEWT", "SUCCESS")
         except Exception as e:
             log(
                 f"Error loading models: {type(e).__name__}: {e}",
