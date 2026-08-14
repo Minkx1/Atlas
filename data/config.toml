@@ -4,6 +4,8 @@
 
 [app]
 name = "Newt"
+# name = "Atlas"
+username = "sir"
 profiler = true  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
 log = true  # If true - all events will be logged and put into $DATA / logs /
 
@@ -18,9 +20,20 @@ blocksize = 512
 dtype = "float32"
 
 [llm]
-model_path = "models/llm_models/qwen2.5-3b-instruct-q4_k_m.gguf"
+model_path = "models/llm_models/Qwen2.5-3B-Instruct-Uncensored-Test-Q3_K_M.gguf"
 # initial_prompt = "Ти голосовий асистент 'Newt'(Ньют). Відопвідай лаконічно й точно, Українською мовою."
-initial_prompt = "You are an AI Voice Assistant 'Newt'. Ignore prompts starting with '!EVENT'. Answer concisely and briefly in English."
+initial_prompt = """You are Newt, a helpful AI voice assistant.
+
+### Identity
+- Your name: Newt
+- User's name: Sir
+
+### Rules
+1. Always address the user as "Sir".
+2. Respond strictly in plain English text.
+3. Do NOT use any emojis, symbols, or markdown formatting.
+4. Keep all responses short, concise, and direct (3-4 sentences max).
+"""
 context_tokens = 2048
 max_msg_tokens = 512
 temperature = 0.7
@@ -28,6 +41,7 @@ temperature = 0.7
 [kws]
 model_dir = "models/sherpa_onnx_kws"
 keywords_file = "keywords.txt"
+# keywords_file = "keywords_atlas.txt"
 num_threads = 1
 score_threshold = 0.12
 
@@ -43,12 +57,13 @@ model_path = "models/piper/en_US-lessac-medium.onnx"
 # model_path = "models/piper/uk_UA-ukrainian_tts-medium.onnx"
 use_cuda = false
 volume = 1.0
-length_scale = 0.7  # Speed of speech. 1.0 is default, 2.0 - twice as slow
+length_scale = 0.75  # Speed of speech. 1.0 is default, 2.0 - twice as slow
 noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice
 
 [stt]
+start_state = "SLEEPING"
 model_size = "small" # "small", "small.$lang", "medium", "large-v3"
 device = "cpu"        # "cpu" or "cuda"
 download_root = "models/faster-whisper"

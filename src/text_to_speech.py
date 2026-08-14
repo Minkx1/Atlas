@@ -48,6 +48,7 @@ class TextToSpeech:
         self.voice = PiperVoice.load(
             self.path, use_cuda=cfg.tts.use_cuda, download_dir=self.path.parent
         )
+        self._generate_basic_sounds()
         emit_event(EventType.TTS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
 
     def _download_model(self):
@@ -133,7 +134,8 @@ class TextToSpeech:
             with wave.open(f"{wav_file_path}", "wb") as f:
                 self.voice.synthesize_wav(text, f, self.syn_config)
 
-    def play_audio(self, path: Path) -> None:
+    @staticmethod
+    def play_audio(path: Path) -> None:
         playsound(path)
 
     def start(self):
@@ -152,31 +154,33 @@ class TextToSpeech:
         self.queue.put(None)
         self.worker_thread.join()
 
+    def _generate_basic_sounds(self):
+        # if file is run generates basic sound files
 
-def _main():
-    # if file is run generates basic sound files
-    tts = TextToSpeech()
+        sounds_dir = DATA_DIR / "sounds"
+        user_name = cfg.username
+        basic_sounds = {
+            ("greet/greet1.wav", f"Good Evening, {user_name}."),
+            ("greet/greet2.wav", f"Welcome back, {user_name}."),
+            ("greet/greet3.wav", f"Greetings, {user_name}."),
+            ("farewell/bye1.wav", f"Goodbye, {user_name}."),
+            ("farewell/bye2.wav", f"Farewell, {user_name}."),
+            ("farewell/bye3.wav", f"Have a good day, {user_name}."),
+            ("thanks/thanks1.wav", f"Thank you, {user_name}."),
+            ("thanks/thanks2.wav", f"I truly apreciate this, {user_name}."),
+            ("sorry/sorry1.wav", f"I am really sorry, {user_name}."),
+            ("sorry/sorry2.wav", "Please accept my apologies."),
+            ("sorry/sorry3.wav", f"My apologies, {user_name}."),
+            # ("welcome/welcome1.wav", "You're welcome, sir."),
+        }
 
-    sounds_dir = DATA_DIR / "sounds"
-    basic_sounds = {
-        ("greet/greet1.wav", "Good Evening, sir."),
-        ("greet/greet2.wav", "Welcome back, sir."),
-        ("greet/greet3.wav", "Greetings, sir."),
-        ("farewell/bye1.wav", "Goodbye, sir."),
-        ("farewell/bye2.wav", "Farewell, sir."),
-        ("farewell/bye3.wav", "Have a good day, sir."),
-        ("thanks/thanks1.wav", "Thank you, sir."),
-        ("thanks/thanks2.wav", "I truly apreciate this, sir."),
-        ("sorry/sorry1.wav", "I am really sorry, sir."),
-        ("sorry/sorry2.wav", "Please accept my apologies."),
-        ("sorry/sorry3.wav", "My apologies, sir."),
-        # ("welcome/welcome1.wav", "You're welcome, sir."),
-    }
-
-    for path, text in basic_sounds:
-        path = sounds_dir / path
-        tts._text_to_wav(text, path)
+        for path, text in basic_sounds:
+            path = sounds_dir / path
+            self._text_to_wav(text.strip(), path)
 
 
 if __name__ == "__main__":
-    _main()
+    tts = TextToSpeech()
+    tts.load()
+    # tts = TextToSpeech.play_audio(Path("data/sounds/greet/greet1.wav"))
+    # playsound("data/sounds/greet/greet1.wav")

@@ -40,7 +40,8 @@ class CommandOperator:
 
     def __init__(self) -> None:
         self.history = []
-        self.trigers = {
+        self.intent_threshold = 0.5
+        self.triggers = {
             "thanks": ["nice", "you are good", "you are amazing", "good job"],
             "farewell": ["bye", "bye-bye", "bye bye", "good night", "goodbye"],
             "sorry": [
@@ -60,9 +61,11 @@ class CommandOperator:
 
     def _load_triggers_from_config(self) -> None:
         for intent, triggers in cfg.op.load_triggers().items():
-            self.trigers[intent] = triggers
+            self.triggers[intent] = triggers
 
     def operate(self, cmd: str) -> str | None:
+        self.history.append(cmd)
+
         if self.exec_builtin(cmd):
             return "builtin"
         elif self.exec_user(cmd):
@@ -81,25 +84,53 @@ class CommandOperator:
                 if toml.exists() and toml.is_file():
                     l.append(CommandOperator.Command(cmd_dir, toml))
 
+    @staticmethod
+    def _eval_score(trigger: str, cmd: str) -> float:
+        if re.search(rf"\b{re.escape(trigger)}\b", cmd):
+            trigger_word_count = len(trigger.split())
+
+            cmd_word_count = len(cmd.split())
+
+            return trigger_word_count / cmd_word_count
+
+        return 0.0
+
     def exec_builtin(self, cmd: str) -> bool:
         """Checks whether command is in a _builtin_ level and if so exutes it."""
         if cmd == "!EVENT_KEYWORD_DETECTED":
             self._play_random_sound("greet")
             return True
 
-        cmd_lower = cmd.lower()
+        cmd_clean = re.sub(r"[^\w\s]", "", cmd.lower()).strip()
+        if not cmd_clean:
+            return False
 
-        for intent, triggers in self.trigers.items():
-            if any(trigger in cmd_lower for trigger in triggers):
-                emit_event(
-                    EventType.UI_STATE_CHANGE,
-                    {"state": "BUILTIN_CMD", "detail": f"Intent: {intent}"},
-                )
-                self._play_random_sound(intent)
+        best_intent: str | None = None
+        best_score = 0.0
 
-                if intent == "farewell":
-                    emit_event(EventType.OP_ASK_FINISH)
-                return True
+        # evaluating best trigger
+        for intent, triggers in self.triggers:
+            for trigger in triggers:
+                trigger_clean = re.sub(r"[^\w\s]", "", trigger.lower()).strip()
+
+                score = self._eval_score(trigger_clean, cmd_clean)
+
+                if score > best_score:
+                    best_score = score
+                    best_intent = intent
+
+        if best_intent and (
+            best_score >= self.intent_threshold or best_intent == "farewell"
+        ):
+            emit_event(
+                EventType.UI_STATE_CHANGE,
+                {"state": "BUILTIN_CMD", "detail": f"Intent: {best_intent}"},
+            )
+            self._play_random_sound(best_intent)
+
+            if best_intent == "farewell":
+                emit_event(EventType.OP_ASK_FINISH)
+            return True
 
         return False
 
@@ -142,6 +173,9 @@ class LLM:
         self.max_tokens = l.max_msg_tokens
         self.temperature = l.temperature
 
+        self.repeat_penalty = 1.5
+        self.stop = ["😊", "\nUser:", "User:", "<|im_end|>"]
+
         self.history: list[dict[str, str]] = [
             {"role": "system", "content": self.initial_prompt}
         ]
@@ -168,7 +202,8 @@ class LLM:
             messages=[self.history],  # type: ignore
             max_tokens=self.max_tokens,
             temperature=self.temperature,
-            repeat_penalty=1.1,  # Token repeatance protection
+            repeat_penalty=self.repeat_penalty,  # Token repeatance protection
+            stop=self.stop,
         )
 
         gen_ms = time.perf_counter() - start_time
@@ -193,7 +228,8 @@ class LLM:
             messages=self.history,  # type: ignore
             max_tokens=self.max_tokens,
             temperature=self.temperature,
-            repeat_penalty=1.1,
+            repeat_penalty=self.repeat_penalty,
+            stop=self.stop,
             stream=True,  # adding streaming
         )
 

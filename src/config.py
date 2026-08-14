@@ -45,6 +45,7 @@ class VADConfig:
 @dataclass
 class STTConfig:
     model_size: Literal["small", "small.en", "medium", "large-v3"] = "medium"
+    start_state: str = "AWAKE"
     device: Literal["cpu", "cuda"] = "cpu"
     download_root: str = "models/whisper_models_cache"
     compute_type: str = "int8"
@@ -117,6 +118,7 @@ class OPConfig:
 @dataclass
 class AppConfig:
     name: str = "Newt"
+    username: str = "Sir"
     profiler: bool = False
     log: bool = False
 
@@ -151,6 +153,7 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
 
     res = AppConfig(
         name=app.get("name", "Newt"),
+        username=app.get("username", "Sir"),
         profiler=app.get("profiler", False),
         log=app.get("log", False),
         audio=AudioConfig(**data.get("audio", {})),

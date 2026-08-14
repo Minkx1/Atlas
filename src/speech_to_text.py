@@ -248,7 +248,11 @@ class AudioPipeline:
         self.kws = kws
         self.on_audio_ready = on_audio_ready
 
-        self.state = LState.SLEEPING
+        if cfg.stt.start_state == "AWAKE":
+            self.state = LState.AWAKE
+        else:
+            self.state = LState.SLEEPING
+
         self.awake_deadline = 0.0
 
         self.preroll_buffer = deque(maxlen=cfg.vad.preroll_blocks)
