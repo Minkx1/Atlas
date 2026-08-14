@@ -4,6 +4,7 @@ import signal
 import sys
 import threading
 
+from .cmd_operator import LLM, CommandOperator, Operator
 from .config import cfg
 from .events import (
     Event,
@@ -12,7 +13,6 @@ from .events import (
     EventType,
     emit_event,
 )
-from .operator import LLM, CommandOperator, Operator
 from .profiler import profiler
 from .speech_to_text import VAD, KeyWordSpotter, Listener, Whisper
 from .text_to_speech import TextToSpeech

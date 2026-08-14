@@ -1,6 +1,6 @@
 #
-# operator.py
-# Center Of Operations: processes commands from STT
+# cmd_operator.py
+# Operator: processes and operates commands
 #
 
 import os
