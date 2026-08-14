@@ -172,12 +172,17 @@ class EventLogger:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
 
-        # sub to all ('*') events
-        EventManager().subscribe(EventType.WILDCARD, self._log_event)
+        # Subscribe only to DEBUG_LOG events (explicit, not wildcard)
+        EventManager().subscribe(EventType.DEBUG_LOG, self._log_event)
 
     def _get_log_filepath(self, timestamp: float) -> Path:
         date_str = time.strftime("%Y-%m-%d", time.localtime(timestamp))
         return self.logs_dir / f"{date_str}.log"
+
+    def _write_file(self, msg: str, timestamp: float):
+        log_file = self._get_log_filepath(timestamp)
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
 
     def _log_event(self, event: Event):
         message_text = self._format_message(event)
@@ -185,9 +190,7 @@ class EventLogger:
         #     message_text
         # )  # this prints into console, which right now is not needed.
 
-        log_file = self._get_log_filepath(event.timestamp)
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(message_text + "\n")
+        self._write_file(message_text, event.timestamp)
 
     def _format_message(self, event: Event) -> str:
         timestamp = time.strftime("%H:%M:%S", time.localtime(event.timestamp))
@@ -196,7 +199,7 @@ class EventLogger:
             level = str(event.content.get("level", "INFO")).upper()
             source = str(event.content.get("source", "SYSTEM"))
             message = str(event.content.get("message", ""))
-            return f"[{timestamp}] [{source}] {level}: {message}"
+            return f"[{timestamp}] [{source}]  [{level}]: {message}"
 
         content_str = (
             str(event.content)[:100] + "..."

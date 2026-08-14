@@ -116,8 +116,8 @@ class OPConfig:
                 continue
 
             commands[str(intent)] = {
-                "sound": values.get("sound"),
-                "text": values.get("text"),
+                "sounds": values.get("sounds", []),
+                "triggers": values.get("triggers", []),
             }
 
         return commands

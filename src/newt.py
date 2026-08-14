@@ -3,6 +3,7 @@
 import signal
 import sys
 import threading
+import time
 
 from .cmd_operator import LLM, CommandOperator, Operator
 from .config import cfg
@@ -12,6 +13,7 @@ from .events import (
     EventManager,
     EventType,
     emit_event,
+    log,
 )
 from .profiler import profiler
 from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
@@ -28,6 +30,10 @@ class Newt:
 
         if cfg.log:
             self.logger = EventLogger()
+            self.logger._write_file(
+                f" ===== New Session: [{time.strftime('%H:%M:%S', time.localtime(time.time()))}] | SUCCESS ===== \n",
+                time.time(),
+            )
 
         # main components
 
@@ -48,13 +54,29 @@ class Newt:
         self._setup_subscriptions()
 
     def load_models(self):
-        self.tts.load()
+        try:
+            log("Starting model loading...", "NEWT", "INFO")
+            self.tts.load()
+            log("TTS model loaded.", "NEWT", "DEBUG")
 
-        self.llm.load()
+            self.llm.load()
+            log("LLM model loaded.", "NEWT", "DEBUG")
 
-        self.vad.load()
-        self.kws.load()
-        self.whisper.load()
+            self.vad.load()
+            log("VAD model loaded.", "NEWT", "DEBUG")
+            self.kws.load()
+            log("KWS model loaded.", "NEWT", "DEBUG")
+            self.whisper.load()
+            log("Whisper model loaded.", "NEWT", "DEBUG")
+
+            log("All models loaded successfully.", "NEWT", "INFO")
+        except Exception as e:
+            log(
+                f"Error loading models: {type(e).__name__}: {e}",
+                "NEWT",
+                "ERROR",
+            )
+            raise
 
     def _setup_subscriptions(self):
         """Subscribe all nececessary callbacks for events."""
@@ -131,12 +153,30 @@ class Newt:
             AssistantUI.print_benchmark_report(profiler.get_summary())
 
     def close(self):
-        emit_event(EventType.PROFILER_FINISH)
+        try:
+            log("Shutting down assistant...", "NEWT", "INFO")
+            emit_event(EventType.PROFILER_FINISH)
 
-        if getattr(self, "operator", None):
-            self.operator.close()
-        if getattr(self, "tts", None):
-            self.tts.close()
+            if getattr(self, "operator", None):
+                self.operator.close()
+                log("Operator closed.", "NEWT", "DEBUG")
+            if getattr(self, "tts", None):
+                self.tts.close()
+                log("TTS closed.", "NEWT", "DEBUG")
+            if getattr(self, "listener", None):
+                self.listener.close()
+                log("Listener closed.", "NEWT", "DEBUG")
+
+            self._shutdown()
+
+            self.events.flush_and_stop()
+            log("Shutdown complete.", "NEWT", "INFO")
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error during shutdown: {type(e).__name__}: {e}",
+                "NEWT",
+                "ERROR",
+            )
         if getattr(self, "listener", None):
             self.listener.close()
 

@@ -54,11 +54,12 @@ class TextToSpeech:
     def _download_model(self):
         model_path = DATA_DIR / cfg.tts.model_path
         name = model_path.stem
-        log(f"[I] Downloading PiperTTS model: {name}", "TTS", "INFO")
+        log(f"Downloading PiperTTS model: {name}", "TTS", "INFO")
 
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
+            log(f"Starting download subprocess for {name}...", "TTS", "DEBUG")
             subprocess.run(
                 f"{sys.executable} -m piper.download_voices {name}",
                 cwd=model_path.parent,
@@ -67,17 +68,12 @@ class TextToSpeech:
                 stderr=sys.stderr,
                 check=True,
             )
+            log(f"PiperTTS model {name} downloaded successfully.", "TTS", "INFO")
         except Exception as e:  # noqa: BLE001
             log(
-                f"[!] Error during downloading PiperTTS model({name}): {e}",
+                f"Error downloading PiperTTS model {name}: {type(e).__name__}: {e}",
                 "TTS",
                 "ERROR",
-            )
-        else:
-            log(
-                f"[$] PiperTTS model({name}) was downloaded succesfully.",
-                "TTS",
-                "SUCCES",
             )
 
     def _tts_worker(self):
@@ -117,6 +113,7 @@ class TextToSpeech:
     def tts(self, text: str) -> None:
         if text.strip():
             try:
+                log(f"Synthesizing TTS: {text[:50]}...", "TTS", "DEBUG")
                 audio_chunks = list(self.voice.synthesize(text, self.syn_config))
                 audio_array = np.concatenate(
                     [chunk.audio_float_array for chunk in audio_chunks]
@@ -124,19 +121,41 @@ class TextToSpeech:
 
                 sd.play(audio_array, samplerate=audio_chunks[0].sample_rate)
                 sd.wait()
+                log("TTS playback completed.", "TTS", "DEBUG")
             except Exception as e:  # noqa: BLE001
-                print(f"[!] Error occured during TTS synthesis: {e}")
+                log(
+                    f"Error during TTS synthesis: {type(e).__name__}: {e}",
+                    "TTS",
+                    "ERROR",
+                )
 
     def _text_to_wav(self, text: str, wav_file_path: Path) -> None:
         if text.strip():
-            wav_file_path.parent.mkdir(exist_ok=True, parents=True)
-
-            with wave.open(f"{wav_file_path}", "wb") as f:
-                self.voice.synthesize_wav(text, f, self.syn_config)
+            try:
+                wav_file_path.parent.mkdir(exist_ok=True, parents=True)
+                log(f"Writing WAV: {wav_file_path.name}", "TTS", "DEBUG")
+                with wave.open(f"{wav_file_path}", "wb") as f:
+                    self.voice.synthesize_wav(text, f, self.syn_config)
+                log(f"WAV written: {wav_file_path.name}", "TTS", "DEBUG")
+            except Exception as e:  # noqa: BLE001
+                log(
+                    f"Error writing WAV {wav_file_path.name}: {type(e).__name__}: {e}",
+                    "TTS",
+                    "ERROR",
+                )
 
     @staticmethod
     def play_audio(path: Path) -> None:
-        playsound(path)
+        try:
+            log(f"Playing audio: {path.name}", "TTS", "DEBUG")
+            playsound(path)
+            log(f"Audio playback done: {path.name}", "TTS", "DEBUG")
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error playing audio {path.name}: {type(e).__name__}: {e}",
+                "TTS",
+                "ERROR",
+            )
 
     def start(self):
         if not hasattr(self, "voice"):

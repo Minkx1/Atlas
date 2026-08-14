@@ -33,17 +33,26 @@ class VAD:
         self.is_speaking = False
 
     def load(self):
-        _start = time.perf_counter()
-
-        self.model = load_silero_vad()
-        self.iterator = VADIterator(
-            self.model,
-            threshold=cfg.vad.threshold,
-            min_silence_duration_ms=cfg.vad.min_silence_duration_ms,
-            sampling_rate=cfg.audio.sample_rate,
-            speech_pad_ms=cfg.vad.speech_pad_ms,
-        )
-        emit_event(EventType.VAD_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
+        try:
+            _start = time.perf_counter()
+            log("Loading Silero VAD model...", "VAD", "INFO")
+            self.model = load_silero_vad()
+            self.iterator = VADIterator(
+                self.model,
+                threshold=cfg.vad.threshold,
+                min_silence_duration_ms=cfg.vad.min_silence_duration_ms,
+                sampling_rate=cfg.audio.sample_rate,
+                speech_pad_ms=cfg.vad.speech_pad_ms,
+            )
+            elapsed = (time.perf_counter() - _start) * 1000
+            log(f"VAD model loaded in {elapsed:.0f}ms", "VAD", "INFO")
+            emit_event(EventType.VAD_LOADED, f"{elapsed}ms")
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error loading VAD model: {type(e).__name__}: {e}",
+                "VAD",
+                "ERROR",
+            )
 
     @staticmethod
     def _normalize_chunk(audio_chunk: np.ndarray | torch.Tensor) -> torch.Tensor:
@@ -102,21 +111,30 @@ class KeyWordSpotter:
             # raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
     def load(self):
-        _start = time.perf_counter()
-        self.kws = sherpa_onnx.KeywordSpotter(
-            tokens=self.tokens,
-            encoder=self.encoder,
-            decoder=self.decoder,
-            joiner=self.joiner,
-            keywords_file=f"{DATA_DIR / cfg.kws.keywords_file}",
-            num_threads=cfg.kws.num_threads,
-            keywords_threshold=cfg.kws.score_threshold,
-            feature_dim=80,
-        )
+        try:
+            _start = time.perf_counter()
+            log("Loading Sherpa-ONNX KWS model...", "KWS", "INFO")
+            self.kws = sherpa_onnx.KeywordSpotter(
+                tokens=self.tokens,
+                encoder=self.encoder,
+                decoder=self.decoder,
+                joiner=self.joiner,
+                keywords_file=f"{DATA_DIR / cfg.kws.keywords_file}",
+                num_threads=cfg.kws.num_threads,
+                keywords_threshold=cfg.kws.score_threshold,
+                feature_dim=80,
+            )
 
-        self.stream = self.kws.create_stream()
-
-        emit_event(EventType.KWS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
+            self.stream = self.kws.create_stream()
+            elapsed = (time.perf_counter() - _start) * 1000
+            log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "INFO")
+            emit_event(EventType.KWS_LOADED, f"{elapsed}ms")
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error loading KWS model: {type(e).__name__}: {e}",
+                "KWS",
+                "ERROR",
+            )
 
     @staticmethod
     def _download_sherpa_onnx_model(model_path: Path):
@@ -188,27 +206,36 @@ class Whisper:
         self.model_dir: Path = DATA_DIR / w.download_root
 
     def load(self):
-        w = cfg.stt
-        if not self.model_dir.exists():
-            log(
-                f"No Faster-Whisper model found in {self.model_dir}. Downloading...",
-                "Whisper",
-                "WARN",
+        try:
+            w = cfg.stt
+            if not self.model_dir.exists():
+                log(
+                    f"No Faster-Whisper model found in {self.model_dir}. Downloading...",
+                    "STT",
+                    "INFO",
+                )
+            else:
+                log(f"Using Whisper model from {self.model_dir}", "STT", "DEBUG")
+
+            _start = time.perf_counter()
+            log(f"Loading Whisper model: {w.model_size}...", "STT", "INFO")
+            self.model = WhisperModel(
+                w.model_size,
+                device=w.device,
+                compute_type=w.compute_type,
+                cpu_threads=w.cpu_threads,
+                num_workers=1,
+                download_root=str(self.model_dir),
             )
-
-        _start = time.perf_counter()
-        self.model = WhisperModel(
-            w.model_size,
-            device=w.device,
-            compute_type=w.compute_type,
-            cpu_threads=w.cpu_threads,
-            num_workers=1,
-            download_root=str(self.model_dir),
-        )
-
-        emit_event(
-            EventType.WHISPER_LOADED, f"{(time.perf_counter() - _start) * 1000}ms"
-        )
+            elapsed = (time.perf_counter() - _start) * 1000
+            log(f"Whisper model loaded in {elapsed:.0f}ms", "STT", "INFO")
+            emit_event(EventType.WHISPER_LOADED, f"{elapsed}ms")
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error loading Whisper model: {type(e).__name__}: {e}",
+                "STT",
+                "ERROR",
+            )
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
         """Turns Spech(audio array) into a text. Returns (text, time_to_process)."""

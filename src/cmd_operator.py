@@ -1,5 +1,5 @@
 #
-# cmd_operator.py
+# OPerator.py
 # Operator: processes and operates commands
 #
 
@@ -56,8 +56,8 @@ class CommandOperator:
             ],
         }
 
-        self.intent_threshold = 0.65
-        self.margin = 0.08
+        self.intent_threshold = 0.60
+        self.margin = 0.05
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
         self.trigger_embeddings: dict[str, np.ndarray] = {}
@@ -67,11 +67,31 @@ class CommandOperator:
         self._precompute_embeddings()
 
     def _load_builtin_commands(self) -> None:
-        self.builtin_commands = cfg.op.load_builtin_commands() or {}
+        self.builtin_commands = cfg.op.load_builtin_commands() or {}  # type: ignore
+
+        log(
+            f"Loaded builtin intents: {list(self.builtin_commands.keys())}",
+            "OP",
+            "DEBUG",
+        )
 
         for intent, data in self.builtin_commands.items():
-            if isinstance(data, dict) and "triggers" in data:
-                self.triggers[intent] = data["triggers"]  # type: ignore
+            if isinstance(data, dict):
+                if "triggers" in data:
+                    self.triggers[intent] = data["triggers"]  # type: ignore
+
+                sounds = data.get("sounds", [])
+                log(
+                    f"Intent '{intent}' loaded: {len(data.get('triggers', []))} triggers, {len(sounds)} sounds.",
+                    "OP",
+                    "DEBUG",
+                )
+            else:
+                log(
+                    f"Warning: Data for intent '{intent}' is not a dict. Type: {type(data)}",
+                    "OP",
+                    "WARNING",
+                )
 
     def _load_user_commands(self) -> None:
         cmd_dir = DATA_DIR / "commands"
@@ -89,9 +109,11 @@ class CommandOperator:
 
     def _precompute_embeddings(self) -> None:
         """Precomputes embeddings for triggers."""
+        log("Precomputing trigger embeddings...", "OP", "DEBUG")
         for intent, triggers in self.triggers.items():
             vectors = self._get_embedd_vec(triggers)
             self.trigger_embeddings[intent] = vectors
+        log("Embeddings precomputed.", "OP", "DEBUG")
 
     def _get_embedd_vec(self, phrase: str | list[str]) -> np.ndarray:
         return self.model.encode(
@@ -107,6 +129,7 @@ class CommandOperator:
         self.history.append(cmd)
 
         if cmd == "!EVENT_KEYWORD_DETECTED":
+            log("Keyword detected directly!", "OP", "DEBUG")
             payload = self.exec_builtin("greet")
             return "builtin", payload
 
@@ -131,35 +154,58 @@ class CommandOperator:
 
         cmd_vec = self._get_embedd_vec(cmd_clean)
 
-        best_intent: str | None = None
-        best_score = 0.0
-        second_best_score = 0.0
+        scores = []
 
         for intent, vectors in self.trigger_embeddings.items():
             for trigger_vec in vectors:
                 score = self._eval_cosine_similarity(cmd_vec, trigger_vec)
+                scores.append((score, intent))
+        scores.sort(key=lambda x: x[0], reverse=True)
 
-                if score > best_score:
-                    second_best_score = best_score
-                    best_score = score
-                    best_intent = intent
-                elif score > second_best_score:
-                    second_best_score = score
-
-        if best_intent == "llm_query":
+        if not scores:
             return None
 
-        if best_intent and best_score >= self.intent_threshold:
+        best_score, best_intent = scores[0]
+        second_best_score = scores[1][0] if len(scores) > 1 else 0.0
+        second_best_intent = scores[1][1] if len(scores) > 1 else "None"
+
+        log(
+            f"Intent check '{cmd_clean}': Best: {best_intent} ({best_score:.3f}), 2nd: {second_best_intent} ({second_best_score:.3f})",
+            "OP",
+            "DEBUG",
+        )
+
+        if best_intent == "llm_query":
+            log("Intent is 'llm_query', passing to LLM.", "OP", "DEBUG")
+            return None
+
+        if best_score >= self.intent_threshold:
             margin = best_score - second_best_score
             is_confident = margin >= self.margin
 
             if is_confident:
-                log(f"Found intent: {best_intent} (Score: {best_score:.2f})", "CMD_OP")
+                log(
+                    f"Found confident intent: {best_intent} (Score: {best_score:.3f}, Margin: {margin:.3f})",
+                    "OP",
+                )
                 return best_intent
+            else:
+                log(
+                    f"Rejected intent '{best_intent}': Margin too low ({margin:.3f} < {self.margin})",
+                    "OP",
+                    "DEBUG",
+                )
+        else:
+            log(
+                f"Rejected intent '{best_intent}': Score too low ({best_score:.3f} < {self.intent_threshold})",
+                "OP",
+                "DEBUG",
+            )
 
         return None
 
     def exec_builtin(self, intent: str) -> dict[str, str | None] | None:
+        log(f"Executing builtin intent: {intent}", "OP", "DEBUG")
         payload = self._play_random_sound(intent)
 
         if intent == "farewell":
@@ -173,6 +219,12 @@ class CommandOperator:
         conf = self.builtin_commands.get(category, {})
         sounds = conf.get("sounds", [])
 
+        log(
+            f"Fetching sound for '{category}'. Found config: {bool(conf)}, Sounds list: {sounds}",
+            "OP",
+            "DEBUG",
+        )
+
         if isinstance(sounds, list) and sounds:
             sound = random.choice(sounds)
 
@@ -184,23 +236,38 @@ class CommandOperator:
                 text_str = sound.get("text", "")
             elif isinstance(sound, str):
                 path_str = sound
+            else:
+                log(
+                    f"Invalid sound type in config for '{category}': {type(sound)}",
+                    "OP",
+                    "WARNING",
+                )
 
             if text_str:
                 try:
                     text_str = text_str.format(username=cfg.username, name=cfg.name)
-                except KeyError:
-                    pass
+                except KeyError as e:
+                    log(
+                        f"Formatting text failed for sound '{text_str}': Missing key {e}",
+                        "OP",
+                        "DEBUG",
+                    )
 
             if path_str:
                 path = Path(path_str)
                 if not path.is_absolute():
                     path = DATA_DIR / "sounds" / path
 
+                log(
+                    f"Playing sound payload: {path_str} | text: {text_str}",
+                    "OP",
+                    "DEBUG",
+                )
                 payload = {"path": str(path), "text": text_str if text_str else None}
                 emit_event(EventType.TTS_PLAY_SOUND, payload)
                 return payload
 
-        log(f"No sounds available for category: {category}", "CMD_OP", "WARNING")
+        log(f"No sounds available for category: {category}", "OP", "WARNING")
         return None
 
     def exec_user(self, intent: str, cmd: str) -> bool:
@@ -235,67 +302,112 @@ class LLM:
         ]
 
     def load(self):
-        _start = time.perf_counter()
-        self.llama = llama_cpp.Llama(
-            model_path=str(self.model_path),
-            n_ctx=self.context_tokens,
-            n_threads=(int(os.cpu_count() or 1)),
-            n_gpu_layers=0,
-            verbose=False,
-        )
-        emit_event(EventType.LLM_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
+        try:
+            _start = time.perf_counter()
+            log(f"Loading LLM model: {self.model_path.name}...", "LLM", "INFO")
+            self.llama = llama_cpp.Llama(
+                model_path=str(self.model_path),
+                n_ctx=self.context_tokens,
+                n_threads=(int(os.cpu_count() or 1)),
+                n_gpu_layers=0,
+                verbose=False,
+            )
+            elapsed = (time.perf_counter() - _start) * 1000
+            log(f"LLM model loaded in {elapsed:.0f}ms", "LLM", "INFO")
+            emit_event(EventType.LLM_LOADED, f"{elapsed}ms")
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error loading LLM model: {type(e).__name__}: {e}",
+                "LLM",
+                "ERROR",
+            )
 
     def history_add_response(self, text: str) -> None:
         self.history.append({"role": "assistant", "content": text})
 
     def get_response(self, message: str) -> _LLM_Response:
-        self.history.append({"role": "user", "content": message})
-        start_time = time.perf_counter()
+        try:
+            log(f"LLM: Getting response for: {message[:60]}...", "LLM", "DEBUG")
+            self.history.append({"role": "user", "content": message})
+            start_time = time.perf_counter()
 
-        response = self.llama.create_chat_completion(  # type: ignore
-            messages=[self.history],  # type: ignore
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            repeat_penalty=self.repeat_penalty,
-            stop=self.stop,
-        )
+            response = self.llama.create_chat_completion(  # type: ignore
+                messages=[self.history],  # type: ignore
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                repeat_penalty=self.repeat_penalty,
+                stop=self.stop,
+            )
 
-        gen_ms = time.perf_counter() - start_time
-        text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
-        usage = response["usage"]  # type: ignore
+            gen_ms = (time.perf_counter() - start_time) * 1000
+            text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
+            usage = response["usage"]  # type: ignore
 
-        return LLM._LLM_Response(
-            text=text,
-            prompt_tokens=usage.get("prompt_tokens", 0),
-            completion_tokens=usage.get("completion_tokens", 0),
-            gen_ms=gen_ms,
-        )
+            log(
+                f"LLM response generated in {gen_ms:.0f}ms ({usage.get('completion_tokens', 0)} tokens)",
+                "LLM",
+                "DEBUG",
+            )
+            return LLM._LLM_Response(
+                text=text,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                gen_ms=gen_ms,
+            )
+        except Exception as e:
+            log(
+                f"Error getting LLM response: {type(e).__name__}: {e}",
+                "LLM",
+                "ERROR",
+            )
+            raise
 
     def stream_response(self, message: str):
-        self.history.append({"role": "user", "content": message})
+        try:
+            log(f"LLM: Streaming response for: {message[:60]}...", "LLM", "DEBUG")
+            self.history.append({"role": "user", "content": message})
 
-        output = self.llama.create_chat_completion(  # type: ignore
-            messages=self.history,  # type: ignore
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            repeat_penalty=self.repeat_penalty,
-            stop=self.stop,
-            stream=True,
-        )
+            output = self.llama.create_chat_completion(  # type: ignore
+                messages=self.history,  # type: ignore
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                repeat_penalty=self.repeat_penalty,
+                stop=self.stop,
+                stream=True,
+            )
 
-        for chunk in output:
-            delta = chunk["choices"][0]["delta"]  # type: ignore
-            if "content" in delta:
-                yield delta["content"]  # type: ignore
+            for chunk in output:
+                try:
+                    delta = chunk["choices"][0]["delta"]  # type: ignore
+                    if "content" in delta:
+                        yield delta["content"]  # type: ignore
+                except Exception as e:  # noqa: BLE001
+                    log(
+                        f"Error processing stream chunk: {type(e).__name__}: {e}",
+                        "LLM",
+                        "ERROR",
+                    )
+        except Exception as e:  # noqa: BLE001
+            log(
+                f"Error streaming LLM response: {type(e).__name__}: {e}",
+                "LLM",
+                "ERROR",
+            )
 
     def close(self):
         if hasattr(self, "llama") and self.llama is not None:
             try:
+                log("Closing LLM model...", "LLM", "DEBUG")
                 self.llama.close()
-            except Exception:  # noqa: BLE001, S110
-                pass
+            except Exception as e:  # noqa: BLE001
+                log(
+                    f"Error closing LLM: {type(e).__name__}: {e}",
+                    "LLM",
+                    "WARNING",
+                )
             finally:
                 self.llama = None
+                log("LLM model closed.", "LLM", "DEBUG")
 
     def __del__(self):
         self.close()
@@ -355,7 +467,6 @@ class Operator:
         emit_event(EventType.PROFILER_SET_STATE, "PROCESSING")
         start_time = time.perf_counter()
         full_response_text = ""
-
         tts_engaged = False
 
         try:
@@ -394,8 +505,6 @@ class Operator:
 
         finally:
             emit_event(EventType.PROFILER_SET_STATE, "AWAKE")
-
             if tts_engaged:
                 wait_for(EventType.TTS_FREE)
-
             emit_event(EventType.OP_READY)
