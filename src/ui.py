@@ -104,6 +104,13 @@ class AssistantUI:
             console.print(text, end=" ", style="white")
 
     @staticmethod
+    def print_assistant_say(text: str, **kwargs):
+        if text.strip():
+            console.print(
+                f'\n[bold bright_green][{cfg.name}]:[/bold bright_green] [white]"{text}"[/white]'
+            )
+
+    @staticmethod
     def print_llm_response(
         text=None,
         gen_ms: float = 0.0,

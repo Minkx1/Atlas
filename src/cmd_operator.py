@@ -12,9 +12,11 @@ import time
 from pathlib import Path
 
 import llama_cpp
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 from .config import DATA_DIR, cfg
-from .events import EventType, emit_event, wait_for
+from .events import EventType, emit_event, log, wait_for
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -36,45 +38,46 @@ class CommandOperator:
         def __init__(self, dir: Path, config: Path) -> None:
             self.root = dir
             self.config_path = config
-            # self.congig = self._parse_config(self.config)
 
     def __init__(self) -> None:
-        self.history = []
-        self.intent_threshold = 0.5
-        self.triggers = {
-            "thanks": ["nice", "you are good", "you are amazing", "good job"],
-            "farewell": ["bye", "bye-bye", "bye bye", "good night", "goodbye"],
-            "sorry": [
-                "you are stupid",
-                "are you stupid",
-                "fuck you",
-                "you suck",
-                "you are a moron",
-                "wrong",
-                "you are wrong",
+        self.history: list[str] = []
+        self.builtin_commands: dict[
+            str, dict[str, list[dict[str, str]] | list[str]]
+        ] = {}
+
+        self.triggers: dict[str, list[str]] = {
+            "llm_query": [
+                "what is",
+                "how to",
+                "tell me about",
+                "explain",
+                "write a code",
+                "can you",
             ],
-            "greet": ["hello", "hi", "nice to meet you"],
         }
-        self._load_triggers_from_config()
 
-        self.load_user_commands()
+        self.intent_threshold = 0.65
+        self.margin = 0.08
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    def _load_triggers_from_config(self) -> None:
-        for intent, triggers in cfg.op.load_triggers().items():
-            self.triggers[intent] = triggers
+        self.trigger_embeddings: dict[str, np.ndarray] = {}
 
-    def operate(self, cmd: str) -> str | None:
-        self.history.append(cmd)
+        self._load_builtin_commands()
+        self._load_user_commands()
+        self._precompute_embeddings()
 
-        if self.exec_builtin(cmd):
-            return "builtin"
-        elif self.exec_user(cmd):
-            return "user"
-        else:
-            return None
+    def _load_builtin_commands(self) -> None:
+        self.builtin_commands = cfg.op.load_builtin_commands() or {}
 
-    def load_user_commands(self):
+        for intent, data in self.builtin_commands.items():
+            if isinstance(data, dict) and "triggers" in data:
+                self.triggers[intent] = data["triggers"]  # type: ignore
+
+    def _load_user_commands(self) -> None:
         cmd_dir = DATA_DIR / "commands"
+
+        if not cmd_dir.exists():
+            return
 
         l: list[CommandOperator.Command] = []
 
@@ -84,72 +87,123 @@ class CommandOperator:
                 if toml.exists() and toml.is_file():
                     l.append(CommandOperator.Command(cmd_dir, toml))
 
+    def _precompute_embeddings(self) -> None:
+        """Precomputes embeddings for triggers."""
+        for intent, triggers in self.triggers.items():
+            vectors = self._get_embedd_vec(triggers)
+            self.trigger_embeddings[intent] = vectors
+
+    def _get_embedd_vec(self, phrase: str | list[str]) -> np.ndarray:
+        return self.model.encode(
+            phrase, normalize_embeddings=True, convert_to_numpy=True
+        )
+
     @staticmethod
-    def _eval_score(trigger: str, cmd: str) -> float:
-        if re.search(rf"\b{re.escape(trigger)}\b", cmd):
-            trigger_word_count = len(trigger.split())
+    def _eval_cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+        return float(np.dot(vec1, vec2))
 
-            cmd_word_count = len(cmd.split())
+    def operate(self, cmd: str) -> tuple[str | None, dict | None]:
+        """Returns tuple: (command_type, payload)"""
+        self.history.append(cmd)
 
-            return trigger_word_count / cmd_word_count
-
-        return 0.0
-
-    def exec_builtin(self, cmd: str) -> bool:
-        """Checks whether command is in a _builtin_ level and if so exutes it."""
         if cmd == "!EVENT_KEYWORD_DETECTED":
-            self._play_random_sound("greet")
-            return True
+            payload = self.exec_builtin("greet")
+            return "builtin", payload
 
         cmd_clean = re.sub(r"[^\w\s]", "", cmd.lower()).strip()
         if not cmd_clean:
-            return False
+            return None, None
+
+        intent = self._detect_intent(cmd_clean)
+
+        if not intent:
+            return None, None
+        elif intent.startswith("!"):  # user command
+            self.exec_user(intent, cmd)
+            return "user", None
+        else:
+            payload = self.exec_builtin(intent)
+            return "builtin", payload
+
+    def _detect_intent(self, cmd_clean: str) -> str | None:
+        if not cmd_clean:
+            return None
+
+        cmd_vec = self._get_embedd_vec(cmd_clean)
 
         best_intent: str | None = None
         best_score = 0.0
+        second_best_score = 0.0
 
-        # evaluating best trigger
-        for intent, triggers in self.triggers:
-            for trigger in triggers:
-                trigger_clean = re.sub(r"[^\w\s]", "", trigger.lower()).strip()
-
-                score = self._eval_score(trigger_clean, cmd_clean)
+        for intent, vectors in self.trigger_embeddings.items():
+            for trigger_vec in vectors:
+                score = self._eval_cosine_similarity(cmd_vec, trigger_vec)
 
                 if score > best_score:
+                    second_best_score = best_score
                     best_score = score
                     best_intent = intent
+                elif score > second_best_score:
+                    second_best_score = score
 
-        if best_intent and (
-            best_score >= self.intent_threshold or best_intent == "farewell"
-        ):
-            emit_event(
-                EventType.UI_STATE_CHANGE,
-                {"state": "BUILTIN_CMD", "detail": f"Intent: {best_intent}"},
-            )
-            self._play_random_sound(best_intent)
+        if best_intent == "llm_query":
+            return None
 
-            if best_intent == "farewell":
-                emit_event(EventType.OP_ASK_FINISH)
-            return True
+        if best_intent and best_score >= self.intent_threshold:
+            margin = best_score - second_best_score
+            is_confident = margin >= self.margin
 
-        return False
+            if is_confident:
+                log(f"Found intent: {best_intent} (Score: {best_score:.2f})", "CMD_OP")
+                return best_intent
 
-    def _play_random_sound(self, category: str):
-        sound_dir = DATA_DIR / "sounds" / category
-        if sound_dir.exists() and sound_dir.is_dir():
-            sounds = [
-                ch for ch in sound_dir.iterdir() if ch.is_file() and ch.suffix == ".wav"
-            ]
-            if sounds:
-                path = random.choice(sounds)
-                emit_event(EventType.TTS_PLAY_SOUND, path)
-            else:
-                emit_event(
-                    EventType.UI_STATE_CHANGE,
-                    {"state": "ERROR", "detail": f"No sounds in {category}"},
-                )
+        return None
 
-    def exec_user(self, cmd: str) -> bool:
+    def exec_builtin(self, intent: str) -> dict[str, str | None] | None:
+        payload = self._play_random_sound(intent)
+
+        if intent == "farewell":
+            emit_event(EventType.OP_ASK_FINISH)
+        elif intent == "sleep":
+            emit_event(EventType.STT_SET_STATE, "SLEEPING")
+
+        return payload
+
+    def _play_random_sound(self, category: str) -> dict[str, str | None] | None:
+        conf = self.builtin_commands.get(category, {})
+        sounds = conf.get("sounds", [])
+
+        if isinstance(sounds, list) and sounds:
+            sound = random.choice(sounds)
+
+            path_str = ""
+            text_str = ""
+
+            if isinstance(sound, dict):
+                path_str = sound.get("path", "")
+                text_str = sound.get("text", "")
+            elif isinstance(sound, str):
+                path_str = sound
+
+            if text_str:
+                try:
+                    text_str = text_str.format(username=cfg.username, name=cfg.name)
+                except KeyError:
+                    pass
+
+            if path_str:
+                path = Path(path_str)
+                if not path.is_absolute():
+                    path = DATA_DIR / "sounds" / path
+
+                payload = {"path": str(path), "text": text_str if text_str else None}
+                emit_event(EventType.TTS_PLAY_SOUND, payload)
+                return payload
+
+        log(f"No sounds available for category: {category}", "CMD_OP", "WARNING")
+        return None
+
+    def exec_user(self, intent: str, cmd: str) -> bool:
         return False
 
 
@@ -202,22 +256,18 @@ class LLM:
             messages=[self.history],  # type: ignore
             max_tokens=self.max_tokens,
             temperature=self.temperature,
-            repeat_penalty=self.repeat_penalty,  # Token repeatance protection
+            repeat_penalty=self.repeat_penalty,
             stop=self.stop,
         )
 
         gen_ms = time.perf_counter() - start_time
-
         text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
-
         usage = response["usage"]  # type: ignore
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        completion_tokens = usage.get("completion_tokens", 0)
 
         return LLM._LLM_Response(
             text=text,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
             gen_ms=gen_ms,
         )
 
@@ -230,7 +280,7 @@ class LLM:
             temperature=self.temperature,
             repeat_penalty=self.repeat_penalty,
             stop=self.stop,
-            stream=True,  # adding streaming
+            stream=True,
         )
 
         for chunk in output:
@@ -254,10 +304,8 @@ class LLM:
 class Operator:
     def __init__(self, cmd: CommandOperator, llm: "LLM") -> None:
         self._running = False
-
         self.cmd = cmd
         self.llm = llm
-
         self.command_queue: queue.Queue[str | None] = queue.Queue()
         self.worker_thread = threading.Thread(
             target=self._operator_worker, name="OPERATOR_THREAD", daemon=True
@@ -276,7 +324,7 @@ class Operator:
 
     @staticmethod
     def _sentence_chunker(token_stream):
-        """Generator: gathers tokens into a complete sentences."""
+        """Generator: gathers tokens into complete sentences."""
         buffer = ""
         for token in token_stream:
             buffer += token
@@ -308,11 +356,16 @@ class Operator:
         start_time = time.perf_counter()
         full_response_text = ""
 
-        try:
-            res = self.cmd.operate(text)
-            emit_event(EventType.OP_CMD_LEVEL, str(res))
+        tts_engaged = False
 
-            if not res:
+        try:
+            res_type, payload = self.cmd.operate(text)
+            emit_event(EventType.OP_CMD_LEVEL, str(res_type))
+
+            if res_type == "builtin" and payload is not None:
+                tts_engaged = True
+
+            if not res_type:
                 token_stream = self.llm.stream_response(text)
 
                 is_first_chunk = True
@@ -320,6 +373,7 @@ class Operator:
                     full_response_text += sentence + " "
 
                     emit_event(EventType.TTS_SPEAK, sentence)
+                    tts_engaged = True
 
                     emit_event(
                         EventType.UI_LLM_CHUNK,
@@ -340,6 +394,8 @@ class Operator:
 
         finally:
             emit_event(EventType.PROFILER_SET_STATE, "AWAKE")
-            # TODO: add waiting for Event.TTS_FREE
-            wait_for(EventType.TTS_FREE)
+
+            if tts_engaged:
+                wait_for(EventType.TTS_FREE)
+
             emit_event(EventType.OP_READY)

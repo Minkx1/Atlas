@@ -147,36 +147,61 @@ class TextToSpeech:
     def speak(self, text: str) -> None:
         self.queue.put(text)
 
-    def play_sound(self, path: str | Path) -> None:
-        self.queue.put(Path(path))
+    def play_sound(self, payload: str | Path | dict[str, str | Path | None]) -> None:
+        if isinstance(payload, dict):
+            path = payload.get("path") or payload.get("sound")
+            text = payload.get("text")
+
+            formatted_text = str(text).format(username=cfg.username, name=cfg.name)
+            if formatted_text:
+                emit_event(EventType.UI_ASSISTANT_SAY, {"text": formatted_text})
+            if not path:
+                return
+            payload = Path(path)
+        elif isinstance(payload, str):
+            payload = Path(payload)
+
+        self.queue.put(payload)
 
     def close(self):
         self.queue.put(None)
         self.worker_thread.join()
 
     def _generate_basic_sounds(self):
-        # if file is run generates basic sound files
-
+        log("Checking builtin sounds...", "TTS", "INFO")
         sounds_dir = DATA_DIR / "sounds"
-        user_name = cfg.username
-        basic_sounds = {
-            ("greet/greet1.wav", f"Good Evening, {user_name}."),
-            ("greet/greet2.wav", f"Welcome back, {user_name}."),
-            ("greet/greet3.wav", f"Greetings, {user_name}."),
-            ("farewell/bye1.wav", f"Goodbye, {user_name}."),
-            ("farewell/bye2.wav", f"Farewell, {user_name}."),
-            ("farewell/bye3.wav", f"Have a good day, {user_name}."),
-            ("thanks/thanks1.wav", f"Thank you, {user_name}."),
-            ("thanks/thanks2.wav", f"I truly apreciate this, {user_name}."),
-            ("sorry/sorry1.wav", f"I am really sorry, {user_name}."),
-            ("sorry/sorry2.wav", "Please accept my apologies."),
-            ("sorry/sorry3.wav", f"My apologies, {user_name}."),
-            # ("welcome/welcome1.wav", "You're welcome, sir."),
-        }
 
-        for path, text in basic_sounds:
-            path = sounds_dir / path
-            self._text_to_wav(text.strip(), path)
+        builtin_cmds = cfg.op.load_builtin_commands() or {}
+
+        for data in builtin_cmds.values():
+            sounds_list: list[dict[str, str]] = data.get("sounds", [])  # type: ignore
+
+            for sound_obj in sounds_list:
+                path_str = sound_obj.get("path")
+                text_template = sound_obj.get("text")
+
+                if not path_str or not text_template:
+                    continue
+
+                full_path = sounds_dir / path_str
+
+                # if full_path.exists():
+                #     continue
+
+                try:
+                    formatted_text = text_template.format(
+                        username=cfg.username, name=cfg.name
+                    )
+                except KeyError as e:
+                    log(
+                        f"Missing config key {e} for string '{text_template}'",
+                        "TTS",
+                        "ERROR",
+                    )
+                    continue
+
+                log(f"Generating missing sound: {path_str}", "TTS", "INFO")
+                self._text_to_wav(formatted_text.strip(), full_path)
 
 
 if __name__ == "__main__":

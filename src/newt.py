@@ -14,7 +14,7 @@ from .events import (
     emit_event,
 )
 from .profiler import profiler
-from .speech_to_text import VAD, KeyWordSpotter, Listener, Whisper
+from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
 from .text_to_speech import TextToSpeech
 from .ui import AssistantUI, console
 
@@ -70,6 +70,10 @@ class Newt:
             lambda e: emit_event(EventType.PROFILER_SET_STATE, e.content),
         )
         em.subscribe(
+            EventType.STT_SET_STATE,
+            lambda e: app.listener.pipeline.set_state(LState(e.content)),
+        )
+        em.subscribe(
             EventType.STT_TRANSCRIBED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, e.content),
         )
@@ -101,6 +105,10 @@ class Newt:
         em.subscribe(
             EventType.UI_LLM_RESPONSE,
             lambda e: AssistantUI.print_llm_response(**e.content),
+        )
+        em.subscribe(
+            EventType.UI_ASSISTANT_SAY,
+            lambda e: AssistantUI.print_assistant_say(**e.content),
         )
 
         def _prof_start(event: Event | None = None):

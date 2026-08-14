@@ -399,7 +399,11 @@ class Listener:
                         source="STT",
                         level="WARN",
                     )
-                self.pipeline.set_state(LState.AWAKE)
+                self.pipeline.set_state(
+                    LState.AWAKE
+                    if self.pipeline.get_state() != LState.SLEEPING
+                    else self.pipeline.get_state()
+                )
                 self.pipeline.update_deadline()
 
             self.audio_queue.task_done()

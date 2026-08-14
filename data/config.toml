@@ -10,7 +10,7 @@ profiler = true  # If true, shows full debug and profiler info: CPU and RAM Usag
 log = true  # If true - all events will be logged and put into $DATA / logs /
 
 [op]
-cmd_trigers = "cmd_trigers.json"
+builtin_commands = "builtin_commands.json"
 
 [audio]
 sample_rate = 16000

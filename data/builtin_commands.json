@@ -1,0 +1,208 @@
+{
+    "greet": {
+        "triggers": [
+            "hello",
+            "hi",
+            "nice to meet you",
+            "hey",
+            "good morning",
+            "good evening",
+            "good day",
+            "what's up",
+            "howdy",
+            "greetings"
+        ],
+        "sounds": [
+            {
+                "path": "greet/greet1.wav",
+                "text": "Good Evening, {username}"
+            },
+            {
+                "path": "greet/greet2.wav",
+                "text": "Welcome back, {username}"
+            },
+            {
+                "path": "greet/greet3.wav",
+                "text": "Greetings, {username}"
+            },
+            {
+                "path": "greet/greet4.wav",
+                "text": "Hello! How can I help you, {username}?"
+            },
+            {
+                "path": "greet/greet5.wav",
+                "text": "Hi there! Nice to talk to you again."
+            },
+            {
+                "path": "greet/greet6.wav",
+                "text": "Hey {username}, I am ready when you are."
+            }
+        ]
+    },
+    "farewell": {
+        "triggers": [
+            "bye",
+            "bye-bye",
+            "bye bye",
+            "good night",
+            "goodbye",
+            "see you",
+            "see you later",
+            "catch you later",
+            "have a good one",
+            "talk to you later",
+            "exit",
+            "stop"
+        ],
+        "sounds": [
+            {
+                "path": "farewell/bye1.wav",
+                "text": "Goodbye, {username}."
+            },
+            {
+                "path": "farewell/bye2.wav",
+                "text": "Farewell, {username}."
+            },
+            {
+                "path": "farewell/bye3.wav",
+                "text": "Have a good day, {username}."
+            },
+            {
+                "path": "farewell/bye4.wav",
+                "text": "See you soon, {username}!"
+            },
+            {
+                "path": "farewell/bye5.wav",
+                "text": "Take care! Talk to you later."
+            },
+            {
+                "path": "farewell/bye6.wav",
+                "text": "Goodbye! Let me know if you need anything else."
+            }
+        ]
+    },
+    "sleep": {
+        "triggers": [
+            "Go to sleep.",
+            "Sleep mode.",
+            "Quit",
+            "I am not talking to you"
+        ],
+        "sounds": [
+            {
+                "path": "sleep/sleep1.wav",
+                "text": "Going to sleep."
+            },
+            {
+                "path": "sleep/sleep2.wav",
+                "text": "Ok, going quite."
+            }
+        ]
+    },
+    "thanks": {
+        "triggers": [
+            "nice",
+            "you are good",
+            "you are amazing",
+            "good job",
+            "thank you",
+            "thanks",
+            "thanks a lot",
+            "awesome job",
+            "well done",
+            "great response",
+            "perfect",
+            "appreciate it"
+        ],
+        "sounds": [
+            {
+                "path": "thanks/thanks1.wav",
+                "text": "Thank you, {username}."
+            },
+            {
+                "path": "thanks/thanks2.wav",
+                "text": "I truly appreciate this, {username}."
+            },
+            {
+                "path": "thanks/thanks3.wav",
+                "text": "You are very welcome!"
+            },
+            {
+                "path": "thanks/thanks4.wav",
+                "text": "Happy to help, {username}."
+            },
+            {
+                "path": "thanks/thanks5.wav",
+                "text": "Anytime! Glad I could be useful."
+            },
+            {
+                "path": "thanks/thanks6.wav",
+                "text": "Don't mention it, happy to be of service!"
+            }
+        ]
+    },
+    "sorry": {
+        "triggers": [
+            "you are stupid",
+            "are you stupid",
+            "fuck you",
+            "you suck",
+            "you are a moron",
+            "wrong",
+            "you are wrong",
+            "that is incorrect",
+            "bad answer",
+            "you made a mistake",
+            "you don't understand",
+            "shut up",
+            "you are useless",
+            "terrible work"
+        ],
+        "sounds": [
+            {
+                "path": "sorry/sorry1.wav",
+                "text": "I am really sorry, {username}."
+            },
+            {
+                "path": "sorry/sorry2.wav",
+                "text": "Please accept my apologies."
+            },
+            {
+                "path": "sorry/sorry3.wav",
+                "text": "My apologies, {username}."
+            },
+            {
+                "path": "sorry/sorry4.wav",
+                "text": "I am sorry for the confusion. I will try to do better."
+            },
+            {
+                "path": "sorry/sorry5.wav",
+                "text": "Oops, my bad. Let me fix that for you."
+            },
+            {
+                "path": "sorry/sorry6.wav",
+                "text": "I apologize, {username}. Still learning every day."
+            }
+        ]
+    },
+    "whoami": {
+        "triggers": [
+            "who are you",
+            "what is your name",
+            "tell me about yourself",
+            "identify yourself",
+            "what are you",
+            "who am i talking to"
+        ],
+        "sounds": [
+            {
+                "path": "whoami/whoami1.wav",
+                "text": "I am {name}, your Voice Assistant."
+            },
+            {
+                "path": "whoami/whoami2.wav",
+                "text": "My name is {name}. I am your personal assistant."
+            }
+        ]
+    }
+}

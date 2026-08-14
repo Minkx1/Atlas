@@ -1,14 +1,21 @@
-# Silero Voice Activity Detection
-silero-vad
-numpy
-sounddevice
-playsound3
+# libs & utils
 torch
-faster-whisper
+numpy
 hf-transfer
-sherpa-onnx
 rich
 psutil
 python-dotenv
+
+# STT
+silero-vad
+sounddevice
+faster-whisper
+sherpa-onnx
+
+# TTS
 piper-tts
+playsound3
+
+# OP
 llama-cpp-python
+sentence-transformers

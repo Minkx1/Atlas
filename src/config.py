@@ -83,20 +83,22 @@ class LLMConfig:
 
 @dataclass
 class OPConfig:
-    cmd_trigers: str = "cmd_trigers.json"
+    builtin_commands: str = "builtin_commands.json"
 
-    def get_triggers_path(self, base_dir: str | Path | None = None) -> Path:
-        path = Path(self.cmd_trigers)
+    def get_builtin_commands_path(self, base_dir: str | Path | None = None) -> Path:
+        path = Path(self.builtin_commands)
         if path.is_absolute():
             return path
 
         base = Path(base_dir) if base_dir is not None else DATA_DIR
         return base / path
 
-    def load_triggers(self, base_dir: str | Path | None = None) -> dict[str, list[str]]:
-        path = self.get_triggers_path(base_dir)
+    def load_builtin_commands(
+        self, base_dir: str | Path | None = None
+    ) -> dict[str, dict[str, str | list[str] | None]]:
+        path = self.get_builtin_commands_path(base_dir)
         if not path.exists():
-            fallback = DATA_DIR / self.cmd_trigers
+            fallback = DATA_DIR / self.builtin_commands
             if fallback.exists():
                 path = fallback
             else:
@@ -108,11 +110,17 @@ class OPConfig:
         if not isinstance(payload, dict):
             return {}
 
-        return {
-            str(intent): [str(trigger) for trigger in triggers]
-            for intent, triggers in payload.items()
-            if isinstance(triggers, list)
-        }
+        commands: dict[str, dict[str, str | list[str] | None]] = {}
+        for intent, values in payload.items():
+            if not isinstance(values, dict):
+                continue
+
+            commands[str(intent)] = {
+                "sound": values.get("sound"),
+                "text": values.get("text"),
+            }
+
+        return commands
 
 
 @dataclass
