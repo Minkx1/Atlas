@@ -157,7 +157,7 @@ def wait_for(event: EventType, timeout: float | None = None) -> Event | None:
     return EventManager().wait_for(event, timeout)
 
 
-def log(message: str, source: str = "SYSTEM", level: str = "DEBUG"):
+def log(message: str, source: str = "SYS", level: str = "DEBUG"):
     emit_event(
         EventType.DEBUG_LOG,
         {"message": str(message), "source": source, "level": level.upper()},
@@ -183,12 +183,11 @@ class EventLogger:
         log_file = self._get_log_filepath(timestamp)
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(msg + "\n")
+            f.flush()
 
     def _log_event(self, event: Event):
         message_text = self._format_message(event)
-        # self.console.print(
-        #     message_text
-        # )  # this prints into console, which right now is not needed.
+        # self.console.print(message_text)
 
         self._write_file(message_text, event.timestamp)
 

@@ -6,9 +6,6 @@ import sys
 import threading
 import time
 
-print("[DEBUG] Loading libs...")
-_start = time.perf_counter()
-
 from .cmd_operator import LLM, CommandOperator, Operator
 from .config import cfg
 from .events import (
@@ -24,7 +21,6 @@ from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
 from .text_to_speech import TextToSpeech
 from .ui import AssistantUI, console
 
-print(f"[DEBUG] Loading complete. Took: {(time.perf_counter()-_start)*1000}ms")
 
 class Newt:
     def __init__(self) -> None:
@@ -63,6 +59,7 @@ class Newt:
             log("Starting model loading...", "NEWT", "INFO")
             self.tts.load()
 
+            self.cmd.load()
             self.llm.load()
 
             self.vad.load()

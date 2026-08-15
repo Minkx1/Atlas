@@ -13,7 +13,6 @@ from pathlib import Path
 
 import llama_cpp
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from .config import DATA_DIR, cfg
 from .events import EventType, emit_event, log, wait_for
@@ -58,6 +57,14 @@ class CommandOperator:
 
         self.intent_threshold = 0.50
         self.margin = 0.05
+
+    def load(self):
+        _start = time.perf_counter()
+
+        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+        os.environ["TQDM_DISABLE"] = "1"
+
+        from sentence_transformers import SentenceTransformer
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
         self.trigger_embeddings: dict[str, np.ndarray] = {}
@@ -65,6 +72,8 @@ class CommandOperator:
         self._load_builtin_commands()
         self._load_user_commands()
         self._precompute_embeddings()
+
+        log(f"Embeddings & commands loaded in: {(time.perf_counter()-_start)*1000}ms", "OP", "INFO")
 
     def _load_builtin_commands(self) -> None:
         """Loads all triggers and intents from _builtin commands config_"""

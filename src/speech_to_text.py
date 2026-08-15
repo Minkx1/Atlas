@@ -3,6 +3,14 @@
 # SoundDevice.InputStream[microphone] -> KeyWordSpotter[Sherpa ONNX KWS] -> Voice Activity Detector[Silero VAD] -> STT[faster-whisper] -> "recognized text"
 #
 
+from __future__ import annotations  # some type annotations shit
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import torch
+
+
 import os
 import queue
 import time
@@ -13,12 +21,8 @@ from pathlib import Path
 from threading import Thread
 
 import numpy as np
-import sherpa_onnx
 import sounddevice as sd
-import torch
 from dotenv import load_dotenv
-from faster_whisper import WhisperModel
-from silero_vad import VADIterator, load_silero_vad
 
 from .config import DATA_DIR, cfg
 from .events import EventType, emit_event, log, wait_for
@@ -33,6 +37,8 @@ class VAD:
         self.is_speaking = False
 
     def load(self):
+        from silero_vad import VADIterator, load_silero_vad
+
         try:
             _start = time.perf_counter()
             log("Loading Silero VAD model...", "VAD", "INFO")
@@ -57,6 +63,7 @@ class VAD:
     @staticmethod
     def _normalize_chunk(audio_chunk: np.ndarray | torch.Tensor) -> torch.Tensor:
         if isinstance(audio_chunk, np.ndarray):
+            import torch
             return torch.from_numpy(
                 audio_chunk.squeeze(1) if audio_chunk.ndim > 1 else audio_chunk
             )
@@ -111,6 +118,8 @@ class KeyWordSpotter:
             # raise FileNotFoundError(f"No Sherpa model in: {cfg.kws.model_dir}")
 
     def load(self):
+        import sherpa_onnx
+        
         try:
             _start = time.perf_counter()
             log("Loading Sherpa-ONNX KWS model...", "KWS", "INFO")
@@ -206,6 +215,8 @@ class Whisper:
         self.model_dir: Path = DATA_DIR / w.download_root
 
     def load(self):
+        from faster_whisper import WhisperModel
+
         try:
             w = cfg.stt
             if not self.model_dir.exists():
