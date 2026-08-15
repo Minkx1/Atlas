@@ -2,9 +2,12 @@
 torch
 numpy
 hf-transfer
-rich
 psutil
 python-dotenv
+
+# UI
+textual
+rich
 
 # STT
 silero-vad

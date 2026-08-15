@@ -61,7 +61,7 @@ length_scale = 0.75  # Speed of speech. 1.0 is default, 2.0 - twice as slow
 noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice
-silence_duration = 0.0
+silence_duration = 0.2
 
 [stt]
 start_state = "SLEEPING"
