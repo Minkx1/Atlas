@@ -56,7 +56,7 @@ class CommandOperator:
             ],
         }
 
-        self.intent_threshold = 0.60
+        self.intent_threshold = 0.50
         self.margin = 0.05
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -67,6 +67,7 @@ class CommandOperator:
         self._precompute_embeddings()
 
     def _load_builtin_commands(self) -> None:
+        """Loads all triggers and intents from _builtin commands config_"""
         self.builtin_commands = cfg.op.load_builtin_commands() or {}  # type: ignore
 
         log(
@@ -79,8 +80,6 @@ class CommandOperator:
             if isinstance(data, dict):
                 if "triggers" in data:
                     self.triggers[intent] = data["triggers"]  # type: ignore
-
-                sounds = data.get("sounds", [])
             else:
                 log(
                     f"Warning: Data for intent '{intent}' is not a dict. Type: {type(data)}",
@@ -155,14 +154,24 @@ class CommandOperator:
             for trigger_vec in vectors:
                 score = self._eval_cosine_similarity(cmd_vec, trigger_vec)
                 scores.append((score, intent))
-        scores.sort(key=lambda x: x[0], reverse=True)
 
         if not scores:
             return None
 
-        best_score, best_intent = scores[0]
-        second_best_score = scores[1][0] if len(scores) > 1 else 0.0
-        second_best_intent = scores[1][1] if len(scores) > 1 else "None"
+        intent_best_scores = {}  # best scores for every intent
+        for score, intent in scores:
+            if intent not in intent_best_scores or score > intent_best_scores[intent]:
+                intent_best_scores[intent] = score
+
+        sorted_intents = sorted(
+            intent_best_scores.items(), key=lambda x: x[1], reverse=True
+        )
+
+        best_intent, best_score = sorted_intents[0]
+
+        # Seeking second best ONLY from other scores
+        second_best_score = sorted_intents[1][1] if len(sorted_intents) > 1 else 0.0
+        second_best_intent = sorted_intents[1][0] if len(sorted_intents) > 1 else "None"
 
         log(
             f"Intent check '{cmd_clean}': Best: {best_intent} ({best_score:.3f}), 2nd: {second_best_intent} ({second_best_score:.3f})",
@@ -182,6 +191,7 @@ class CommandOperator:
                 log(
                     f"Found confident intent: {best_intent} (Score: {best_score:.3f}, Margin: {margin:.3f})",
                     "OP",
+                    "DEBUG",
                 )
                 return best_intent
             else:

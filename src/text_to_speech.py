@@ -11,9 +11,8 @@ from pathlib import Path
 
 import numpy as np
 import sounddevice as sd
+import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
-from playsound3 import playsound
-from pydub import AudioSegment
 
 if __name__ == "__main__":
     from config import DATA_DIR, cfg
@@ -126,7 +125,11 @@ class TextToSpeech:
                     [chunk.audio_float_array for chunk in audio_chunks]
                 )
 
-                sd.play(audio_array, samplerate=audio_chunks[0].sample_rate)
+                samplerate = audio_chunks[0].sample_rate
+                silence = np.zeros(int(samplerate * cfg.tts.silence_duration), dtype=audio_array.dtype)
+                padded_audio = np.concatenate((silence, audio_array))
+
+                sd.play(padded_audio, samplerate=samplerate)
                 sd.wait()
                 log("TTS playback completed.", "TTS", "DEBUG")
             except Exception as e:  # noqa: BLE001
@@ -136,7 +139,7 @@ class TextToSpeech:
                     "ERROR",
                 )
 
-    def _text_to_wav(self, text: str, output_path: Path) -> None:
+    def _text_to_file(self, text: str, output_path: Path) -> None:
         if not text.strip():
             return
 
@@ -147,17 +150,21 @@ class TextToSpeech:
             with wave.open(str(wav_file), "wb") as f:
                 self.voice.synthesize_wav(text, f, self.syn_config)
 
-            # converting with pydub
-            if output_path.suffix.lower() == ".mp3":
-                log(f"Compressing to MP3: {output_path.name}", "TTS", "DEBUG")
+            if output_path == wav_file:
+                return  # .wav file was already generated
 
-                audio_mp3 = AudioSegment.from_wav(str(wav_file))
-                audio_mp3.export(str(output_path), format="mp3", bitrate="128k")
+            if output_path.suffix.lower() in {".flac", ".ogg"}:
+                log(
+                    f"Compressing to {output_path.suffix.lower()}: {output_path.name}",
+                    "TTS",
+                    "DEBUG",
+                )
 
-                wav_file.unlink()  # Видаляємо WAV
+                sf.write(output_path, *sf.read(wav_file))
+
+                wav_file.unlink()
             else:
-                if wav_file != output_path:
-                    wav_file.rename(output_path)
+                log(f"Unsupported output format: {output_path.suffix}", "TTS", "ERROR")
 
         except Exception as e:
             log(
@@ -170,8 +177,17 @@ class TextToSpeech:
     def play_audio(path: Path) -> None:
         try:
             log(f"Playing audio: {path.name}", "TTS", "DEBUG")
-            playsound(path)
-            log(f"Audio playback done: {path.name}", "TTS", "DEBUG")
+            audio, samplerate = sf.read(path)
+            
+            if audio.ndim > 1:  # if stereo file
+                silence = np.zeros((int(samplerate * cfg.tts.silence_duration), audio.shape[1]), dtype=audio.dtype)
+            else:
+                silence = np.zeros(int(samplerate * cfg.tts.silence_duration), dtype=audio.dtype)
+                
+            padded_audio = np.concatenate((silence, audio))  # audio with silence before
+
+            sd.play(padded_audio, samplerate)
+            sd.wait()
         except Exception as e:  # noqa: BLE001
             log(
                 f"Error playing audio {path.name}: {type(e).__name__}: {e}",
@@ -298,7 +314,7 @@ class TextToSpeech:
                     continue
 
                 log(f"Generating sound: {path_str}", "TTS", "INFO")
-                self._text_to_wav(formatted_text.strip(), full_path)
+                self._text_to_file(formatted_text.strip(), full_path)
 
         # Updating manifest
         with open(manifest_file, "w", encoding="utf-8") as f:

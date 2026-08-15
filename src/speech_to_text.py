@@ -367,6 +367,10 @@ class AudioPipeline:
             self.update_deadline()
             self.set_state(LState.AWAKE)
 
+    def reset_buffers(self) -> None:
+        self.preroll_buffer.clear()
+        self.speech_buffer.clear()
+
 
 class Listener:
     def __init__(self, vad: VAD, whisper: Whisper, kws: KeyWordSpotter) -> None:
@@ -385,9 +389,11 @@ class Listener:
         self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
         self._running = False
+        self._is_muted = False
 
     def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
-        self.pipeline.process(indata)
+        if not self._is_muted:
+            self.pipeline.process(indata)
 
     def _on_audio_recorded(self, full_audio: np.ndarray, listen_ms: float):
         self.audio_queue.put((full_audio.copy(), listen_ms))
@@ -455,6 +461,11 @@ class Listener:
 
         self.stt_worker_thread.start()
         self.audio_input_thread.start()
+
+    def mute(self):
+        self._is_muted = True
+    def unmute(self):
+        self._is_muted = False
 
     def close(self):
         self._running = False

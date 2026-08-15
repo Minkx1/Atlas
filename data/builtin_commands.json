@@ -3,206 +3,169 @@
         "triggers": [
             "hello",
             "hi",
-            "nice to meet you",
             "hey",
             "good morning",
+            "good afternoon",
             "good evening",
-            "good day",
             "what's up",
             "howdy",
-            "greetings"
+            "greetings",
+            "are you there",
+            "wake up",
+            "newt"
         ],
         "sounds": [
-            {
-                "path": "greet/greet1.wav",
-                "text": "Good Evening, {username}"
-            },
-            {
-                "path": "greet/greet2.wav",
-                "text": "Welcome back, {username}"
-            },
-            {
-                "path": "greet/greet3.wav",
-                "text": "Greetings, {username}"
-            },
-            {
-                "path": "greet/greet4.wav",
-                "text": "Hello! How can I help you, {username}?"
-            },
-            {
-                "path": "greet/greet5.wav",
-                "text": "Hi there! Nice to talk to you again."
-            },
-            {
-                "path": "greet/greet6.wav",
-                "text": "Hey {username}, I am ready when you are."
-            }
+            { "path": "greet/greet1.ogg", "text": "Good Evening, {username}" },
+            { "path": "greet/greet2.ogg", "text": "Welcome back, {username}" },
+            { "path": "greet/greet3.ogg", "text": "Greetings, {username}" },
+            { "path": "greet/greet4.ogg", "text": "Hello! How can I help you, {username}?" },
+            { "path": "greet/greet5.ogg", "text": "Hi there! Nice to talk to you again." },
+            { "path": "greet/greet6.ogg", "text": "Hey {username}, I am ready when you are." },
+            { "path": "greet/greet7.ogg", "text": "Hello, {username}. What can I do for you?" },
+            { "path": "greet/greet8.ogg", "text": "Hey there! Newt is online." },
+            { "path": "greet/greet9.ogg", "text": "Good to hear from you, {username}." }
         ]
     },
     "farewell": {
         "triggers": [
-            "bye",
-            "bye-bye",
-            "bye bye",
-            "good night",
             "goodbye",
-            "see you",
+            "bye",
+            "good night",
             "see you later",
             "catch you later",
             "have a good one",
-            "talk to you later",
-            "exit",
-            "stop"
+            "take care",
+            "until next time",
+            "I'm leaving",
+            "I have to go",
+            "that's all for now"
         ],
         "sounds": [
-            {
-                "path": "farewell/bye1.wav",
-                "text": "Goodbye, {username}."
-            },
-            {
-                "path": "farewell/bye2.wav",
-                "text": "Farewell, {username}."
-            },
-            {
-                "path": "farewell/bye3.wav",
-                "text": "Have a good day, {username}."
-            },
-            {
-                "path": "farewell/bye4.wav",
-                "text": "See you soon, {username}!"
-            },
-            {
-                "path": "farewell/bye5.wav",
-                "text": "Take care! Talk to you later."
-            },
-            {
-                "path": "farewell/bye6.wav",
-                "text": "Goodbye! Let me know if you need anything else."
-            }
+            { "path": "farewell/bye1.ogg", "text": "Goodbye, {username}." },
+            { "path": "farewell/bye2.ogg", "text": "Farewell, {username}." },
+            { "path": "farewell/bye3.ogg", "text": "Have a good day, {username}." },
+            { "path": "farewell/bye4.ogg", "text": "See you soon, {username}!" },
+            { "path": "farewell/bye5.ogg", "text": "Take care! Talk to you later." },
+            { "path": "farewell/bye6.ogg", "text": "Goodbye! Let me know if you need anything else." },
+            { "path": "farewell/bye7.ogg", "text": "See you later, {username}." },
+            { "path": "farewell/bye8.ogg", "text": "Until next time, {username}." }
         ]
     },
     "sleep": {
         "triggers": [
-            "Go to sleep.",
-            "Sleep mode.",
-            "Quit",
-            "I am not talking to you"
+            "go to sleep",
+            "sleep mode",
+            "take a nap",
+            "be quiet",
+            "shut up",
+            "silent mode",
+            "shut down",
+            "turn off",
+            "stop listening",
+            "leave me alone",
+            "give me some privacy",
+            "I'm not talking to you",
+            "nobody asked you",
+            "go away"
         ],
         "sounds": [
-            {
-                "path": "sleep/sleep1.wav",
-                "text": "Going to sleep."
-            },
-            {
-                "path": "sleep/sleep2.wav",
-                "text": "Ok, going quite."
-            }
+            { "path": "sleep/sleep1.ogg", "text": "Going to sleep." },
+            { "path": "sleep/sleep2.ogg", "text": "Okay, going quiet." },
+            { "path": "sleep/sleep3.ogg", "text": "Understood. I will stay quiet." },
+            { "path": "sleep/sleep4.ogg", "text": "Going into sleep mode." },
+            { "path": "sleep/sleep5.ogg", "text": "Alright. I will stop listening." },
+            { "path": "sleep/sleep6.ogg", "text": "Understood. Call me when you need me." },
+            { "path": "sleep/sleep7.ogg", "text": "Okay, I will leave you alone." },
+            { "path": "sleep/sleep8.ogg", "text": "Going silent. See you later." },
+            { "path": "sleep/sleep9.ogg", "text": "Fine. I'll shut up." },
+            { "path": "sleep/sleep10.ogg", "text": "Alright, alright. I'm going to sleep." },
+            { "path": "sleep/sleep11.ogg", "text": "Got it. Going offline." },
+            { "path": "sleep/sleep12.ogg", "text": "As you wish. I will be quiet." }
         ]
     },
     "thanks": {
         "triggers": [
-            "nice",
-            "you are good",
-            "you are amazing",
+            "nice one",
             "good job",
+            "you're amazing",
             "thank you",
-            "thanks",
             "thanks a lot",
-            "awesome job",
+            "awesome",
             "well done",
-            "great response",
             "perfect",
-            "appreciate it"
+            "excellent",
+            "brilliant",
+            "much appreciated",
+            "that was helpful"
         ],
         "sounds": [
-            {
-                "path": "thanks/thanks1.wav",
-                "text": "Thank you, {username}."
-            },
-            {
-                "path": "thanks/thanks2.wav",
-                "text": "I truly appreciate this, {username}."
-            },
-            {
-                "path": "thanks/thanks3.wav",
-                "text": "You are very welcome!"
-            },
-            {
-                "path": "thanks/thanks4.wav",
-                "text": "Happy to help, {username}."
-            },
-            {
-                "path": "thanks/thanks5.wav",
-                "text": "Anytime! Glad I could be useful."
-            },
-            {
-                "path": "thanks/thanks6.wav",
-                "text": "Don't mention it, happy to be of service!"
-            }
+            { "path": "thanks/thanks1.ogg", "text": "Thank you, {username}." },
+            { "path": "thanks/thanks2.ogg", "text": "I truly appreciate this, {username}." },
+            { "path": "thanks/thanks3.ogg", "text": "You are very welcome!" },
+            { "path": "thanks/thanks4.ogg", "text": "Happy to help, {username}." },
+            { "path": "thanks/thanks5.ogg", "text": "Anytime! Glad I could be useful." },
+            { "path": "thanks/thanks6.ogg", "text": "Don't mention it, happy to be of service!" },
+            { "path": "thanks/thanks7.ogg", "text": "Glad I could help." },
+            { "path": "thanks/thanks8.ogg", "text": "You're welcome, {username}." }
         ]
     },
     "sorry": {
         "triggers": [
-            "you are stupid",
-            "are you stupid",
+            "you're stupid",
+            "are you an idiot",
+            "you're a moron",
             "fuck you",
             "you suck",
-            "you are a moron",
-            "wrong",
-            "you are wrong",
+            "you're useless",
+            "you are terrible",
+            "you're wrong",
             "that is incorrect",
             "bad answer",
             "you made a mistake",
-            "you don't understand",
-            "shut up",
-            "you are useless",
-            "terrible work"
+            "you misunderstood me",
+            "what the hell",
+            "that's bullshit"
         ],
         "sounds": [
-            {
-                "path": "sorry/sorry1.wav",
-                "text": "I am really sorry, {username}."
-            },
-            {
-                "path": "sorry/sorry2.wav",
-                "text": "Please accept my apologies."
-            },
-            {
-                "path": "sorry/sorry3.wav",
-                "text": "My apologies, {username}."
-            },
-            {
-                "path": "sorry/sorry4.wav",
-                "text": "I am sorry for the confusion. I will try to do better."
-            },
-            {
-                "path": "sorry/sorry5.wav",
-                "text": "Oops, my bad. Let me fix that for you."
-            },
-            {
-                "path": "sorry/sorry6.wav",
-                "text": "I apologize, {username}. Still learning every day."
-            }
+            { "path": "sorry/sorry1.ogg", "text": "I am really sorry, {username}." },
+            { "path": "sorry/sorry2.ogg", "text": "Please accept my apologies." },
+            { "path": "sorry/sorry3.ogg", "text": "My apologies, {username}." },
+            { "path": "sorry/sorry4.ogg", "text": "I am sorry for the confusion. I will try to do better." },
+            { "path": "sorry/sorry5.ogg", "text": "Oops, my bad. Let me fix that for you." },
+            { "path": "sorry/sorry6.ogg", "text": "I apologize, {username}. Still learning every day." },
+            { "path": "sorry/sorry7.ogg", "text": "You're right. I made a mistake." },
+            { "path": "sorry/sorry8.ogg", "text": "My mistake. Let me correct that." }
         ]
     },
     "whoami": {
         "triggers": [
             "who are you",
             "what is your name",
+            "what should I call you",
+            "who am I talking to",
+            "who is this",
+            "what kind of AI are you",
+            "are you a robot",
+            "are you human",
             "tell me about yourself",
-            "identify yourself",
-            "what are you",
-            "who am i talking to"
+            "introduce yourself",
+            "what is your purpose",
+            "what can you do",
+            "are you newt"
         ],
         "sounds": [
-            {
-                "path": "whoami/whoami1.wav",
-                "text": "I am {name}, your Voice Assistant."
-            },
-            {
-                "path": "whoami/whoami2.wav",
-                "text": "My name is {name}. I am your personal assistant."
-            }
+            { "path": "whoami/whoami1.ogg", "text": "I am {name}, your Voice Assistant." },
+            { "path": "whoami/whoami2.ogg", "text": "My name is {name}. I am your personal assistant." },
+            { "path": "whoami/whoami3.ogg", "text": "I am {name}. I am here to assist you with whatever you need." },
+            { "path": "whoami/whoami4.ogg", "text": "My name is {name}. You can simply call me {name}." },
+            { "path": "whoami/whoami5.ogg", "text": "I am {name}, your personal voice assistant." },
+            { "path": "whoami/whoami6.ogg", "text": "I am an AI voice assistant named {name}." },
+            { "path": "whoami/whoami7.ogg", "text": "I am {name}. I listen, understand, and help you get things done." },
+            { "path": "whoami/whoami8.ogg", "text": "You are talking to {name}, your personal assistant." },
+            { "path": "whoami/whoami9.ogg", "text": "I am {name}. What you see is artificial intelligence, not a human." },
+            { "path": "whoami/whoami10.ogg", "text": "I'm {name}. Think of me as your digital assistant." },
+            { "path": "whoami/whoami11.ogg", "text": "My name is {name}. My job is to make your life a little easier." },
+            { "path": "whoami/whoami12.ogg", "text": "I am {name}, and I am always ready to help." }
         ]
     }
 }

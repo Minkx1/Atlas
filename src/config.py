@@ -70,6 +70,7 @@ class TTSConfig:
     noise_scale: float = 1.0  # more audio variation
     noise_w_scale: float = 1.0  # more speaking variation
     normalize_audio: bool = False  # use raw audio from voice
+    silence_duration: float = 0.2
 
 
 @dataclass

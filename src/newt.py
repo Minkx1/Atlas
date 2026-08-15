@@ -1,9 +1,13 @@
 # newt.py
 
+
 import signal
 import sys
 import threading
 import time
+
+print("[DEBUG] Loading libs...")
+_start = time.perf_counter()
 
 from .cmd_operator import LLM, CommandOperator, Operator
 from .config import cfg
@@ -20,6 +24,7 @@ from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
 from .text_to_speech import TextToSpeech
 from .ui import AssistantUI, console
 
+print(f"[DEBUG] Loading complete. Took: {(time.perf_counter()-_start)*1000}ms")
 
 class Newt:
     def __init__(self) -> None:
@@ -81,6 +86,10 @@ class Newt:
         # TTS
         em.subscribe(EventType.TTS_SPEAK, lambda e: app.tts.speak(e.content))
         em.subscribe(EventType.TTS_PLAY_SOUND, lambda e: app.tts.play_sound(e.content))
+
+        em.subscribe(EventType.TTS_BUSY, lambda e: app.listener.mute())
+        em.subscribe(EventType.TTS_FREE, lambda e: app.listener.unmute())
+        em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_CONTINUE))
 
         em.subscribe(
             EventType.STT_CHANGED_STATE,

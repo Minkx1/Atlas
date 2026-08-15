@@ -61,6 +61,7 @@ length_scale = 0.75  # Speed of speech. 1.0 is default, 2.0 - twice as slow
 noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice
+silence_duration = 0.0
 
 [stt]
 start_state = "SLEEPING"
@@ -71,7 +72,7 @@ compute_type = "int8"
 beam_size = 5
 cpu_threads = 6
 
-awake_timeout = 10.0  # How many seconds the assistant waits for a command after the wake word
+awake_timeout = 15.0  # How many seconds the assistant waits for a command after the wake word
 min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
 # --- EN Preset ---
 language = "en"
