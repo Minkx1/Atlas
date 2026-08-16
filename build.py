@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from src import __version__
+from src.utils import __version__
 
 sys_name = platform.system().lower()  # 'linux', 'windows', 'darwin'
 machine = platform.machine().lower()  # 'x86_64', 'amd64'
