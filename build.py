@@ -45,8 +45,19 @@ def compile_exe():
         sys.executable,
         "-m",
         "nuitka",
-        "--onefile",
+        "--standalone",
+        "--lto=no",
         "--assume-yes-for-downloads",
+        
+        "--follow-import-to=src",
+        
+        "--nofollow-import-to=torch.testing",
+        "--nofollow-import-to=torch._dynamo",
+        "--nofollow-import-to=unittest",
+        "--nofollow-import-to=pytest",
+        
+        "--enable-plugin=anti-bloat",
+        
         f"--output-dir={DIST_DIR}",
         f"--output-filename={APP_NAME}",
         "--remove-output",
@@ -59,39 +70,27 @@ def compile_exe():
 
 def stage_and_archive():
     print("Making archive...")
-
     STAGING_DIR.mkdir(exist_ok=True)
 
-    exe_name = f"{APP_NAME}.exe" if os.name == "nt" else APP_NAME
-    shutil.copy(DIST_DIR / exe_name, STAGING_DIR / exe_name)
-    print(f"  Added executable: {exe_name}")
-
+    nuitka_output_dir = DIST_DIR / "main.dist"  # or DIST_DIR / f"{APP_NAME}.dist"
+    
+    if nuitka_output_dir.exists():
+        shutil.copytree(nuitka_output_dir, STAGING_DIR, dirs_exist_ok=True)
+    
     for file_name in FILES_TO_INCLUDE:
         file_path = BASE_DIR / file_name
         if file_path.exists():
             shutil.copy(file_path, STAGING_DIR / file_name)
-            print(f"  Added file: {file_name}")
-        else:
-            print(f"  [WARN]: {file_name} not found!")
 
     for dir_name in DIRS_TO_INCLUDE:
         dir_path = BASE_DIR / dir_name
         if dir_path.exists():
             shutil.copytree(dir_path, STAGING_DIR / dir_name)
-            print(f"  Added directory: {dir_name}/")
-        else:
-            print(f"  [WARN]: Directory {dir_name}/ not found!")
 
     archive_format = "zip" if os.name == "nt" else "gztar"
-
-    shutil.make_archive(
-        str(ARCHIVE_NAME), archive_format, BASE_DIR, STAGING_DIR.name
-    )
-
+    shutil.make_archive(str(ARCHIVE_NAME), archive_format, BASE_DIR, STAGING_DIR.name)
     shutil.rmtree(STAGING_DIR)
-
-    extension = ".zip" if archive_format == "zip" else ".tar.gz"
-    print(f"[$] Archiving complete: {ARCHIVE_NAME.name}{extension}")
+    print(f"[$] Archiving complete: {ARCHIVE_NAME.name}")
 
 
 if __name__ == "__main__":

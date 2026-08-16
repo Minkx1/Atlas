@@ -34,6 +34,11 @@ jobs:
           pip install -r requirements.txt
           pip install nuitka zstandard ordered-set
 
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.os }}-nuitka
+
       - name: Run Build Script
         run: python build.py
 
