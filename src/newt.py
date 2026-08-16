@@ -1,9 +1,6 @@
 # newt.py
 
-
-import signal
 import sys
-import threading
 import time
 
 from .cmd_operator import LLM, CommandOperator, Operator

@@ -55,7 +55,7 @@ class CommandOperator:
             ],
         }
 
-        self.intent_threshold = 0.50
+        self.intent_threshold = 0.60
         self.margin = 0.05
 
     def load(self):
@@ -484,8 +484,8 @@ class Operator:
         tts_engaged = False
 
         try:
+            emit_event(EventType.STT_SET_STATE, "WAITING")
             res_type, payload = self.cmd.operate(text)
-            emit_event(EventType.OP_CMD_LEVEL, str(res_type))
 
             if res_type == "builtin" and payload is not None:
                 tts_engaged = True
@@ -521,4 +521,5 @@ class Operator:
             emit_event(EventType.PROFILER_SET_STATE, "AWAKE")
             if tts_engaged:
                 wait_for(EventType.TTS_FREE)
+            emit_event(EventType.STT_SET_STATE, "AWAKE")
             emit_event(EventType.OP_READY)

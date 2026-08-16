@@ -53,11 +53,11 @@ speech_pad_ms = 60
 preroll_blocks = 6
 
 [tts]
-model_path = "models/piper/en_US-lessac-medium.onnx"
+model_path = "models/piper/en_US-ryan-medium.onnx"
 # model_path = "models/piper/uk_UA-ukrainian_tts-medium.onnx"
 use_cuda = false
 volume = 1.0
-length_scale = 0.75  # Speed of speech. 1.0 is default, 2.0 - twice as slow
+length_scale = 0.85  # Speed of speech. 1.0 is default, 2.0 - twice as slow
 noise_scale = 1.0  # more audio variation
 noise_w_scale = 1.0  # more speaking variation
 normalize_audio = false  # use raw audio from voice

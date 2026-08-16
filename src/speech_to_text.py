@@ -301,6 +301,9 @@ class AudioPipeline:
     def set_state(self, new_state: LState, detail: str | None = None) -> None:
         if self.state != new_state:
             self.state = new_state
+            if new_state == LState.AWAKE:
+                self.update_deadline()
+
             emit_event(EventType.STT_CHANGED_STATE, new_state.value)
 
             payload = {"state": new_state.value}
@@ -402,9 +405,29 @@ class Listener:
         self._running = False
         self._is_muted = False
 
+        self._last_wave_emit = 0.0
+        self._wave_fps_interval = 0.04
+
     def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
         if not self._is_muted:
             self.pipeline.process(indata)
+
+            now = time.monotonic()
+            if now - self._last_wave_emit >= self._wave_fps_interval:
+                self._last_wave_emit = now
+
+                # Обчислюємо RMS (середню гучність) або стискаємо масив
+                # indata зазвичай має форму (blocksize, channels)
+                audio_mono = indata[:, 0] if indata.ndim > 1 else indata
+                
+                # Варіант А: Обчислення RMS (одне число від 0.0 до 1.0)
+                rms = float(np.sqrt(np.mean(audio_mono**2)))
+
+                # Варіант Б: Даунсемплінг масиву (наприклад, 16 точок для стовпчиків)
+                # chunk_size = len(audio_mono) // 16
+                # wave_samples = [float(np.abs(audio_mono[i:i+chunk_size]).max()) for i in range(0, len(audio_mono), chunk_size)]
+
+                emit_event(EventType.STT_AUDIOWAVE, rms)
 
     def _on_audio_recorded(self, full_audio: np.ndarray, listen_ms: float):
         self.audio_queue.put((full_audio.copy(), listen_ms))
@@ -436,19 +459,12 @@ class Listener:
                 emit_event(EventType.STT_TRANSCRIBED, text)
                 self.pipeline.set_state(LState.WAITING)
 
-                success = wait_for(EventType.STT_CONTINUE)
-                if not success:
-                    log(
-                        "STT worker timed out(15s) waiting for STT_CONTINUE!",
-                        source="STT",
-                        level="WARN",
-                    )
-                self.pipeline.set_state(
-                    LState.AWAKE
-                    if self.pipeline.get_state() != LState.SLEEPING
-                    else self.pipeline.get_state()
-                )
-                self.pipeline.update_deadline()
+                # self.pipeline.set_state(
+                #     LState.AWAKE
+                #     if self.pipeline.get_state() != LState.SLEEPING
+                #     else self.pipeline.get_state()
+                # )
+                # self.pipeline.update_deadline()
 
             self.audio_queue.task_done()
 

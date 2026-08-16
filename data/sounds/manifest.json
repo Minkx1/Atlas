@@ -2,10 +2,10 @@
     "settings": {
         "name": "Newt",
         "username": "sir",
-        "model_path": "models/piper/en_US-lessac-medium.onnx",
+        "model_path": "models/piper/en_US-ryan-medium.onnx",
         "use_cuda": false,
         "volume": 1.0,
-        "length_scale": 0.75,
+        "length_scale": 0.85,
         "noise_scale": 1.0,
         "noise_w_scale": 1.0,
         "normalize_audio": false
