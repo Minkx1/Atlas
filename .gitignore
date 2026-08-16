@@ -9,3 +9,6 @@ dist/
 
 data/models/
 data/logs/
+.nuitka_cache
+*.tar.gz
+*.tar.xz
