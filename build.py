@@ -7,10 +7,9 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import zipfile
 from pathlib import Path
 
-from src.utils import __version__
+from src import __version__
 
 # --- Конфігурація ---
 APP_NAME = "newt"
