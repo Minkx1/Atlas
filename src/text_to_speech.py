@@ -166,7 +166,7 @@ class TextToSpeech:
             else:
                 log(f"Unsupported output format: {output_path.suffix}", "TTS", "ERROR")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             log(
                 f"Error generating audio {output_path.name}: {type(e).__name__}: {e}",
                 "TTS",

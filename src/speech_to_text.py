@@ -25,7 +25,7 @@ import sounddevice as sd
 from dotenv import load_dotenv
 
 from .config import DATA_DIR, cfg
-from .events import EventType, emit_event, log, wait_for
+from .events import EventType, emit_event, log
 
 # makes downloading Whisper models from HF faster
 load_dotenv()  # loads HF_TOKEN from .env file.
