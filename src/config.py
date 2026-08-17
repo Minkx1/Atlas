@@ -16,7 +16,8 @@ if OS_NAME not in {"posix", "nt"}:
 
 
 def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
+    is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+    if is_compiled:
         exe_dir = Path(sys.executable).resolve().parent
         if exe_dir.name == "bin":
             return exe_dir.parent
