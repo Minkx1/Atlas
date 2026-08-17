@@ -22,6 +22,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache Nuitka
+        uses: actions/cache@v4
+        with:
+          path: .nuitka_cache
+          key: ${{ runner.os }}-nuitka-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-
+
       - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -42,11 +50,22 @@ jobs:
       - name: Run Build Script
         run: python build.py
 
+      - name: Split large archives
+        shell: bash
+        run: |
+          for f in *.tar.xz; do
+            if [ -f "$f" ]; then
+              echo "Splitting $f into chunks..."
+              split -b 1500M --numeric-suffixes=1 -a 3 "$f" "${f}."
+              rm "$f" 
+            fi
+          done
+
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            *.tar.xz
+            *.0*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

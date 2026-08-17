@@ -7,11 +7,13 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import time
 from pathlib import Path
+
+_start = time.perf_counter()
 
 from src import __version__
 
-# --- Конфігурація ---
 APP_NAME = "newt"
 ENTRY_POINT = "main.py"
 VERSION = __version__
@@ -184,6 +186,11 @@ def compile_exe(cpu_only: bool = False):
     nuitka_dist = DIST_DIR / "main.dist"
     if nuitka_dist.exists():
         post_build_cleanup(nuitka_dist)
+
+    _compile_end = time.perf_counter()
+    print(
+        f"Compilation ended in [{datetime.timedelta(seconds=int(_compile_end - _start))}]"
+    )
 
 
 def make_compressed_archive():
