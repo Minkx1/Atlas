@@ -64,6 +64,7 @@ class VAD:
     def _normalize_chunk(audio_chunk: np.ndarray | torch.Tensor) -> torch.Tensor:
         if isinstance(audio_chunk, np.ndarray):
             import torch
+
             return torch.from_numpy(
                 audio_chunk.squeeze(1) if audio_chunk.ndim > 1 else audio_chunk
             )
@@ -119,7 +120,7 @@ class KeyWordSpotter:
 
     def load(self):
         import sherpa_onnx
-        
+
         try:
             _start = time.perf_counter()
             log("Loading Sherpa-ONNX KWS model...", "KWS", "INFO")
@@ -415,18 +416,9 @@ class Listener:
             now = time.monotonic()
             if now - self._last_wave_emit >= self._wave_fps_interval:
                 self._last_wave_emit = now
-
-                # Обчислюємо RMS (середню гучність) або стискаємо масив
-                # indata зазвичай має форму (blocksize, channels)
                 audio_mono = indata[:, 0] if indata.ndim > 1 else indata
-                
-                # Варіант А: Обчислення RMS (одне число від 0.0 до 1.0)
+
                 rms = float(np.sqrt(np.mean(audio_mono**2)))
-
-                # Варіант Б: Даунсемплінг масиву (наприклад, 16 точок для стовпчиків)
-                # chunk_size = len(audio_mono) // 16
-                # wave_samples = [float(np.abs(audio_mono[i:i+chunk_size]).max()) for i in range(0, len(audio_mono), chunk_size)]
-
                 emit_event(EventType.STT_AUDIOWAVE, rms)
 
     def _on_audio_recorded(self, full_audio: np.ndarray, listen_ms: float):
@@ -491,6 +483,7 @@ class Listener:
 
     def mute(self):
         self._is_muted = True
+
     def unmute(self):
         self._is_muted = False
 
@@ -498,6 +491,17 @@ class Listener:
         self._running = False
         self.audio_queue.put(None)
 
-        self.stt_worker_thread.join()
-        self.audio_input_thread.join()
+        if (
+            hasattr(self, "stt_worker_thread")
+            and self.stt_worker_thread is not None
+            and self.stt_worker_thread.is_alive()
+        ):
+            self.stt_worker_thread.join(timeout=2.0)
+        if (
+            hasattr(self, "audio_input_thread")
+            and self.audio_input_thread is not None
+            and self.audio_input_thread.is_alive()
+        ):
+            self.audio_input_thread.join(timeout=2.0)
+
         emit_event(EventType.STT_FINISH)

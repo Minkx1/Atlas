@@ -55,9 +55,7 @@ class Newt:
 
     def _shutdown(self):
         self.alive = False
-        # Якщо UI існує і працює, наказуємо йому коректно завершитись
-        if hasattr(self, 'ui') and getattr(self.ui, 'is_running', False):
-            # Викликаємо exit() безпечно з іншого потоку
+        if hasattr(self, "ui") and getattr(self.ui, "is_running", False):
             self.ui.call_from_thread(self.ui.exit)
 
     def load_models(self):
@@ -155,6 +153,7 @@ class Newt:
         if cfg.profiler:
             profiler.stop()
             from .old_ui import print_benchmark_report
+
             print_benchmark_report(profiler.get_summary())
 
     def close(self):

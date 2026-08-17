@@ -2,10 +2,9 @@
 
 import json
 import queue
-import subprocess
-import sys
 import threading
 import time
+import urllib.request
 import wave
 from pathlib import Path
 
@@ -20,6 +19,10 @@ if __name__ == "__main__":
 else:
     from .config import DATA_DIR, cfg
     from .events import EventType, emit_event, log
+
+
+VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
+HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
 
 
 class TextToSpeech:
@@ -59,28 +62,61 @@ class TextToSpeech:
 
     def _download_model(self):
         model_path = DATA_DIR / cfg.tts.model_path
-        name = model_path.stem
-        log(f"Downloading PiperTTS model: {name}", "TTS", "INFO")
 
-        model_path.parent.mkdir(parents=True, exist_ok=True)
+        model_key = model_path.stem
+        model_dir = model_path.parent
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        log(
+            f"Downloading PiperTTS model '{model_key}' via HuggingFace index...",
+            "TTS",
+            "INFO",
+        )
 
         try:
-            log(f"Starting download subprocess for {name}...", "TTS", "DEBUG")
-            subprocess.run(
-                f"{sys.executable} -m piper.download_voices {name}",
-                cwd=model_path.parent,
-                shell=True,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                check=True,
+            req = urllib.request.Request(
+                VOICES_JSON_URL, headers={"User-Agent": "Mozilla/5.0"}
             )
-            log(f"PiperTTS model {name} downloaded successfully.", "TTS", "INFO")
-        except Exception as e:  # noqa: BLE001
+            with urllib.request.urlopen(req) as resp:
+                voices_data = json.loads(resp.read().decode("utf-8"))
+
+            if model_key not in voices_data:
+                raise ValueError(
+                    f"Model '{model_key}' not found in Piper voices index."
+                )
+
+            # 2. Знаходимо всі файли для цього голосу (.onnx та .onnx.json)
+            files = voices_data[model_key].get("files", {})
+
+            for rel_path in files:
+                file_name = Path(rel_path).name
+                target_path = model_dir / file_name
+                download_url = HF_BASE_URL + rel_path
+
+                if not target_path.exists():
+                    log(f"Downloading {file_name}...", "TTS", "INFO")
+                    file_req = urllib.request.Request(
+                        download_url, headers={"User-Agent": "Mozilla/5.0"}
+                    )
+                    with (
+                        urllib.request.urlopen(file_req) as response,
+                        open(target_path, "wb") as out_file,
+                    ):
+                        out_file.write(response.read())
+
             log(
-                f"Error downloading PiperTTS model {name}: {type(e).__name__}: {e}",
+                f"PiperTTS model '{model_key}' downloaded successfully.",
+                "TTS",
+                "SUCCESS",
+            )
+
+        except Exception as e:
+            log(
+                f"Failed to download PiperTTS model '{model_key}': {type(e).__name__}: {e}",
                 "TTS",
                 "ERROR",
             )
+            raise
 
     def _tts_worker(self):
         """Background thread that gathers sentences(text chunks) from queue and voices them."""
@@ -126,7 +162,9 @@ class TextToSpeech:
                 )
 
                 samplerate = audio_chunks[0].sample_rate
-                silence = np.zeros(int(samplerate * cfg.tts.silence_duration), dtype=audio_array.dtype)
+                silence = np.zeros(
+                    int(samplerate * cfg.tts.silence_duration), dtype=audio_array.dtype
+                )
                 padded_audio = np.concatenate((silence, audio_array))
 
                 sd.play(padded_audio, samplerate=samplerate)
@@ -178,12 +216,17 @@ class TextToSpeech:
         try:
             log(f"Playing audio: {path.name}", "TTS", "DEBUG")
             audio, samplerate = sf.read(path)
-            
+
             if audio.ndim > 1:  # if stereo file
-                silence = np.zeros((int(samplerate * cfg.tts.silence_duration), audio.shape[1]), dtype=audio.dtype)
+                silence = np.zeros(
+                    (int(samplerate * cfg.tts.silence_duration), audio.shape[1]),
+                    dtype=audio.dtype,
+                )
             else:
-                silence = np.zeros(int(samplerate * cfg.tts.silence_duration), dtype=audio.dtype)
-                
+                silence = np.zeros(
+                    int(samplerate * cfg.tts.silence_duration), dtype=audio.dtype
+                )
+
             padded_audio = np.concatenate((silence, audio))  # audio with silence before
 
             sd.play(padded_audio, samplerate)
@@ -325,4 +368,5 @@ class TextToSpeech:
 
 if __name__ == "__main__":
     tts = TextToSpeech()
-    tts.load()
+    tts._download_model()
+    # tts.load()

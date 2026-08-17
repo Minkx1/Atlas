@@ -14,17 +14,18 @@ OS_NAME = os.name
 if OS_NAME not in {"posix", "nt"}:
     raise OSError(f"Unsupported OS: {OS_NAME}")
 
-if getattr(sys, "frozen", False):
-    if OS_NAME == "posix":
-        # on Linux compiled binary will be in bin/ dir
-        PROJECT_ROOT = Path(sys.executable).resolve().parent.parent
-    else:
-        # on Win newt.exe will be directly in the root with and data/ folder
-        PROJECT_ROOT = Path(sys.executable).resolve().parent
-else:
-    PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-DATA_DIR = PROJECT_ROOT / "data"
+def get_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        if exe_dir.name == "bin":
+            return exe_dir.parent
+        return exe_dir
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR = get_base_dir()
+DATA_DIR = BASE_DIR / "data"
 DEFAULT_CONFIG_PATH = DATA_DIR / "config.toml"
 
 
