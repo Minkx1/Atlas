@@ -36,9 +36,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller nuitka zstandard ordered-set
           pip install -r requirements.txt
+          # uninstalling heavy CUDA torch and installing light CPU only
+          pip uninstall -y torch torchvision torchaudio
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Run Build Script
-        run: python build.py
+        run: python build.py --cpu-only
 
       - name: Handle Large Archives (Split if > 1.9GB)
         shell: bash

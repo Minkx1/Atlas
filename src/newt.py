@@ -33,21 +33,19 @@ class Newt:
                 time.time(),
             )
 
-        # main components
-
-        self.tts = TextToSpeech()
-
-        self.cmd = CommandOperator()
-        self.llm = LLM()
-
-        self.operator = Operator(self.cmd, self.llm)
-
-        # STT pipeline
-
+        # STT Pipeline
         self.kws = KeyWordSpotter()
         self.vad = VAD()
         self.whisper = Whisper()
         self.listener = Listener(self.vad, self.whisper, self.kws)
+
+        # TTS
+        self.tts = TextToSpeech()
+
+        # Operator
+        self.cmd = CommandOperator()
+        self.llm = LLM()
+        self.operator = Operator(self.cmd, self.llm)
 
         self._setup_subscriptions()
 
@@ -59,14 +57,14 @@ class Newt:
     def load_models(self):
         try:
             log("Starting model loading...", "NEWT", "INFO")
+            self.vad.load()
+            self.kws.load()
+            self.whisper.load()
+
             self.tts.load()
 
             self.cmd.load()
             self.llm.load()
-
-            self.vad.load()
-            self.kws.load()
-            self.whisper.load()
 
             log("All models loaded successfully.", "NEWT", "SUCCESS")
         except Exception as e:
