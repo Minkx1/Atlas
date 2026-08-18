@@ -146,7 +146,7 @@ def post_build_cleanup(dist_path: Path):
                         stderr=subprocess.DEVNULL,
                         check=False,
                     )
-                except Exception:  # noqa: BLE001, S110
+                except Exception:  # noqa: BLE001
                     pass
 
     mb_saved = removed_bytes / (1024 * 1024)
@@ -161,7 +161,7 @@ def generate_build_info():
             .decode()
             .strip()
         )
-    except Exception:  # noqa: BLE001, S110
+    except Exception:  # noqa: BLE001
         pass
 
     return {
@@ -180,17 +180,36 @@ def compile_exe(cpu_only: bool = False):
 
     if BACKEND == "pyinstaller":
         BUILD_DIR.mkdir(exist_ok=True)
+
+        import piper
+
+        espeak_data = Path(piper.__file__).parent / "espeak-ng-data"
+        if not espeak_data.exists():
+            print(
+                f"[!] WARNING: espeak-ng-data not found at {espeak_data}! Audio generation WILL crash!"
+            )
+
         cmd = [
             sys.executable,
             "-m",
             "PyInstaller",
+            f"{ENTRY_POINT}",
             "--noconfirm",
             "--onedir",
+            "--contents-directory=bin",
             f"--name={APP_NAME}",
             f"--distpath={DIST_DIR}",
             f"--workpath={BUILD_DIR}",
             f"--specpath={BUILD_DIR}",
-            "--clean",
+            # "--clean",
+            "--collect-data=silero_vad",
+            f"--add-data={espeak_data}{os.pathsep}piper/espeak-ng-data",
+            # "--collect-all=piper_phonemize",
+            "--collect-all=piper",
+            "--collect-all=onnxruntime",
+            "--collect-all=textual",
+            "--collect-all=rich",
+            "--collect-all=llama_cpp",
             "--exclude-module=tkinter",
             "--exclude-module=matplotlib",
             "--exclude-module=IPython",
@@ -205,8 +224,6 @@ def compile_exe(cpu_only: bool = False):
                     "--exclude-module=triton",
                 ]
             )
-
-        cmd.append(ENTRY_POINT)
 
     elif BACKEND == "nuitka":
         cmd = [
@@ -270,23 +287,8 @@ def make_compressed_archive():
     STAGING_DIR.mkdir(exist_ok=True)
     out_dist = get_out_dist_dir()
 
-    if SYS_NAME == "linux":
-        bin_dir = STAGING_DIR / "bin"
-        if out_dist.exists():
-            shutil.copytree(out_dist, bin_dir, dirs_exist_ok=True)
-
-        launcher_path = STAGING_DIR / APP_NAME
-        with open(launcher_path, "w", encoding="utf-8") as f:
-            f.write("#!/bin/bash\n")
-            f.write('export LD_LIBRARY_PATH="$DIR/bin:$LD_LIBRARY_PATH"\n')
-            f.write(
-                'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"\n'
-            )
-            f.write(f'exec "$DIR/bin/{APP_NAME}" "$@"\n')
-        launcher_path.chmod(0o755)
-    else:
-        if out_dist.exists():
-            shutil.copytree(out_dist, STAGING_DIR, dirs_exist_ok=True)
+    if out_dist.exists():
+        shutil.copytree(out_dist, STAGING_DIR, dirs_exist_ok=True)
 
     info_path = STAGING_DIR / "build_info.json"
     with open(info_path, "w", encoding="utf-8") as f:
@@ -320,8 +322,29 @@ def make_compressed_archive():
 
     # archive_file = ARCHIVE_NAME.with_suffix(".tar.xz")
     archive_file = BASE_DIR / f"{BASENAME}.tar.xz"
-    with tarfile.open(archive_file, "w:xz") as tf:
-        tf.add(STAGING_DIR, arcname=STAGING_DIR.name)
+    compressed = False
+    if shutil.which("tar") and shutil.which("xz"):
+        try:
+            subprocess.run(
+                [
+                    "tar",
+                    "-I",
+                    "xz -T0",  # -T0 makes ALL CPU cores to work
+                    "-cf",
+                    str(archive_file),
+                    "-C",
+                    str(STAGING_DIR.parent),
+                    STAGING_DIR.name,
+                ],
+                check=True,
+            )
+            compressed = True
+        except Exception as e:  # noqa: BLE001
+            print(f"[!] System tar failed ({e}), falling back to python tarfile...")
+
+    if not compressed:
+        with tarfile.open(archive_file, "w:xz") as tf:
+            tf.add(STAGING_DIR, arcname=STAGING_DIR.name)
 
     shutil.rmtree(STAGING_DIR)
 

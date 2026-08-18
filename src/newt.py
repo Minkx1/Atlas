@@ -6,7 +6,6 @@ import time
 from .cmd_operator import LLM, CommandOperator, Operator
 from .config import cfg
 from .events import (
-    Event,
     EventLogger,
     EventManager,
     EventType,
@@ -16,7 +15,6 @@ from .events import (
 
 # from .ui import AssistantUI, console
 from .new_ui import UI
-from .profiler import profiler
 from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
 from .text_to_speech import TextToSpeech
 
@@ -93,10 +91,6 @@ class Newt:
         em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_CONTINUE))
 
         em.subscribe(
-            EventType.STT_CHANGED_STATE,
-            lambda e: emit_event(EventType.PROFILER_SET_STATE, e.content),
-        )
-        em.subscribe(
             EventType.STT_SET_STATE,
             lambda e: app.listener.pipeline.set_state(LState(e.content)),
         )
@@ -107,9 +101,6 @@ class Newt:
         em.subscribe(
             EventType.STT_KEYWORD_DETECTED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
-        )
-        em.subscribe(
-            EventType.STT_START, lambda e: emit_event(EventType.PROFILER_START)
         )
 
         em.subscribe(EventType.OP_ASK_FINISH, lambda e: app._shutdown())
@@ -138,28 +129,13 @@ class Newt:
         #     lambda e: AssistantUI.print_assistant_say(**e.content),
         # )
 
-        def _prof_start(event: Event | None = None):
-            if cfg.profiler:
-                profiler.start()
-
-        em.subscribe(EventType.PROFILER_START, lambda e: _prof_start(e))
-        em.subscribe(
-            EventType.PROFILER_SET_STATE,
-            lambda e: profiler.set_state(e.content),
-        )
-        em.subscribe(EventType.PROFILER_FINISH, app._prof_finish)
-
-    def _prof_finish(self, *args):
-        if cfg.profiler:
-            profiler.stop()
-            from .old_ui import print_benchmark_report
-
-            print_benchmark_report(profiler.get_summary())
-
     def close(self):
         try:
             log("Shutting down assistant...", "NEWT", "INFO")
-            emit_event(EventType.PROFILER_FINISH)
+
+            if getattr(self, "listener", None):
+                self.listener.close()
+                log("Listener closed.", "NEWT", "DEBUG")
 
             if getattr(self, "operator", None):
                 self.operator.close()
@@ -167,26 +143,37 @@ class Newt:
             if getattr(self, "tts", None):
                 self.tts.close()
                 log("TTS closed.", "NEWT", "DEBUG")
-            if getattr(self, "listener", None):
-                self.listener.close()
-                log("Listener closed.", "NEWT", "DEBUG")
+
+            if hasattr(self, "kws"):
+                if hasattr(self.kws, "stream"):
+                    del self.kws.stream
+                if hasattr(self.kws, "kws"):
+                    del self.kws.kws
+            if hasattr(self, "vad") and hasattr(self.vad, "iterator"):
+                del self.vad.iterator
+            if hasattr(self, "whisper") and hasattr(self.whisper, "model"):
+                del self.whisper.model
 
             self._shutdown()
-
             self.events.flush_and_stop()
             log("Shutdown complete.", "NEWT", "INFO")
         except Exception as e:  # noqa: BLE001
-            log(
-                f"Error during shutdown: {type(e).__name__}: {e}",
-                "NEWT",
-                "ERROR",
+            log(f"Error during shutdown: {type(e).__name__}: {e}", "NEWT", "ERROR")
+
+        finally:
+            import sys
+
+            sys.stdout.write(
+                "\x1b[?1000l"
+                "\x1b[?1003l"
+                "\x1b[?1015l\x1b[?1006l"
+                "\x1b[?25h"
+                "\x1b[=0u"
+                "\x1b[<u"
+                "\x1b[>4m"
+                "\x1b[?2004l"
             )
-        if getattr(self, "listener", None):
-            self.listener.close()
-
-        self._shutdown()
-
-        self.events.flush_and_stop()
+            sys.stdout.flush()
 
     def main(self):
         self.load_models()
@@ -199,6 +186,10 @@ class Newt:
 
         self.ui = UI(newt_app=self)
         self.ui.run()  # this blocks main thread
+        # from threading import Event
+
+        # while self.alive:
+        #     Event().wait(1.0)
 
     def start(self):
         try:

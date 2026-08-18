@@ -6,15 +6,14 @@ from rich.panel import Panel
 
 if __name__ == "__main__":
     MAIN = True
+
     from config import cfg
-    from utils import __version__
 else:
     MAIN = False
     from .config import cfg
-    from .utils import __version__
 
+__version__ = "UNEXPECTED_BEHAVIOUR"
 console = Console()
-
 
 
 def _get_timestamp() -> str:
@@ -37,15 +36,12 @@ def print_banner():
         f"[dim]Waiting for [/dim][white]'{cfg.name}'[/white][dim]... "
         f"Press [bold]Ctrl+C[/bold] to exit.[/dim]"
     )
-    if cfg.profiler:
-        banner_text += "\n[bold yellow]⚡ PROFILER MODE ENABLED[/bold yellow]"
 
     console.print(Panel.fit(banner_text, border_style="cyan"))
 
 
 def print_state_change(state: str, detail: str = ""):
-    if not cfg.profiler:
-        return
+    return
 
     time_str = _get_timestamp()
     if state == "AWAKE":
@@ -65,42 +61,42 @@ def print_state_change(state: str, detail: str = ""):
 def print_transcription(
     text: str, listen_ms: float = 0.0, recog_ms: float = 0.0, rtf: float = 0.0
 ):
-    if cfg.profiler:
-        console.print(
-            f"\n[bold magenta]╭─ SpeechToText[/bold magenta] [dim]({_get_timestamp()})[/dim]"
-        )
-        console.print(
-            f'[bold magenta]├─[/bold magenta] [bold white]"{text}"[/bold white]'
-        )
-        console.print(
-            f"[bold magenta]╰─[/bold magenta] [dim]Audio: [white]{listen_ms:.0f} ms[/white] │ "
-            f"STT Latency: [white]{recog_ms:.0f} ms[/white] │ "
-            f"RTF:[/dim] {_format_rtf(rtf)}"
-        )
-    else:
-        console.print(f'\n[bold cyan][User]:[/bold cyan] [white]"{text}"[/white]')
+    # if cfg.profiler:
+    #     console.print(
+    #         f"\n[bold magenta]╭─ SpeechToText[/bold magenta] [dim]({_get_timestamp()})[/dim]"
+    #     )
+    #     console.print(
+    #         f'[bold magenta]├─[/bold magenta] [bold white]"{text}"[/bold white]'
+    #     )
+    #     console.print(
+    #         f"[bold magenta]╰─[/bold magenta] [dim]Audio: [white]{listen_ms:.0f} ms[/white] │ "
+    #         f"STT Latency: [white]{recog_ms:.0f} ms[/white] │ "
+    #         f"RTF:[/dim] {_format_rtf(rtf)}"
+    #     )
+    # else:
+    console.print(f'\n[bold cyan][User]:[/bold cyan] [white]"{text}"[/white]')
 
 
 def print_llm_chunk(text: str, is_first: bool = False):
     if not text:
         return
 
-    if cfg.profiler:
-        if is_first:
-            console.print(
-                f"\n[bold yellow]╭─ LLM[/bold yellow] [dim]({_get_timestamp()})[/dim]"
-            )
-            console.print(
-                '[bold yellow]├─[/bold yellow] [bold white]"[/bold white]', end=""
-            )
-        console.print(text, end=" ", style="bold white")
-    else:
-        if is_first:
-            console.print(
-                f"\n[bold bright_green][{cfg.name}]:[/bold bright_green] ",
-                end="",
-            )
-        console.print(text, end=" ", style="white")
+    # if cfg.profiler:
+    #     if is_first:
+    #         console.print(
+    #             f"\n[bold yellow]╭─ LLM[/bold yellow] [dim]({_get_timestamp()})[/dim]"
+    #         )
+    #         console.print(
+    #             '[bold yellow]├─[/bold yellow] [bold white]"[/bold white]', end=""
+    #         )
+    #     console.print(text, end=" ", style="bold white")
+    # else:
+    if is_first:
+        console.print(
+            f"\n[bold bright_green][{cfg.name}]:[/bold bright_green] ",
+            end="",
+        )
+    console.print(text, end=" ", style="white")
 
 
 def print_assistant_say(text: str, **kwargs):
@@ -116,37 +112,38 @@ def print_llm_response(
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
 ):
-    if cfg.profiler:
-        console.print('"', style="bold white")
+    # if cfg.profiler:
+    #     console.print('"', style="bold white")
 
-        total_tokens = prompt_tokens + completion_tokens
-        speed = (
-            (completion_tokens / (gen_ms / 1000.0))
-            if gen_ms > 0 and completion_tokens > 0
-            else 0.0
-        )
+    #     total_tokens = prompt_tokens + completion_tokens
+    #     speed = (
+    #         (completion_tokens / (gen_ms / 1000.0))
+    #         if gen_ms > 0 and completion_tokens > 0
+    #         else 0.0
+    #     )
 
-        if total_tokens > 0:
-            console.print(
-                f"[bold yellow]├─[/bold yellow] [dim]Tokens: [white]{prompt_tokens}[/white] prompt + "
-                f"[white]{completion_tokens}[/white] gen = [bold white]{total_tokens}[/bold white] total[/dim]"
-            )
+    #     if total_tokens > 0:
+    #         console.print(
+    #             f"[bold yellow]├─[/bold yellow] [dim]Tokens: [white]{prompt_tokens}[/white] prompt + "
+    #             f"[white]{completion_tokens}[/white] gen = [bold white]{total_tokens}[/bold white] total[/dim]"
+    #         )
 
-        console.print(
-            f"[bold yellow]╰─[/bold yellow] [dim]Gen Time: [white]{gen_ms:.0f} ms[/white]"
-            + (
-                f" │ Speed: [bold green]{speed:.1f} tok/s[/bold green][/dim]"
-                if speed > 0
-                else "[/dim]"
-            )
-        )
-    else:
-        console.print()
+    #     console.print(
+    #         f"[bold yellow]╰─[/bold yellow] [dim]Gen Time: [white]{gen_ms:.0f} ms[/white]"
+    #         + (
+    #             f" │ Speed: [bold green]{speed:.1f} tok/s[/bold green][/dim]"
+    #             if speed > 0
+    #             else "[/dim]"
+    #         )
+    #     )
+    # else:
+    console.print()
 
 
 def print_tts_status(syn_ms: float = 0.0, audio_ms: float = 0.0, rtf: float = 0.0):
-    if not cfg.profiler:
-        return
+    return
+    # if not cfg.profiler:
+    # return
 
     console.print("[bold cyan]╭─ TextToSpeech[/bold cyan]")
     console.print(
@@ -157,8 +154,8 @@ def print_tts_status(syn_ms: float = 0.0, audio_ms: float = 0.0, rtf: float = 0.
 
 
 def print_benchmark_report(summary: dict[str, dict[str, float]]):
-    if not cfg.profiler:
-        return
+    # if not cfg.profiler:
+    return
 
     from rich.table import Table
 

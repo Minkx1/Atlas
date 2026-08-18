@@ -273,10 +273,17 @@ class UI(App):
         em.subscribe(EventType.UI_LLM_CHUNK, self.event_on_llm_chunk)
         em.subscribe(EventType.UI_ASSISTANT_SAY, self.event_on_assistant_say)
 
+    def safe_call(self, fn, *args, **kwargs):
+        if getattr(self, "is_running", False):
+            try:
+                self.call_from_thread(fn, *args, **kwargs)
+            except Exception:
+                pass
+
     def event_stt_changed_state(self, event: Event):
         def _():
             state_str = event.content
-            
+
             if state_str in {"SLEEPING", "WAITING"}:
                 self.audiowave.is_listening = False
             else:
@@ -295,11 +302,11 @@ class UI(App):
 
             self.status_text.update(formatted_state)
 
-        self.call_from_thread(_)
+        self.safe_call(_)
 
     def on_audio_wave(self, event: Event):
         wave_data = event.content
-        self.call_from_thread(self.audiowave.push_volume, wave_data)
+        self.safe_call(self.audiowave.push_volume, wave_data)
 
     def event_on_debug_log(self, event: Event):
         """This method is called from EVENT_DISPATCHER thread"""
@@ -325,7 +332,7 @@ class UI(App):
         formatted_msg = f"[[#00d7ff]{timestamp}[/#00d7ff]] [[bold]{source}[/bold]] [{color}][{level}][/{color}]: {message}"
 
         # transport writing to Textual main thread
-        self.call_from_thread(self.event_log.write, formatted_msg)
+        self.safe_call(self.event_log.write, formatted_msg)
 
     def event_on_llm_chunk(self, event: Event):
         def f():
@@ -333,8 +340,10 @@ class UI(App):
             is_first = event.content["is_first"]
 
             if is_first:
-                self._current_assistant_text = fr": {chunk_text}"
-                self._current_assistant_label = Label(self._current_assistant_text, classes="chat-message")
+                self._current_assistant_text = rf": {chunk_text}"
+                self._current_assistant_label = Label(
+                    self._current_assistant_text, classes="chat-message"
+                )
                 self.dialog.mount(self._current_assistant_label)
                 self._current_assistant_label.scroll_visible()
             else:
@@ -343,27 +352,28 @@ class UI(App):
                     self._current_assistant_label.update(self._current_assistant_text)
                     self.dialog.scroll_end(animate=False)
 
-        self.call_from_thread(f)
+        self.safe_call(f)
 
     def event_on_assistant_say(self, event: Event):
         def f():
-            text = fr": {event.content['text']}"
+            text = rf": {event.content['text']}"
             msg_label = Label(text, classes="chat-message")
             self.dialog.mount(msg_label)
             msg_label.scroll_visible()
 
-        self.call_from_thread(f)
+        self.safe_call(f)
 
     def event_on_received_command(self, event: Event):
         def f():
             if not str(event.content).startswith("!EVENT"):
-                user_text = fr"> [#00d7ff]{event.content}[/#00d7ff]"
-                        
+                user_text = rf"> [#00d7ff]{event.content}[/#00d7ff]"
+
                 msg_label = Label(user_text, classes="chat-message")
                 self.dialog.mount(msg_label)
-                msg_label.scroll_visible() # auto-scroll
-        self.call_from_thread(f)
-    
+                msg_label.scroll_visible()  # auto-scroll
+
+        self.safe_call(f)
+
     def on_resize(self, event: Resize) -> None:
         req_w, req_h = 80, 24
         if event.size.width < req_w or event.size.height < req_h:
@@ -385,6 +395,7 @@ class UI(App):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.input.value = ""
         emit_event(EventType.OP_RECEIVE_CMD, event.value)
+
 
 if __name__ == "__main__":
     UI().run()

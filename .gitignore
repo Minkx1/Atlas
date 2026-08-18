@@ -13,3 +13,5 @@ data/logs/
 *.tar.gz
 *.tar.xz
 *-x86_64
+bin/
+newt/

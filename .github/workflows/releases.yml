@@ -63,5 +63,8 @@ jobs:
           files: |
             *.tar.xz
             *.tar.xz.*
+            *.tar.gz
+            *.tag.gz.*
+            *.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -409,17 +409,20 @@ class Listener:
         self._last_wave_emit = 0.0
         self._wave_fps_interval = 0.04
 
-    def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
-        if not self._is_muted:
-            self.pipeline.process(indata)
+    # def _audio_callback(self, indata: np.ndarray, frames, time_info, status):
+    #     if not self._is_muted:
+    #         try:
+    #             self.pipeline.process(indata)
 
-            now = time.monotonic()
-            if now - self._last_wave_emit >= self._wave_fps_interval:
-                self._last_wave_emit = now
-                audio_mono = indata[:, 0] if indata.ndim > 1 else indata
+    #             now = time.monotonic()
+    #             if now - self._last_wave_emit >= self._wave_fps_interval:
+    #                 self._last_wave_emit = now
+    #                 audio_mono = indata[:, 0] if indata.ndim > 1 else indata
+    #                 rms = float(np.sqrt(np.mean(audio_mono**2)))
 
-                rms = float(np.sqrt(np.mean(audio_mono**2)))
-                emit_event(EventType.STT_AUDIOWAVE, rms)
+    #                 emit_event(EventType.STT_AUDIOWAVE, rms)
+    #         except Exception:
+    #             pass
 
     def _on_audio_recorded(self, full_audio: np.ndarray, listen_ms: float):
         self.audio_queue.put((full_audio.copy(), listen_ms))
@@ -451,26 +454,37 @@ class Listener:
                 emit_event(EventType.STT_TRANSCRIBED, text)
                 self.pipeline.set_state(LState.WAITING)
 
-                # self.pipeline.set_state(
-                #     LState.AWAKE
-                #     if self.pipeline.get_state() != LState.SLEEPING
-                #     else self.pipeline.get_state()
-                # )
-                # self.pipeline.update_deadline()
-
             self.audio_queue.task_done()
 
     def _audio_input(self):
         try:
+            # InputStream without a callback
             with sd.InputStream(
                 samplerate=cfg.audio.sample_rate,
                 channels=cfg.audio.channels,
                 blocksize=cfg.audio.blocksize,
                 dtype=cfg.audio.dtype,
-                callback=self._audio_callback,
-            ):
+            ) as stream:
                 while self._running:
-                    sd.sleep(100)
+                    indata, overflowed = stream.read(cfg.audio.blocksize)
+
+                    if not self._is_muted:
+                        try:
+                            self.pipeline.process(indata)
+
+                            now = time.monotonic()
+                            if now - self._last_wave_emit >= self._wave_fps_interval:
+                                self._last_wave_emit = now
+                                audio_mono = indata[:, 0] if indata.ndim > 1 else indata
+                                rms = float(np.sqrt(np.mean(audio_mono**2)))
+                                emit_event(EventType.STT_AUDIOWAVE, rms)
+                        except Exception as e:  # noqa: BLE001
+                            log(
+                                f"Error processing audio chunk: {e}",
+                                "LISTENER",
+                                "ERROR",
+                            )
+
         except Exception as e:  # noqa: BLE001
             log(f"Microphone input error: {e}", "LISTENER", "ERROR")
 

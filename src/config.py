@@ -22,7 +22,7 @@ def get_base_dir() -> Path:
         if exe_dir.name == "bin":
             return exe_dir.parent
         return exe_dir
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent  # /src/config.py parent.parent is /
 
 
 BASE_DIR = get_base_dir()
@@ -140,7 +140,6 @@ class OPConfig:
 class AppConfig:
     name: str = "Newt"
     username: str = "Sir"
-    profiler: bool = False
     log: bool = False
 
     audio: AudioConfig = field(default_factory=AudioConfig)
@@ -161,9 +160,9 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
                 DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"), encoding="utf-8"
             )
         else:
-            path.write_text(
-                """[app]\nname = \"Newt\"\nprofiler = false\ndebug_server = false\n\n[op]\ncmd_trigers = \"cmd_trigers.json\"\n""",
-                encoding="utf-8",
+            raise FileNotFoundError(
+                "[!] [config.toml] file was not found! Please consider downloading latest version from github repository"
+                + "(https://github.com/Minkx1/Newt/tree/master/data/config.toml)"
             )
         return load_config(str(path))
 
@@ -175,7 +174,6 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
     res = AppConfig(
         name=app.get("name", "Newt"),
         username=app.get("username", "Sir"),
-        profiler=app.get("profiler", False),
         log=app.get("log", False),
         audio=AudioConfig(**data.get("audio", {})),
         llm=LLMConfig(**data.get("llm", {})),

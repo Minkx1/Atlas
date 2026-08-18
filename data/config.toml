@@ -6,7 +6,6 @@
 name = "Newt"
 # name = "Atlas"
 username = "sir"
-profiler = true  # If true, shows full debug and profiler info: CPU and RAM Usage per each state, time, delay and efficiency of every step
 log = true  # If true - all events will be logged and put into $DATA / logs /
 
 [op]

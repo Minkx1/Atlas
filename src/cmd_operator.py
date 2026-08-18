@@ -65,6 +65,7 @@ class CommandOperator:
         os.environ["TQDM_DISABLE"] = "1"
 
         from sentence_transformers import SentenceTransformer
+
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
         self.trigger_embeddings: dict[str, np.ndarray] = {}
@@ -73,7 +74,11 @@ class CommandOperator:
         self._load_user_commands()
         self._precompute_embeddings()
 
-        log(f"Embeddings & commands loaded in: {(time.perf_counter()-_start)*1000}ms", "OP", "INFO")
+        log(
+            f"Embeddings & commands loaded in: {(time.perf_counter() - _start) * 1000}ms",
+            "OP",
+            "INFO",
+        )
 
     def _load_builtin_commands(self) -> None:
         """Loads all triggers and intents from _builtin commands config_"""
@@ -478,7 +483,6 @@ class Operator:
         if not text:
             return
 
-        emit_event(EventType.PROFILER_SET_STATE, "PROCESSING")
         start_time = time.perf_counter()
         full_response_text = ""
         tts_engaged = False
@@ -518,7 +522,6 @@ class Operator:
                 self.llm.history_add_response(full_response_text.strip())
 
         finally:
-            emit_event(EventType.PROFILER_SET_STATE, "AWAKE")
             if tts_engaged:
                 wait_for(EventType.TTS_FREE)
             emit_event(EventType.STT_SET_STATE, "AWAKE")
