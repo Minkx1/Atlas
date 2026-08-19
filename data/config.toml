@@ -3,24 +3,67 @@
 # ==========================================
 
 [app]
+
+# The name the Assistant will call ITSELF.
+# ! Note, that changing this does not automatically change keyword phrases
+# ! for waking the assistant or the LLM prompt.
+# ! If you want to change them, edit '$DATA/keywords.txt'
+# ! and the prompt below. See docs on the GitHub repo.
 name = "Newt"
-# name = "Atlas"
+
+# The name that the assistant will use to address the USER.
+# This value is also used in the default LLM prompt below.
 username = "sir"
-log = true  # If true - all events will be logged and put into $DATA / logs /
+
+# Enable or disable application logging.
+# If true, all important events will be logged and saved to '$DATA/logs/'.
+# Set to false if you do not want the assistant to create log files.
+log = true
+
 
 [op]
+
+# Path to the built-in commands configuration file.
+# This file contains commands, their triggers, and possible responses.
+# If you want to add a command or edit an existing one,
+# you can modify this file as you wish.
 builtin_commands = "builtin_commands.json"
 
+
 [audio]
+
+# Audio input settings used by the microphone processing pipeline.
+# It is recommended not to change these values unless you know what you are doing.
+
+# Number of audio samples captured per second.
+# 16000 Hz is the standard sample rate used by most speech-recognition models.
 sample_rate = 16000
+
+# Number of audio channels.
+# 1 = mono, 2 = stereo.
+# Speech recognition normally works best with mono audio.
 channels = 1
-# 512 -> 32 ms in 1 audio chunk
+
+# Number of audio samples processed in one audio block.
+# Smaller values reduce latency but increase CPU overhead.
+# Larger values reduce CPU overhead but increase latency.
 blocksize = 512
+
+# Internal format of audio samples.
+# float32 is commonly used by the Sounddevice.
 dtype = "float32"
 
+
 [llm]
+
+# Path to the LLM model in GGUF format.
+# You can download any compatible GGUF model from Hugging Face
+# or another source and put it in '$DATA/models/llm_models/'.
 model_path = "models/llm_models/Qwen2.5-3B-Instruct-Uncensored-Test-Q3_K_M.gguf"
-# initial_prompt = "Ти голосовий асистент 'Newt'(Ньют). Відопвідай лаконічно й точно, Українською мовою."
+
+# Initial system prompt passed to the LLM when a conversation starts.
+# This defines the assistant's identity, the way it addresses the user,
+# and the general format/style of its responses.
 initial_prompt = """You are Newt, a helpful AI voice assistant.
 
 ### Identity
@@ -33,50 +76,177 @@ initial_prompt = """You are Newt, a helpful AI voice assistant.
 3. Do NOT use any emojis, symbols, or markdown formatting.
 4. Keep all responses short, concise, and direct (3-4 sentences max).
 """
+
+# Maximum amount of conversation context kept by the LLM, measured in tokens.
+# A larger value allows the model to remember more previous messages,
+# but requires more RAM/VRAM and can make inference slower.
 context_tokens = 2048
-max_msg_tokens = 512
+
+# Maximum number of tokens the LLM can generate for a single response.
+# Higher values allow longer answers but increase generation time.
+max_msg_tokens = 128
+
+# Controls how random/creative the LLM responses are.
+# Lower values make responses more predictable and consistent.
+# Higher values make responses more varied but potentially less reliable.
 temperature = 0.7
 
+
 [kws]
+
+# Directory containing the Sherpa-ONNX Keyword Spotting model.
+# The model is used to detect the assistant's wake word.
 model_dir = "models/sherpa_onnx_kws"
+
+# Path to the file containing all pseudo-phonemes/keyword definitions
+# used by the Sherpa-ONNX KeywordSpotter model.
 keywords_file = "keywords.txt"
-# keywords_file = "keywords_atlas.txt"
+
+# Number of CPU threads used by the Keyword Spotter.
+# More threads can improve processing speed on some CPUs,
+# but may also rapidly increase CPU usage.
 num_threads = 1
+
+# Minimum confidence score required for a detected keyword to be accepted.
+# Lower values make the wake word easier to trigger but can cause
+# more false activations.
+# Higher values reduce false activations but may make the wake word
+# harder to recognize.
 score_threshold = 0.12
 
+
 [vad]
+
+# Voice Activity Detection threshold.
+# Determines how confidently the audio must be classified as speech.
+# Lower values make VAD more sensitive to quiet speech/noise.
+# Higher values require a stronger speech signal.
 threshold = 0.5
+
+# Amount of silence required before the current speech segment is considered finished.
+# A higher value prevents the assistant from stopping too early,
+# but increases the time before STT processing starts.
 min_silence_duration_ms = 600
+
+# Additional audio added around detected speech.
+# This helps prevent the beginning or end of words from being cut off.
 speech_pad_ms = 60
-# ~400 ms preroll before speech (12 blocks * 32 ms)
+
+# Number of audio blocks kept before speech is detected.
+# This acts as a small audio pre-roll so the beginning of a word
+# is not lost when VAD activates.
+# With sample_rate=16000 and blocksize=512, one block is ~32 ms.
+# 6 blocks therefore keep roughly ~192 ms of audio before speech.
 preroll_blocks = 6
 
+
 [tts]
+
+# Path to the Piper TTS model.
+# This model is responsible for converting generated text into speech.
 model_path = "models/piper/en_US-ryan-medium.onnx"
-# model_path = "models/piper/uk_UA-ukrainian_tts-medium.onnx"
+
+# Enable CUDA acceleration for TTS.
+# false = use CPU.
+# true = use a compatible NVIDIA GPU/CUDA backend, if supported.
 use_cuda = false
+
+# Output volume multiplier.
+# 1.0 = normal volume.
+# Values below 1.0 make the voice quieter.
+# Values above 1.0 make it louder.
 volume = 1.0
-length_scale = 0.85  # Speed of speech. 1.0 is default, 2.0 - twice as slow
-noise_scale = 1.0  # more audio variation
-noise_w_scale = 1.0  # more speaking variation
-normalize_audio = false  # use raw audio from voice
-silence_duration = 0.2
+
+# Controls the speaking speed.
+# 1.0 = default speed.
+# Values below 1.0 make speech faster.
+# Values above 1.0 make speech slower.
+length_scale = 0.85
+
+# Controls variation in the generated audio.
+# Higher values can make the voice sound more varied,
+# while lower values make it more consistent.
+noise_scale = 1.0
+
+# Controls variation in phoneme duration/prosody.
+# Higher values can produce more variation in how words are spoken.
+noise_w_scale = 1.0
+
+# Whether Piper's generated audio should be normalized.
+# false = use the raw audio produced by the voice model.
+# true = normalize the output level before playback.
+normalize_audio = false
+
+# Silence inserted before TTS playback starts, in seconds.
+# A small delay can help prevent the beginning of speech from being cut off.
+# If you notice that the beginning or end of speech is cut off,
+# try increasing this value slightly.
+silence_duration = 0.3
+
 
 [stt]
+
+# Initial state of the speech-recognition system.
+# SLEEPING means the assistant waits for its wake word
+# before listening for a command.
 start_state = "SLEEPING"
-model_size = "small" # "small", "small.$lang", "medium", "large-v3"
-device = "cpu"        # "cpu" or "cuda"
+
+# Whisper model used for Speech-To-Text.
+# Available sizes depend on the installed model files:
+# "small", "small.$lang", "medium", "large-v3".
+# Larger models generally provide better recognition,
+# but require more CPU/RAM and are slower.
+model_size = "small"
+
+# Device used for speech recognition.
+# "cpu" = process using the CPU.
+# "cuda" = process using a compatible NVIDIA GPU.
+device = "cpu"
+
+# Directory where Faster-Whisper model files are downloaded/stored.
 download_root = "models/faster-whisper"
+
+# Computation type used by Faster-Whisper.
+# int8 significantly reduces CPU memory usage and can improve
+# inference speed on CPUs, with a small possible accuracy trade-off.
 compute_type = "int8"
+
+# Beam search width used during transcription.
+# Higher values can improve recognition quality,
+# but increase processing time.
 beam_size = 5
+
+# Number of CPU threads used by STT.
+# Increasing this can make transcription faster on multi-core CPUs,
+# but also increases CPU usage.
 cpu_threads = 6
 
-awake_timeout = 15.0  # How many seconds the assistant waits for a command after the wake word
-min_command_ms = 600.0  # Minimum phrase length in ms (protection against accidental sounds/clicks)
-# --- EN Preset ---
-language = "en"
-initial_prompt = "English language, speech to an assistant. Terms: Newt, Python, C++, code, programming, Linux, Arch, Cachy, terminal."
+# Maximum amount of time, in seconds, the assistant remains awake
+# and waits for a command after detecting the wake word.
+# After this period, it returns to the sleeping state.
+awake_timeout = 15.0
 
-# # --- UK preset  ---
+# Minimum duration of a command required before sending it to STT.
+# This helps ignore very short accidental sounds, clicks, or noise.
+min_command_ms = 600.0
+
+
+# --- EN Preset ---
+
+# Language used by the STT model.
+# "en" tells Whisper to expect English speech.
+language = "en"
+
+# Additional context given to Whisper during transcription.
+# Useful for improving recognition of uncommon words or names.
+initial_prompt = "Terms: Newt."
+
+
+# --- UK Preset ---
+
+# Ukrainian language preset.
+# Uncomment these two lines and comment out the EN preset above
+# if you want Newt to primarily recognize Ukrainian speech.
+
 # language = "uk"
 # initial_prompt = "Українська мова. Терміни: Newt, асистент, нют, н'ют, ньют."

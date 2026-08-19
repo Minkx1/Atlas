@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import platform
@@ -28,9 +29,6 @@ DIST_DIR = BASE_DIR / "dist"
 BUILD_DIR = BASE_DIR / "build"
 OUT_DIST_DIR = DIST_DIR / APP_NAME
 
-BASENAME = f"{APP_NAME}-{VERSION}-{SYS_NAME}-{MACHINE}"
-STAGING_DIR = BASE_DIR / BASENAME
-
 FILES_TO_INCLUDE = ["README.md", "LICENSE"]
 DIRS_TO_INCLUDE = ["data"]
 
@@ -53,6 +51,10 @@ UNNEEDED_DIR_NAMES = {
     "tests",
     "testing",
     "__pycache__",
+    "torch/bin",
+    "torch/include",
+    "torch/share",
+    "site-packages/torch/bin",
     "site-packages/torch/test",
     "site-packages/numpy/tests",
 }
@@ -68,7 +70,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def clean(full: bool = False):
+def get_basename(cpu_only: bool) -> str:
+    suffix = "-cpu-only" if cpu_only else ""
+    return f"{APP_NAME}-{VERSION}-{SYS_NAME}-{MACHINE}{suffix}"
+
+
+def clean(staging_dir: Path, full: bool = False):
     if full:
         for d in [DIST_DIR, BUILD_DIR]:
             if d.exists():
@@ -76,30 +83,34 @@ def clean(full: bool = False):
     elif OUT_DIST_DIR.exists():
         shutil.rmtree(OUT_DIST_DIR)
 
-    if STAGING_DIR.exists():
-        shutil.rmtree(STAGING_DIR)
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
 
 
 def post_build_cleanup(dist_path: Path):
-    for root, _, files in os.walk(dist_path, topdown=False):
+    bad_subdirs = [
+        "bin/torch/test",
+        "bin/torch/bin",
+        "bin/torch/include",
+        "bin/torch/share",
+        "bin/numpy/tests",
+    ]
+
+    for bad_dir in bad_subdirs:
+        target_dir = dist_path / bad_dir
+        if target_dir.exists():
+            shutil.rmtree(target_dir, ignore_errors=True)
+
+    for root, _, files in os.walk(dist_path):
         current_path = Path(root)
-
-        if any(bad_dir in str(current_path) for bad_dir in UNNEEDED_DIR_NAMES):
-            try:
-                shutil.rmtree(current_path)
-            except OSError:
-                pass
-            continue
-
         for file_name in files:
             file_path = current_path / file_name
 
-            if file_path.suffix.lower() in UNNEEDED_EXTENSIONS:
-                try:
-                    file_path.unlink()
-                except OSError:
-                    pass
-            elif SYS_NAME == "linux" and file_path.name in PROBLEMATIC_LINUX_LIBS:
+            if (
+                file_path.suffix.lower() in UNNEEDED_EXTENSIONS
+                or SYS_NAME == "linux"
+                and file_path.name in PROBLEMATIC_LINUX_LIBS
+            ):
                 try:
                     file_path.unlink()
                 except OSError:
@@ -111,8 +122,29 @@ def post_build_cleanup(dist_path: Path):
                         stderr=subprocess.DEVNULL,
                         check=False,
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
+
+    if SYS_NAME == "linux":
+        seen_hashes = {}
+        for root, _, files in os.walk(dist_path):
+            for file_name in files:
+                file_path = Path(root) / file_name
+
+                if file_path.is_symlink() or not file_path.is_file():
+                    continue
+
+                if file_path.stat().st_size > 500 * 1024:
+                    try:
+                        file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
+                        if file_hash in seen_hashes:
+                            original_path = seen_hashes[file_hash]
+                            file_path.unlink()
+                            os.link(original_path, file_path)
+                        else:
+                            seen_hashes[file_hash] = file_path
+                    except OSError:
+                        pass
 
 
 def generate_build_info():
@@ -123,7 +155,7 @@ def generate_build_info():
             .decode()
             .strip()
         )
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
     return {
@@ -185,20 +217,20 @@ def compile_exe(cpu_only: bool = False):
         post_build_cleanup(OUT_DIST_DIR)
 
 
-def make_compressed_archive():
-    STAGING_DIR.mkdir(exist_ok=True)
+def make_compressed_archive(basename: str, staging_dir: Path):
+    staging_dir.mkdir(exist_ok=True)
 
     if OUT_DIST_DIR.exists():
-        shutil.copytree(OUT_DIST_DIR, STAGING_DIR, dirs_exist_ok=True)
+        shutil.copytree(OUT_DIST_DIR, staging_dir, dirs_exist_ok=True)
 
-    info_path = STAGING_DIR / "build_info.json"
+    info_path = staging_dir / "build_info.json"
     with open(info_path, "w", encoding="utf-8") as f:
         json.dump(generate_build_info(), f, indent=2)
 
     for file_name in FILES_TO_INCLUDE:
         file_path = BASE_DIR / file_name
         if file_path.exists():
-            shutil.copy(file_path, STAGING_DIR / file_name)
+            shutil.copy(file_path, staging_dir / file_name)
 
     for dir_name in DIRS_TO_INCLUDE:
         dir_path = BASE_DIR / dir_name
@@ -206,7 +238,7 @@ def make_compressed_archive():
             if dir_name == "data":
                 shutil.copytree(
                     dir_path,
-                    STAGING_DIR / dir_name,
+                    staging_dir / dir_name,
                     ignore=shutil.ignore_patterns(
                         "models",
                         ".cache",
@@ -219,9 +251,9 @@ def make_compressed_archive():
                     ),
                 )
             else:
-                shutil.copytree(dir_path, STAGING_DIR / dir_name)
+                shutil.copytree(dir_path, staging_dir / dir_name)
 
-    archive_file = BASE_DIR / f"{BASENAME}.tar.xz"
+    archive_file = BASE_DIR / f"{basename}.tar.xz"
     compressed = False
 
     if shutil.which("tar") and shutil.which("xz"):
@@ -234,28 +266,32 @@ def make_compressed_archive():
                     "-cf",
                     str(archive_file),
                     "-C",
-                    str(STAGING_DIR.parent),
-                    STAGING_DIR.name,
+                    str(staging_dir.parent),
+                    staging_dir.name,
                 ],
                 check=True,
             )
             compressed = True
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     if not compressed:
         with tarfile.open(archive_file, "w:xz") as tf:
-            tf.add(STAGING_DIR, arcname=STAGING_DIR.name)
+            tf.add(staging_dir, arcname=staging_dir.name)
 
-    shutil.rmtree(STAGING_DIR)
+    shutil.rmtree(staging_dir)
 
 
 if __name__ == "__main__":
     args = parse_args()
+    basename = get_basename(args.cpu_only)
+    staging_dir = BASE_DIR / basename
+
     try:
-        clean(full=args.full_clean)
+        clean(staging_dir=staging_dir, full=args.full_clean)
         compile_exe(cpu_only=args.cpu_only)
         if not args.no_archive:
-            make_compressed_archive()
-    except Exception as e:
+            make_compressed_archive(basename=basename, staging_dir=staging_dir)
+    except Exception as e:  # noqa: BLE001
+        print(f"Build failed: {e}", file=sys.stderr)
         sys.exit(1)
