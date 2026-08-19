@@ -117,6 +117,8 @@ score_threshold = 0.12
 
 [vad]
 
+model_path = "models/vad/silero_vad.onnx"
+
 # Voice Activity Detection threshold.
 # Determines how confidently the audio must be classified as speech.
 # Lower values make VAD more sensitive to quiet speech/noise.

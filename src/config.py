@@ -48,6 +48,7 @@ class KWSConfig:
 
 @dataclass
 class VADConfig:
+    model_path: str = "models/vad/silero_vad.onnx"
     threshold: float = 0.5
     min_silence_duration_ms: int = 600
     speech_pad_ms: int = 60

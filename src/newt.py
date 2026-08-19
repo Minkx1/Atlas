@@ -147,8 +147,6 @@ class Newt:
                     del self.kws.stream
                 if hasattr(self.kws, "kws"):
                     del self.kws.kws
-            if hasattr(self, "vad") and hasattr(self.vad, "iterator"):
-                del self.vad.iterator
             if hasattr(self, "whisper") and hasattr(self.whisper, "model"):
                 del self.whisper.model
 

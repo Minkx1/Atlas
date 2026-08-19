@@ -3,14 +3,6 @@
 # SoundDevice.InputStream[microphone] -> KeyWordSpotter[Sherpa ONNX KWS] -> Voice Activity Detector[Silero VAD] -> STT[faster-whisper] -> "recognized text"
 #
 
-from __future__ import annotations  # some type annotations shit
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import torch
-
-
 import os
 import queue
 import time
@@ -35,21 +27,51 @@ os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 class VAD:
     def __init__(self) -> None:
         self.is_speaking = False
+        self.model_path: Path = DATA_DIR / cfg.vad.model_path
+
+        self.triggered = False
+        self.temp_end = 0
+        self.current_sample = 0
+
+    def _download_model(self):
+        import urllib.request
+        from urllib.error import URLError
+
+        self.model_path.parent.mkdir(parents=True, exist_ok=True)
+        url = "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
+
+        try:
+            print(f"[I] Downloading Silero VAD ONNX model from {url}...")
+            urllib.request.urlretrieve(url, self.model_path)
+            print(f"[I] Model successfully installed to {self.model_path}")
+        except (URLError, OSError) as e:
+            if self.model_path.exists():
+                self.model_path.unlink()
+            raise RuntimeError(f"[!] Failed to download Silero VAD model: {e}") from e
 
     def load(self):
-        from silero_vad import VADIterator, load_silero_vad
+        import onnxruntime as ort
 
         try:
             _start = time.perf_counter()
-            log("Loading Silero VAD model...", "VAD", "INFO")
-            self.model = load_silero_vad()
-            self.iterator = VADIterator(
-                self.model,
-                threshold=cfg.vad.threshold,
-                min_silence_duration_ms=cfg.vad.min_silence_duration_ms,
-                sampling_rate=cfg.audio.sample_rate,
-                speech_pad_ms=cfg.vad.speech_pad_ms,
+            log("Loading Silero VAD ONNX model...", "VAD", "INFO")
+
+            if not self.model_path.exists():
+                log("No VAD model found. Downloading...", "VAD", "WARN")
+                self._download_model()
+
+            self.session = ort.InferenceSession(
+                str(self.model_path), providers=["CPUExecutionProvider"]
             )
+
+            self.sample_rate = cfg.audio.sample_rate
+            self.threshold = cfg.vad.threshold
+            self.min_silence_samples = (
+                self.sample_rate * cfg.vad.min_silence_duration_ms
+            ) / 1000
+
+            self.reset_state()
+
             elapsed = (time.perf_counter() - _start) * 1000
             log(f"VAD model loaded in {elapsed:.0f}ms", "VAD", "SUCCESS")
             emit_event(EventType.VAD_LOADED, f"{elapsed}ms")
@@ -60,33 +82,69 @@ class VAD:
                 "ERROR",
             )
 
+    def reset_state(self):
+        self.state = np.zeros((2, 1, 128), dtype=np.float32)
+        self.context = np.zeros((1, 64), dtype=np.float32)
+
+        self.triggered = False
+        self.temp_end = 0
+        self.current_sample = 0
+
     @staticmethod
-    def _normalize_chunk(audio_chunk: np.ndarray | torch.Tensor) -> torch.Tensor:
-        if isinstance(audio_chunk, np.ndarray):
-            import torch
+    def _normalize_chunk(audio_chunk: np.ndarray) -> np.ndarray:
+        chunk = audio_chunk.squeeze()
+        if chunk.ndim == 1:
+            chunk = np.expand_dims(chunk, axis=0)
 
-            return torch.from_numpy(
-                audio_chunk.squeeze(1) if audio_chunk.ndim > 1 else audio_chunk
-            )
-        return audio_chunk
+        if chunk.dtype != np.float32:
+            if chunk.dtype == np.int16:
+                chunk = chunk.astype(np.float32) / 32768.0
+            else:
+                chunk = chunk.astype(np.float32)
+        return chunk
 
-    def process(self, audio_chunk: np.ndarray | torch.Tensor) -> str:
+    def process(self, audio_chunk: np.ndarray) -> str:
         """Returns state of speech: 'silence', 'start', 'speaking', 'end'."""
-        if not hasattr(self, "iterator"):
+        if not hasattr(self, "session"):
             raise RuntimeError("VAD was used before vad.load()")
 
         chunk = self._normalize_chunk(audio_chunk)
+        chunk_length = chunk.shape[1]
+        chunk_with_context = np.concatenate((self.context, chunk), axis=1)
+        self.context = chunk[:, -64:]  # updating context
 
-        voice_dict = self.iterator(chunk)
-        if voice_dict:
-            if "start" in voice_dict:
-                self.is_speaking = True
-                return "start"
-            elif "end" in voice_dict:
+        ort_inputs = {
+            "input": chunk_with_context,
+            "state": self.state,
+            "sr": np.array([self.sample_rate], dtype=np.int64),
+        }
+
+        ort_outs = self.session.run(None, ort_inputs)
+        prob = ort_outs[0].item()  # type: ignore
+        self.state = ort_outs[1]
+
+        self.current_sample += chunk_length
+
+        if prob >= self.threshold and self.temp_end:
+            self.temp_end = 0
+
+        if prob >= self.threshold and not self.triggered:
+            self.triggered = True
+            self.is_speaking = True
+            return "start"
+
+        if prob < (self.threshold - 0.15) and self.triggered:
+            if not self.temp_end:
+                self.temp_end = self.current_sample
+
+            # Якщо тиша триває довше за min_silence_duration_ms
+            if self.current_sample - self.temp_end >= self.min_silence_samples:
+                self.triggered = False
                 self.is_speaking = False
+                self.temp_end = 0
                 return "end"
 
-        return "speaking" if self.is_speaking else "silence"
+        return "speaking" if self.triggered else "silence"
 
 
 class KeyWordSpotter:
@@ -466,7 +524,7 @@ class Listener:
                 dtype=cfg.audio.dtype,
             ) as stream:
                 while self._running:
-                    indata, overflowed = stream.read(cfg.audio.blocksize)
+                    indata, _ = stream.read(cfg.audio.blocksize)
 
                     if not self._is_muted:
                         try:

@@ -1,7 +1,7 @@
 # libs & utils
-torch
 numpy
 hf-transfer
+tokenizers
 psutil
 python-dotenv
 
@@ -10,7 +10,6 @@ textual
 rich
 
 # STT
-silero-vad
 sounddevice
 faster-whisper
 sherpa-onnx

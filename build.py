@@ -44,6 +44,13 @@ UNNEEDED_EXTENSIONS = {
     ".pyx",
     ".pxd",
 }
+UNNEEDED_CUDA_LIBS = {
+    "libcufft.so.12",
+    "libcusparse.so.12",
+    "libnvJitLink.so.13",
+    "libnppc.so.12",
+    "libnppig.so.12",
+}
 UNNEEDED_DIR_NAMES = {
     "include",
     "cmake",
@@ -110,6 +117,7 @@ def post_build_cleanup(dist_path: Path):
                 file_path.suffix.lower() in UNNEEDED_EXTENSIONS
                 or SYS_NAME == "linux"
                 and file_path.name in PROBLEMATIC_LINUX_LIBS
+                or file_path.name in UNNEEDED_CUDA_LIBS
             ):
                 try:
                     file_path.unlink()
@@ -187,17 +195,16 @@ def compile_exe(cpu_only: bool = False):
         f"--distpath={DIST_DIR}",
         f"--workpath={BUILD_DIR}",
         f"--specpath={BUILD_DIR}",
-        "--collect-data=silero_vad",
         f"--add-data={espeak_data}{os.pathsep}piper/espeak-ng-data",
         "--collect-all=piper",
         "--collect-all=onnxruntime",
         "--collect-all=textual",
         "--collect-all=rich",
         "--collect-all=llama_cpp",
-        "--exclude-module=tkinter",
-        "--exclude-module=matplotlib",
-        "--exclude-module=IPython",
-        "--exclude-module=pytest",
+        "--exclude-module=torch",
+        "--exclude-module=torchvision",
+        "--exclude-module=torchaudio",
+        "--exclude-module=transformers",
     ]
 
     if cpu_only:
@@ -208,8 +215,8 @@ def compile_exe(cpu_only: bool = False):
                 "--exclude-module=torch.cuda",
             ]
         )
-    else:
-        cmd.extend(["--collect-all=nvidia", "--collect-all=torch"])
+    # else:
+    # cmd.extend(["--collect-all=nvidia", "--collect-all=torch"])
 
     subprocess.run(cmd, check=True)
 
