@@ -31,7 +31,7 @@ def _format_rtf(rtf: float) -> str:
 
 def print_banner():
     banner_text = (
-        f"[bold cyan]🦎 [bright_green]NEWT[/bright_green] Voice Assistant[/bold cyan] "
+        f"[bold cyan][bright_green]ATLAS[/bright_green] Voice Assistant[/bold cyan] "
         f"[dim]• v{__version__}[/dim]\n"
         f"[dim]Waiting for [/dim][white]'{cfg.name}'[/white][dim]... "
         f"Press [bold]Ctrl+C[/bold] to exit.[/dim]"

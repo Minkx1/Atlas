@@ -11,8 +11,7 @@
             "howdy",
             "greetings",
             "are you there",
-            "wake up",
-            "newt"
+            "wake up"
         ],
         "sounds": [
             {
@@ -45,11 +44,15 @@
             },
             {
                 "path": "greet/greet8.ogg",
-                "text": "Hey there! Newt is online."
+                "text": "Hey there! {name} is online."
             },
             {
                 "path": "greet/greet9.ogg",
                 "text": "Good to hear from you, {username}."
+            },
+            {
+                "path": "greet/greet10.ogg",
+                "text": "Yes, {username}?"
             }
         ]
     },
@@ -285,8 +288,7 @@
             "tell me about yourself",
             "introduce yourself",
             "what is your purpose",
-            "what can you do",
-            "are you newt"
+            "what can you do"
         ],
         "sounds": [
             {

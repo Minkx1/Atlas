@@ -17,7 +17,7 @@ if __name__ == "__main__":
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    from src import Newt
+    from src import Atlas
 
-    newt = Newt()
-    newt.start()
+    atlas = Atlas()
+    atlas.start()

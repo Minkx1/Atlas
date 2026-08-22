@@ -70,7 +70,7 @@ class STTConfig:
 
     language: str = "en"
     initial_prompt: str = (
-        "English language, speech to an assistant. Terms: Newt, Python."
+        "English language, speech to an assistant. Terms: Atlas, Python."
     )
 
 
@@ -89,7 +89,7 @@ class TTSConfig:
 @dataclass
 class LLMConfig:
     model_path: str = "models/llm/gemma2_2b."
-    initial_prompt: str = "You are an AI Voice Assistant 'Newt'. Answer briefly and concisely in English. "
+    initial_prompt: str = "You are an AI Voice Assistant 'Atlas'. Answer briefly and concisely in English. "
     context_tokens: int = 2048
     max_msg_tokens: int = 512
     temperature: float = 0.7
@@ -139,7 +139,7 @@ class OPConfig:
 
 @dataclass
 class AppConfig:
-    name: str = "Newt"
+    name: str = "Atlas"
     username: str = "Sir"
     log: bool = False
 
@@ -163,7 +163,7 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
         else:
             raise FileNotFoundError(
                 "[!] [config.toml] file was not found! Please consider downloading latest version from github repository"
-                + "(https://github.com/Minkx1/Newt/tree/master/data/config.toml)"
+                + "(https://github.com/Minkx1/Atlas/tree/master/data/config.toml)"
             )
         return load_config(str(path))
 
@@ -173,7 +173,7 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
     app: dict = data.get("app", {})
 
     res = AppConfig(
-        name=app.get("name", "Newt"),
+        name=app.get("name", "Atlas"),
         username=app.get("username", "Sir"),
         log=app.get("log", False),
         audio=AudioConfig(**data.get("audio", {})),

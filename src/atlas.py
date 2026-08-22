@@ -1,4 +1,4 @@
-# newt.py
+# atlas.py
 
 import sys
 import time
@@ -12,14 +12,14 @@ from .events import (
     emit_event,
     log,
 )
-
-# from .ui import AssistantUI, console
-from .new_ui import UI
 from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
 from .text_to_speech import TextToSpeech
 
+# from .ui import AssistantUI, console
+from .ui import UI
 
-class Newt:
+
+class Atlas:
     def __init__(self) -> None:
         # light components
         self.events = EventManager()
@@ -56,7 +56,7 @@ class Newt:
 
     def load_models(self):
         try:
-            log("Starting model loading...", "NEWT", "INFO")
+            log("Starting model loading...", "ATLAS", "INFO")
             self.vad.load()
             self.kws.load()
             self.whisper.load()
@@ -66,11 +66,11 @@ class Newt:
             self.cmd.load()
             self.llm.load()
 
-            log("All models loaded successfully.", "NEWT", "SUCCESS")
+            log("All models loaded successfully.", "ATLAS", "SUCCESS")
         except Exception as e:
             log(
                 f"Error loading models: {type(e).__name__}: {e}",
-                "NEWT",
+                "ATLAS",
                 "ERROR",
             )
             raise
@@ -129,18 +129,18 @@ class Newt:
 
     def close(self):
         try:
-            log("Shutting down assistant...", "NEWT", "INFO")
+            log("Shutting down assistant...", "ATLAS", "INFO")
 
             if getattr(self, "listener", None):
                 self.listener.close()
-                log("Listener closed.", "NEWT", "DEBUG")
+                log("Listener closed.", "ATLAS", "DEBUG")
 
             if getattr(self, "operator", None):
                 self.operator.close()
-                log("Operator closed.", "NEWT", "DEBUG")
+                log("Operator closed.", "ATLAS", "DEBUG")
             if getattr(self, "tts", None):
                 self.tts.close()
-                log("TTS closed.", "NEWT", "DEBUG")
+                log("TTS closed.", "ATLAS", "DEBUG")
 
             if hasattr(self, "kws"):
                 if hasattr(self.kws, "stream"):
@@ -152,9 +152,9 @@ class Newt:
 
             self._shutdown()
             self.events.flush_and_stop()
-            log("Shutdown complete.", "NEWT", "INFO")
+            log("Shutdown complete.", "ATLAS", "INFO")
         except Exception as e:  # noqa: BLE001
-            log(f"Error during shutdown: {type(e).__name__}: {e}", "NEWT", "ERROR")
+            log(f"Error during shutdown: {type(e).__name__}: {e}", "ATLAS", "ERROR")
 
         finally:
             import sys
@@ -180,8 +180,9 @@ class Newt:
 
         emit_event(EventType.UI_BANNER)
 
-        self.ui = UI(newt_app=self)
+        self.ui = UI(app=self)
         self.ui.run()  # this blocks main thread
+
         # from threading import Event
 
         # while self.alive:

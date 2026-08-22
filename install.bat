@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-echo [Newt] Starting installation...
+echo [Atlas] Starting installation...
 
 where python >nul 2>nul
 if %ERRORLEVEL% neq 0 (
@@ -10,20 +10,20 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-echo [Newt] Creating virtual environment...
+echo [Atlas] Creating virtual environment...
 python -m venv .venv
 
-echo [Newt] Activating environment...
+echo [Atlas] Activating environment...
 call .venv\Scripts\activate.bat
 
-echo [Newt] Updating pip...
+echo [Atlas] Updating pip...
 python -m pip install --upgrade pip
 
 
-echo [Newt] Installing required packages...
+echo [Atlas] Installing required packages...
 pip install --no-cache-dir -r requirements.txt
 
 echo.
-echo [Newt] Installation complete!
+echo [Atlas] Installation complete!
 echo To start the assistant, run: call .venv\Scripts\activate.bat ^&^& python main.py
 pause

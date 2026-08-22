@@ -1,5 +1,5 @@
 # ==========================================
-#         NEWT VOICE ASSISTANT CONFIG
+#         ATLAS VOICE ASSISTANT CONFIG
 # ==========================================
 
 [app]
@@ -9,7 +9,7 @@
 # ! for waking the assistant or the LLM prompt.
 # ! If you want to change them, edit '$DATA/keywords.txt'
 # ! and the prompt below. See docs on the GitHub repo.
-name = "Newt"
+name = "Atlas"
 
 # The name that the assistant will use to address the USER.
 # This value is also used in the default LLM prompt below.
@@ -64,10 +64,10 @@ model_path = "models/llm_models/Qwen2.5-3B-Instruct-Uncensored-Test-Q3_K_M.gguf"
 # Initial system prompt passed to the LLM when a conversation starts.
 # This defines the assistant's identity, the way it addresses the user,
 # and the general format/style of its responses.
-initial_prompt = """You are Newt, a helpful AI voice assistant.
+initial_prompt = """You are Atlas, a helpful AI voice assistant.
 
 ### Identity
-- Your name: Newt
+- Your name: Atlas
 - User's name: Sir
 
 ### Rules
@@ -241,14 +241,14 @@ language = "en"
 
 # Additional context given to Whisper during transcription.
 # Useful for improving recognition of uncommon words or names.
-initial_prompt = "Terms: Newt."
+initial_prompt = "Terms: Atlas."
 
 
 # --- UK Preset ---
 
 # Ukrainian language preset.
 # Uncomment these two lines and comment out the EN preset above
-# if you want Newt to primarily recognize Ukrainian speech.
+# if you want Atlas to primarily recognize Ukrainian speech.
 
 # language = "uk"
-# initial_prompt = "Українська мова. Терміни: Newt, асистент, нют, н'ют, ньют."
+# initial_prompt = "Українська мова. Терміни: Atlas, асистент, атлас."

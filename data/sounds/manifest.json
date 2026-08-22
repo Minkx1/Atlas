@@ -1,6 +1,6 @@
 {
     "settings": {
-        "name": "Newt",
+        "name": "Atlas",
         "username": "sir",
         "model_path": "models/piper/en_US-ryan-medium.onnx",
         "use_cuda": false,
@@ -42,11 +42,15 @@
             },
             {
                 "path": "greet/greet8.ogg",
-                "text": "Hey there! Newt is online."
+                "text": "Hey there! Atlas is online."
             },
             {
                 "path": "greet/greet9.ogg",
                 "text": "Good to hear from you, sir."
+            },
+            {
+                "path": "greet/greet10.ogg",
+                "text": "Yes, sir?"
             }
         ],
         "farewell": [
@@ -204,51 +208,51 @@
         "whoami": [
             {
                 "path": "whoami/whoami1.ogg",
-                "text": "I am Newt, your Voice Assistant."
+                "text": "I am Atlas, your Voice Assistant."
             },
             {
                 "path": "whoami/whoami2.ogg",
-                "text": "My name is Newt. I am your personal assistant."
+                "text": "My name is Atlas. I am your personal assistant."
             },
             {
                 "path": "whoami/whoami3.ogg",
-                "text": "I am Newt. I am here to assist you with whatever you need."
+                "text": "I am Atlas. I am here to assist you with whatever you need."
             },
             {
                 "path": "whoami/whoami4.ogg",
-                "text": "My name is Newt. You can simply call me Newt."
+                "text": "My name is Atlas. You can simply call me Atlas."
             },
             {
                 "path": "whoami/whoami5.ogg",
-                "text": "I am Newt, your personal voice assistant."
+                "text": "I am Atlas, your personal voice assistant."
             },
             {
                 "path": "whoami/whoami6.ogg",
-                "text": "I am an AI voice assistant named Newt."
+                "text": "I am an AI voice assistant named Atlas."
             },
             {
                 "path": "whoami/whoami7.ogg",
-                "text": "I am Newt. I listen, understand, and help you get things done."
+                "text": "I am Atlas. I listen, understand, and help you get things done."
             },
             {
                 "path": "whoami/whoami8.ogg",
-                "text": "You are talking to Newt, your personal assistant."
+                "text": "You are talking to Atlas, your personal assistant."
             },
             {
                 "path": "whoami/whoami9.ogg",
-                "text": "I am Newt. What you see is artificial intelligence, not a human."
+                "text": "I am Atlas. What you see is artificial intelligence, not a human."
             },
             {
                 "path": "whoami/whoami10.ogg",
-                "text": "I'm Newt. Think of me as your digital assistant."
+                "text": "I'm Atlas. Think of me as your digital assistant."
             },
             {
                 "path": "whoami/whoami11.ogg",
-                "text": "My name is Newt. My job is to make your life a little easier."
+                "text": "My name is Atlas. My job is to make your life a little easier."
             },
             {
                 "path": "whoami/whoami12.ogg",
-                "text": "I am Newt, and I am always ready to help."
+                "text": "I am Atlas, and I am always ready to help."
             }
         ]
     }

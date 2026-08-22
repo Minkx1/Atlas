@@ -12,7 +12,7 @@ from pathlib import Path
 
 from src import __version__
 
-APP_NAME = "newt"
+APP_NAME = "atlas"
 ENTRY_POINT = "main.py"
 VERSION = __version__
 
@@ -67,7 +67,7 @@ PROBLEMATIC_LINUX_LIBS = {"libstdc++.so.6", "libgcc_s.so.1", "libm.so.6"}
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Newt Build Script")
+    parser = argparse.ArgumentParser(description="Atlas Build Script")
     parser.add_argument("--full-clean", action="store_true")
     parser.add_argument("--no-archive", action="store_true")
     parser.add_argument("--cpu-only", action="store_true")
