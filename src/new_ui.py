@@ -11,10 +11,10 @@ from textual.widgets import Input, Label, RichLog, Static
 
 if __name__ == "__main__":
     from config import cfg
-    from events import Event, EventManager, EventType, emit_event
+    from events import Event, EventManager, EventType, emit_event, log
 else:
     from .config import cfg
-    from .events import Event, EventManager, EventType, emit_event
+    from .events import Event, EventManager, EventType, emit_event, log
 
 
 class AudioWaveform(Static):
@@ -277,8 +277,9 @@ class UI(App):
         if getattr(self, "is_running", False):
             try:
                 self.call_from_thread(fn, *args, **kwargs)
-            except Exception:
-                pass
+            except Exception as e:
+                log(f"UI thread safe call error: {e}.", "UI", "ERROR")
+                raise
 
     def event_stt_changed_state(self, event: Event):
         def _():

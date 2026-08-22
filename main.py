@@ -8,7 +8,7 @@ if __name__ == "__main__":
     warnings.filterwarnings(
         "ignore", category=UserWarning, module="multiprocessing.resource_tracker"
     )
-    multiprocessing.freeze_support()  # fixing PyInstaller build problems
+    multiprocessing.freeze_support()  # fix C++ threads/processes errors
     try:
         multiprocessing.set_start_method("spawn", force=True)
     except RuntimeError:
@@ -16,7 +16,6 @@ if __name__ == "__main__":
 
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    # os.environ["OMP_NUM_THREADS"] = "1"
 
     from src import Newt
 

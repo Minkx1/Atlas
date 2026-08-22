@@ -8,10 +8,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import time
 from pathlib import Path
-
-_start = time.perf_counter()
 
 from src import __version__
 

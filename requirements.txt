@@ -1,23 +1,14 @@
 # libs & utils
 numpy
-hf-transfer
 tokenizers
-psutil
-python-dotenv
-
 # UI
 textual
 rich
-
-# STT
+# STT & TTS
 sounddevice
+soundfile
 faster-whisper
 sherpa-onnx
-
-# TTS
 piper-tts
-soundfile
-
 # OP
 llama-cpp-python
-sentence-transformers

@@ -1,5 +1,5 @@
 #
-# OPerator.py
+# operator.py
 # Operator: processes and operates commands
 #
 
@@ -155,8 +155,6 @@ class CommandOperator:
     def load(self):
         _start = time.perf_counter()
 
-        # os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-        # os.environ["TQDM_DISABLE"] = "1"
         self.model = ONNXSentenceTransformer(
             "all-MiniLM-L6-v2", DATA_DIR / "models" / "sentence-transformer"
         )
@@ -428,12 +426,13 @@ class LLM:
             elapsed = (time.perf_counter() - _start) * 1000
             log(f"LLM model loaded in {elapsed:.0f}ms", "LLM", "INFO")
             emit_event(EventType.LLM_LOADED, f"{elapsed}ms")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log(
                 f"Error loading LLM model: {type(e).__name__}: {e}",
                 "LLM",
                 "ERROR",
             )
+            raise
 
     def history_add_response(self, text: str) -> None:
         self.history.append({"role": "assistant", "content": text})
@@ -494,30 +493,33 @@ class LLM:
                     delta = chunk["choices"][0]["delta"]  # type: ignore
                     if "content" in delta:
                         yield delta["content"]  # type: ignore
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     log(
                         f"Error processing stream chunk: {type(e).__name__}: {e}",
                         "LLM",
                         "ERROR",
                     )
-        except Exception as e:  # noqa: BLE001
+                    raise
+        except Exception as e:
             log(
                 f"Error streaming LLM response: {type(e).__name__}: {e}",
                 "LLM",
                 "ERROR",
             )
+            raise
 
     def close(self):
         if hasattr(self, "llama") and self.llama is not None:
             try:
                 log("Closing LLM model...", "LLM", "DEBUG")
                 self.llama.close()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log(
                     f"Error closing LLM: {type(e).__name__}: {e}",
                     "LLM",
                     "WARNING",
                 )
+                raise
             finally:
                 self.llama = None
                 log("LLM model closed.", "LLM", "DEBUG")

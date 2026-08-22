@@ -14,13 +14,11 @@ from threading import Thread
 
 import numpy as np
 import sounddevice as sd
-from dotenv import load_dotenv
 
 from .config import DATA_DIR, cfg
 from .events import EventType, emit_event, log
 
-# makes downloading Whisper models from HF faster
-load_dotenv()  # loads HF_TOKEN from .env file.
+# shoukd make downloading Whisper models from HF faster
 os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
 
@@ -197,12 +195,13 @@ class KeyWordSpotter:
             elapsed = (time.perf_counter() - _start) * 1000
             log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "SUCCESS")
             emit_event(EventType.KWS_LOADED, f"{elapsed}ms")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log(
                 f"Error loading KWS model: {type(e).__name__}: {e}",
                 "KWS",
                 "ERROR",
             )
+            raise
 
     @staticmethod
     def _download_sherpa_onnx_model(model_path: Path):
@@ -300,12 +299,13 @@ class Whisper:
             elapsed = (time.perf_counter() - _start) * 1000
             log(f"Whisper model loaded in {elapsed:.0f}ms", "STT", "SUCCESS")
             emit_event(EventType.WHISPER_LOADED, f"{elapsed}ms")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log(
                 f"Error loading Whisper model: {type(e).__name__}: {e}",
                 "STT",
                 "ERROR",
             )
+            raise
 
     def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
         """Turns Spech(audio array) into a text. Returns (text, time_to_process)."""
@@ -536,15 +536,17 @@ class Listener:
                                 audio_mono = indata[:, 0] if indata.ndim > 1 else indata
                                 rms = float(np.sqrt(np.mean(audio_mono**2)))
                                 emit_event(EventType.STT_AUDIOWAVE, rms)
-                        except Exception as e:  # noqa: BLE001
+                        except Exception as e:
                             log(
                                 f"Error processing audio chunk: {e}",
                                 "LISTENER",
                                 "ERROR",
                             )
+                            raise
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log(f"Microphone input error: {e}", "LISTENER", "ERROR")
+            raise
 
     def start(self):
         self._running = True
