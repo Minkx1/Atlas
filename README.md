@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/Minkx1/Newt/releases)
-[![Release](https://img.shields.io/github/v/release/yourusername/newt?color=success)](https://github.com/yourusername/newt/releases)
+[![Release](https://img.shields.io/github/v/release/Minkx1/newt?color=success)](https://github.com/Minkx1/newt/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Newt** is a fast AI-powered, fully offline voice assistant written in Python. It is designed to give you a completely **NEW T**alk with your piece of scrap some would call a PC.
