@@ -12,7 +12,7 @@ from .events import (
     log,
 )
 from .global_operator import LLM, CommandOperator, Operator
-from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
+from .speech_to_text import KeyWordSpotter, Listener, LState, SpeechRecognizer
 from .text_to_speech import TextToSpeech
 
 # from .ui import AssistantUI, console
@@ -35,9 +35,13 @@ class Atlas:
 
         # STT Pipeline
         self.kws = KeyWordSpotter()
-        self.vad = VAD()
-        self.whisper = Whisper()
-        self.listener = Listener(self.vad, self.whisper, self.kws)
+        self.sr = SpeechRecognizer()
+
+        def audio_process(audio_chunk):
+            self.kws.process_chunk(audio_chunk)
+            self.sr.process(audio_chunk)
+
+        self.listener = Listener(audio_process)
 
         # TTS
         self.tts = TextToSpeech()
@@ -57,9 +61,8 @@ class Atlas:
     def load_models(self):
         try:
             log("Starting model loading...", "ATLAS", "INFO")
-            self.vad.load()
             self.kws.load()
-            self.whisper.load()
+            self.sr.load()
 
             self.tts.load()
 
@@ -89,15 +92,14 @@ class Atlas:
         em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_CONTINUE))
 
         em.subscribe(
-            EventType.STT_SET_STATE,
-            lambda e: app.listener.pipeline.set_state(LState(e.content)),
+            EventType.STT_SET_STATE, lambda e: app.sr.set_state(LState(e.content))
         )
         em.subscribe(
             EventType.STT_TRANSCRIBED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, e.content),
         )
         em.subscribe(
-            EventType.STT_KEYWORD_DETECTED,
+            EventType.KWS_KEYWORD_DETECTED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
         )
 
@@ -147,8 +149,8 @@ class Atlas:
                     del self.kws.stream
                 if hasattr(self.kws, "kws"):
                     del self.kws.kws
-            if hasattr(self, "whisper") and hasattr(self.whisper, "model"):
-                del self.whisper.model
+            if hasattr(self, "sr"):
+                self.sr.close()
 
             self._shutdown()
             self.events.flush_and_stop()
@@ -176,6 +178,7 @@ class Atlas:
 
         self.tts.start()
         self.operator.start()
+        self.sr.start()
         self.listener.start()
 
         emit_event(EventType.UI_BANNER)

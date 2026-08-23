@@ -30,10 +30,10 @@ class EventType(StrEnum):
     WHISPER_LOADED = "WHISPER_LOADED"
     VAD_LOADED = "VAD_LOADED"
 
+    KWS_KEYWORD_DETECTED = "KWS_KEYWORD_DETECTED"
     STT_AUDIOWAVE = "STT_AUDIOWAVE"
     STT_CHANGED_STATE = "STT_CHANGED_STATE"
     STT_TRANSCRIBED = "STT_TRANSCRIBED"
-    STT_KEYWORD_DETECTED = "STT_KEYWORD_DETECTED"
     STT_SET_STATE = "STT_SET_STATE"
     STT_CONTINUE = "STT_CONTINUE"
     STT_START = "STT_START"
@@ -144,6 +144,7 @@ class EventManager:
             self.stop()
 
     def stop(self):
+        EventManager._instance = None
         self.queue.put(None)
 
 
