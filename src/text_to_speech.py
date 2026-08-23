@@ -285,9 +285,9 @@ class TextToSpeech:
             "sounds": {},
         }
 
-        builtin_cmds = cfg.op.load_builtin_commands() or {}
+        commands = cfg.op.load_commands() or {}
 
-        for intent, data in builtin_cmds.items():
+        for intent, data in commands.items():
             formatted_sounds = []
             sounds_val: list[dict[str, str]] = data.get("sounds", [])  # type: ignore
 
@@ -318,8 +318,7 @@ class TextToSpeech:
         return state
 
     def _generate_basic_sounds(self):
-        log("Checking builtin sounds...", "TTS", "INFO")
-        _RE_GENERATE_ALL = False
+        log("Checking sounds...", "TTS", "INFO")
 
         sounds_dir = DATA_DIR / "sounds"
         sounds_dir.mkdir(parents=True, exist_ok=True)
@@ -329,9 +328,7 @@ class TextToSpeech:
         old_state = {"settings": {}, "sounds": {}}
         if manifest_file.exists():
             try:
-                with open(
-                    manifest_file, "r", encoding="utf-8"
-                ) as f:  # Тільки utf-8! :)
+                with open(manifest_file, "r", encoding="utf-8") as f:
                     old_state = json.load(f)
             except json.JSONDecodeError:
                 log("Manifest file is corrupted. Regenerating all.", "TTS", "WARNING")
@@ -363,7 +360,7 @@ class TextToSpeech:
         with open(manifest_file, "w", encoding="utf-8") as f:
             json.dump(current_state, f, indent=4)
 
-        log("Builtin sounds check complete.", "TTS", "INFO")
+        log("Sounds check complete.", "TTS", "INFO")
 
 
 if __name__ == "__main__":

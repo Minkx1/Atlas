@@ -291,7 +291,7 @@ class Whisper:
             self.model = WhisperModel(
                 w.model_size,
                 device=w.device,
-                compute_type=w.compute_type,
+                compute_type="int8",
                 cpu_threads=w.cpu_threads,
                 num_workers=1,
                 download_root=str(self.model_dir),

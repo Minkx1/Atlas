@@ -1,0 +1,16 @@
+[command] # command metadata
+id = "say_time"
+description = "Says what's the time is right now."
+
+[execution]
+type = "python"
+file = "main.py"
+
+[operator]
+trigers = [
+    "hey, what's the time",
+    "what's the time",
+    "what time is it",
+    "whats on the clock",
+]
+say = ["Time is: {$time}", "It is {$time}"]

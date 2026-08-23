@@ -27,6 +27,7 @@ def get_base_dir() -> Path:
 
 BASE_DIR = get_base_dir()
 DATA_DIR = BASE_DIR / "data"
+COMMANDS_DIR = BASE_DIR / "commands"
 DEFAULT_CONFIG_PATH = DATA_DIR / "config.toml"
 
 
@@ -61,7 +62,6 @@ class STTConfig:
     start_state: str = "AWAKE"
     device: Literal["cpu", "cuda"] = "cpu"
     download_root: str = "models/whisper_models_cache"
-    compute_type: str = "int8"
     beam_size: int = 5
     cpu_threads: int = 6
 
@@ -97,22 +97,22 @@ class LLMConfig:
 
 @dataclass
 class OPConfig:
-    builtin_commands: str = "builtin_commands.json"
+    commands: str = "commands.json"
 
-    def get_builtin_commands_path(self, base_dir: str | Path | None = None) -> Path:
-        path = Path(self.builtin_commands)
+    def get_commands_path(self, base_dir: str | Path | None = None) -> Path:
+        path = Path(self.commands)
         if path.is_absolute():
             return path
 
         base = Path(base_dir) if base_dir is not None else DATA_DIR
         return base / path
 
-    def load_builtin_commands(
+    def load_commands(
         self, base_dir: str | Path | None = None
     ) -> dict[str, dict[str, str | list[str] | None]]:
-        path = self.get_builtin_commands_path(base_dir)
+        path = self.get_commands_path(base_dir)
         if not path.exists():
-            fallback = DATA_DIR / self.builtin_commands
+            fallback = DATA_DIR / self.commands
             if fallback.exists():
                 path = fallback
             else:

@@ -27,7 +27,7 @@ log = true
 # This file contains commands, their triggers, and possible responses.
 # If you want to add a command or edit an existing one,
 # you can modify this file as you wish.
-builtin_commands = "builtin_commands.json"
+commands = "commands.json"
 
 
 [audio]
@@ -59,7 +59,7 @@ dtype = "float32"
 # Path to the LLM model in GGUF format.
 # You can download any compatible GGUF model from Hugging Face
 # or another source and put it in '$DATA/models/llm_models/'.
-model_path = "models/llm_models/Qwen2.5-3B-Instruct-Uncensored-Test-Q3_K_M.gguf"
+model_path = "models/llm_models/Llama-3.2-3B-Instruct-Q5_K_M.gguf"
 
 # Initial system prompt passed to the LLM when a conversation starts.
 # This defines the assistant's identity, the way it addresses the user,
@@ -204,11 +204,6 @@ device = "cpu"
 
 # Directory where Faster-Whisper model files are downloaded/stored.
 download_root = "models/faster-whisper"
-
-# Computation type used by Faster-Whisper.
-# int8 significantly reduces CPU memory usage and can improve
-# inference speed on CPUs, with a small possible accuracy trade-off.
-compute_type = "int8"
 
 # Beam search width used during transcription.
 # Higher values can improve recognition quality,

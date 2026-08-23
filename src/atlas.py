@@ -3,7 +3,6 @@
 import sys
 import time
 
-from .cmd_operator import LLM, CommandOperator, Operator
 from .config import cfg
 from .events import (
     EventLogger,
@@ -12,6 +11,7 @@ from .events import (
     emit_event,
     log,
 )
+from .global_operator import LLM, CommandOperator, Operator
 from .speech_to_text import VAD, KeyWordSpotter, Listener, LState, Whisper
 from .text_to_speech import TextToSpeech
 
