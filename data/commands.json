@@ -61,6 +61,9 @@
         "triggers": [
             "goodbye",
             "bye",
+            "exit",
+            "quit",
+            "finish",
             "good night",
             "see you later",
             "catch you later",
@@ -114,8 +117,6 @@
             "be quiet",
             "shut up",
             "silent mode",
-            "shut down",
-            "turn off",
             "stop listening",
             "leave me alone",
             "give me some privacy",
