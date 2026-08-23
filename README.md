@@ -88,7 +88,7 @@ Subsequent runs start instantly and operate completely offline.
 
 Once _Atlas_ is running and models are placed, activate the assistant by saying **`Atlas`**.
 
-For detailed setup guides, plugin development, and architecture overview, visit the **[Atlas Documentation](https://www.google.com/search?q=https://minkx1.github.io/Atlas/)**.
+For detailed setup guides, plugin development, and architecture overview, visit the **[Atlas Documentation](https://minkx1.github.io/Atlas/)**.
 
 ## Contributing
 
