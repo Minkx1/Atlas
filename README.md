@@ -1,131 +1,100 @@
 # Atlas
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/Minkx1/Atlas/releases)
 [![Release](https://img.shields.io/github/v/release/Minkx1/Atlas?color=success)](https://github.com/Minkx1/Atlas/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Atlas** is a fast, AI-powered, fully offline voice assistant written in Python. It is designed to give you maximum controll of your PC and Atlas itself.
+**Atlas** is a fast, AI-powered, fully offline voice assistant written in Python. It gives you full control over your PC and assistant behavior through a flexible plugin architecture.
 
-Fast, private, and highly customizable.
+**Private · Offline · Highly Customizable**
 
 ## Table of Contents
 
 - [Main Features](#main-features)
 - [Installation](#installation)
-  - [Method 1: Pre-compiled Release (Recommended)](#method-1-pre-compiled-release-recommended)
-  - [Method 2: Building from Source](#method-2-building-from-source)
+  - [Method I: Pre-compiled Release](#method-i-pre-compiled-release)
+  - [Method II: Building from Source (Recommended)](#method-ii-building-from-source-recommended)
 - [First Launch & Models](#first-launch--models)
-- [Usage](#usage)
+- [Usage & Documentation](#usage--documentation)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Main Features
 
-- **Fully Offline:** Your voice data never leaves your computer.
-- **Cross-Platform:** Should run smoothly on both Windows and Linux.
-- **Great Performance:** Powered by performance optimized models and algorithms.
-- **Highly Customizable:** Nice `config` and `user commands` give you ability to customize _Atlas_ however you wish.
+- **100% Offline & Private:** Your voice data never leaves your computer. Works even in the parking lot.
+- **Cross-Platform:** Native support for Windows and Linux.
+- **High Performance:** Optimized model inference for low-latency response times.
+- **Highly Customizable:** Flexible config and plugin system allows you to customize _Atlas_ however you wish.
+
+## System Requirements
+
+| Component | Minimum | Recommended |
+| :--- | :--- | :--- |
+| **CPU** | 4-Core x86_64 | 8-Core CPU / Dedicated GPU |
+| **RAM / VRAM** | 4 GB RAM | 16 GB RAM / 6+ GB VRAM |
+| **Disk Space** | ~5 GB (base models) | ~10 GB+ (custom LLMs) |
 
 ## Installation
 
-You can install _Atlas_ in two ways: downloading a ready-to-use binary (easiest) or running it from the source code.
+### Method I: Pre-compiled Release
 
-### Method 1: Pre-compiled Release (Recommended)
-
-Due to the size of the AI libraries (CUDA/PyTorch), the release archive is split into multiple parts to bypass GitHub limits.
-
-**For Windows Users:**
-
-1. Go to the [Releases page](https://github.com/Minkx1/Atlas/releases) and download **all** parts of the latest release (`atlas-xxx.tar.xz.001`, `.002`, etc.).
-2. Place all downloaded parts into **one folder**.
-3. Make sure you have [7-Zip](https://7-zip.org/) or [WinRAR](https://win-rar.com/) installed.
-4. Right-click on the **first file** ONLY (`.tar.xz.001`).
-5. Select `7-Zip -> Extract Here`. The archiver will automatically find and merge all the other parts!
-6. Run `atlas.exe` (or the provided executable) inside the extracted folder.
-
-**For Linux Users:**
-
-1. Download all parts to a single directory.
-2. Open your terminal in that directory and merge the files:
-
-   ```bash
-   cat atlas-*.tar.xz.* > atlas.tar.xz
-   ```
-
-3. Extract the merged archive:
-
-   ```bash
-   tar -xf atlas.tar.xz
-   ```
-
-4. Run the executable: `./atlas`
+1. Go to the [Releases page](https://github.com/Minkx1/Atlas/releases) and download latest release.
+2. Extract archive.
+3. Run `Atlas.exe` (Windows) or `./Atlas` binary (Linux).
+4. Download a compatible LLM `.gguf` model (e.g., `Llama-3.2-3B-Instruct`) when prompted.
 
 ---
 
-### Method 2: Building from Source
+### Method II: Building from Source (Recommended)
 
-If you want to modify the code or run _Atlas_ in a Python environment, follow these steps.
+If you want to modify the code or run _Atlas_ in your own Python environment, follow these steps.
 
 #### Prerequisites
 
-- **Python 3.10** or higher.
-- **Git** installed on your system.
-- _(Linux only)_ Audio libraries: `sudo apt-get install -y libportaudio2 portaudio19-dev libasound2-dev`
+- **Python 3.9+** and **Git**
+- _(Linux only)_ Audio drivers & dependencies:
+
+    ```bash
+    sudo apt-get install -y libportaudio2 portaudio19-dev libasound2-dev
+    ```
 
 #### Setup
 
-1. Clone the repository:
-
-    ```bash
-    git clone [https://github.com/Minkx1/Atlas.git](https://github.com/Minkx1/Atlas.git)
-    cd atlas
-    ```
-
-2. Run the automated installation script to set up the environment and dependencies:
-
-    **On Windows:**
-    Double-click `install.bat` or run it in the Command Prompt / PowerShell:
-
-    ```cmd
-    install.bat
-    ```
-
-    **On Linux:**
-
-    ```bash
-    bash install.sh
-    ```
-
-3. Launch the assistant:
-
 ```bash
-python main.py
-```
+git clone https://github.com/Minkx1/Atlas.git
+cd Atlas
 
----
+# Automated environment setup
+install.bat     # Windows
+bash install.sh # Linux
+
+# Run Atlas
+python main.py
+
+```
 
 ## First Launch & Models
 
-Whether you run _Atlas_ from a release or from source, it comes **without** the heavy neural network models pre-installed to save bandwidth.
+On your **very first launch**, _Atlas_ automatically downloads the core neural network models (Whisper, TTS) into the `data/models/` directory.
 
-On your **very first launch**, _Atlas_ will automatically download the necessary AI models (Whisper, TTS, LLM) into the `data/models/` directory.
+> [!IMPORTANT]
+> Atlas **DOES NOT** automatically download the LLM model.
+> You need to download a compatible `.gguf` model (e.g., `Llama-3.2-3B-Instruct`) and place it into the `data/models/llm_models/` directory manually.
 
-> **Note**: This requires an internet connection and will download approximately ~4.5 GB of data. Please be patient! Subsequent launches will be instantaneous and completely offline.*
+Subsequent runs start instantly and operate completely offline.
 
-## Usage
+## Usage & Documentation
 
-Once _Atlas_ is running and the models are loaded, simply activate the assistant using your microphone.
+Once _Atlas_ is running and models are placed, activate the assistant by saying **`Atlas`**.
 
-Say `'Atlas!'` and it will greet you and be **awake** for next 15 seconds(this is customizable).
-When _Atlas_ is awake, he listens to all you say and recognizes it as a command. But if you did not said anything before timer ran out, then you need to wake him again.
-Also, you can change your assistant's name to another, but this also needs to change `data / keywords.txt` file. Please check the guide.
+For detailed setup guides, plugin development, and architecture overview, visit the **[Atlas Documentation](https://www.google.com/search?q=https://minkx1.github.io/Atlas/)**.
 
 ## Contributing
 
-Big thanks to all testers and contributors.
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+Big thanks to all testers and contributors!
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
-This project is licensed under the [MIT License](/LICENSE).
+This project is licensed under the [MIT License](https://www.google.com/search?q=LICENSE).
