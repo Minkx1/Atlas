@@ -41,4 +41,4 @@ Big thanks to all testers and contributors! Pull requests are welcome. For major
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE)
