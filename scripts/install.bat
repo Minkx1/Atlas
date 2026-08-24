@@ -1,6 +1,8 @@
 @echo off
 setlocal
 
+cd /d "%~dp0\.."
+
 echo [Atlas] Starting installation...
 
 where python >nul 2>nul

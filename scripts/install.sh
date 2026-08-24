@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+cd "$(dirname "$0")/.." || exit
+
 echo -e "\033[1;36m[Atlas] Starting installation...\033[0m"
 
 echo "[Atlas] Creating virtual environment..."

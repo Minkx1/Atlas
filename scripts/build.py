@@ -21,7 +21,7 @@ MACHINE = platform.machine().lower()
 if SYS_NAME == "windows":
     MACHINE = "x86_64" if MACHINE == "amd64" else MACHINE
 
-BASE_DIR = Path(__file__).parent.resolve()
+BASE_DIR = Path(__file__).parent.parent.resolve()
 DIST_DIR = BASE_DIR / "dist"
 BUILD_DIR = BASE_DIR / "build"
 OUT_DIST_DIR = DIST_DIR / APP_NAME
