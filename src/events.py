@@ -200,8 +200,8 @@ class EventLogger:
             return f"[{timestamp}] [{source}]  [{level}]: {message}"
 
         content_str = (
-            str(event.content)[:100] + "..."
-            if len(str(event.content)) > 100
+            str(event.content)[:150] + "..."
+            if len(str(event.content)) > 150
             else str(event.content)
         )
         return f"[{timestamp}] {event.name}: {content_str}"

@@ -68,6 +68,9 @@ class ONNXSentenceTransformer:
         if not hasattr(self, "session"):
             raise RuntimeError("Model was used before load() was called.")
 
+        if not sentences:  # prot from [] triggers
+            return np.array([])
+
         is_single_string = isinstance(sentences, str)
         if is_single_string:
             sentences = [sentences]
@@ -179,9 +182,9 @@ class CommandOperator:
                     self.triggers[intent] = _format_triggers(data["triggers"])  # type: ignore
             else:
                 log(
-                    f"Warning: Data for intent '{intent}' is not a dict. Type: {type(data)}",
+                    f"Data for intent '{intent}' is not a dict. Type: {type(data)}",
                     "OP",
-                    "WARNING",
+                    "WARN",
                 )
 
     def _load_plugins(self) -> None:
@@ -203,6 +206,9 @@ class CommandOperator:
         """Precomputes embeddings for triggers."""
         log("Precomputing trigger embeddings...", "OP", "DEBUG")
         for intent, triggers in self.triggers.items():
+            if not triggers:
+                log(f"Intent '{intent}' has empty triggers. Skipping.", "OP", "WARN")
+                continue
             vectors = self._get_embedd_vec(triggers)
             self.trigger_embeddings[intent] = vectors
         log("Embeddings precomputed.", "OP", "DEBUG")
@@ -343,7 +349,7 @@ class CommandOperator:
                 log(
                     f"Invalid sound type in config for '{category}': {type(sound)}",
                     "OP",
-                    "WARNING",
+                    "WARN",
                 )
 
             if text_str:
@@ -370,7 +376,7 @@ class CommandOperator:
                 emit_event(EventType.TTS_PLAY_SOUND, payload)
                 return payload
 
-        log(f"No sounds available for category: {category}", "OP", "WARNING")
+        log(f"No sounds available for category: {category}", "OP", "WARN")
         return None
 
     def exec_user(self, intent: str, cmd: str) -> bool:

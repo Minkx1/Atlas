@@ -254,6 +254,16 @@
                 "path": "whoami/whoami12.ogg",
                 "text": "I am Atlas, and I am always ready to help."
             }
+        ],
+        "idk_cmd": [
+            {
+                "path": "idk_cmd/idk_cmd1.ogg",
+                "text": "I don't know this command."
+            },
+            {
+                "path": "idk_cmd/idk_cmd2.ogg",
+                "text": "Command not recognized."
+            }
         ]
     }
 }

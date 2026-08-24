@@ -155,7 +155,7 @@ class TextToSpeech:
     def tts(self, text: str) -> None:
         if text.strip():
             try:
-                log(f"Synthesizing TTS: {text[:50]}...", "TTS", "DEBUG")
+                log(f"Synthesizing TTS: {text}...", "TTS", "DEBUG")
                 audio_chunks = list(self.voice.synthesize(text, self.syn_config))
                 audio_array = np.concatenate(
                     [chunk.audio_float_array for chunk in audio_chunks]
@@ -331,7 +331,7 @@ class TextToSpeech:
                 with open(manifest_file, "r", encoding="utf-8") as f:
                     old_state = json.load(f)
             except json.JSONDecodeError:
-                log("Manifest file is corrupted. Regenerating all.", "TTS", "WARNING")
+                log("Manifest file is corrupted. Regenerating all.", "TTS", "WARN")
 
         re_generate_all = old_state.get("settings") != current_state["settings"]
 

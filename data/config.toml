@@ -180,7 +180,7 @@ normalize_audio = false
 # A small delay can help prevent the beginning of speech from being cut off.
 # If you notice that the beginning or end of speech is cut off,
 # try increasing this value slightly.
-silence_duration = 0.3
+silence_duration = 0.5
 
 
 [stt]

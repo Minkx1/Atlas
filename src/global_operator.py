@@ -54,11 +54,21 @@ class LLM:
         self.history: list[dict[str, str]] = [
             {"role": "system", "content": self.initial_prompt}
         ]
+        self.no_model = False  # flag that show whether the model file is valid
 
     def load(self):
         try:
             _start = time.perf_counter()
             log(f"Loading LLM model: {self.model_path.name}...", "LLM", "INFO")
+            if not self.model_path.exists():
+                log(
+                    "LLM .gguf model path is not valid. Running without LLM...",
+                    "OP",
+                    "WARN",
+                )
+                self.no_model = True
+                return
+
             self.llama = llama_cpp.Llama(
                 model_path=str(self.model_path),
                 n_ctx=self.context_tokens,
@@ -75,6 +85,7 @@ class LLM:
                 "LLM",
                 "ERROR",
             )
+            self.no_model = True
             raise
 
     def history_add_response(self, text: str) -> None:
@@ -82,7 +93,7 @@ class LLM:
 
     def get_response(self, message: str) -> _LLM_Response:
         try:
-            log(f"LLM: Getting response for: {message[:60]}...", "LLM", "DEBUG")
+            log(f"LLM: Getting response for: {message}...", "LLM", "DEBUG")
             self.history.append({"role": "user", "content": message})
             start_time = time.perf_counter()
 
@@ -119,7 +130,7 @@ class LLM:
 
     def stream_response(self, message: str):
         try:
-            log(f"LLM: Streaming response for: {message[:60]}...", "LLM", "DEBUG")
+            log(f"LLM: Streaming response for: {message}...", "LLM", "DEBUG")
             self.history.append({"role": "user", "content": message})
 
             output = self.llama.create_chat_completion(  # type: ignore
@@ -160,7 +171,7 @@ class LLM:
                 log(
                     f"Error closing LLM: {type(e).__name__}: {e}",
                     "LLM",
-                    "WARNING",
+                    "ERROR",
                 )
                 raise
             finally:
@@ -218,50 +229,60 @@ class Operator:
             self._operate(text)
             self.command_queue.task_done()
 
+    def _stream_llm_response(self, text: str):
+        start_time = time.perf_counter()
+        full_response_text = ""
+
+        token_stream = self.llm.stream_response(text)
+
+        is_first_chunk = True
+        for sentence in self._sentence_chunker(token_stream):
+            full_response_text += sentence + " "
+
+            emit_event(EventType.TTS_SPEAK, sentence)
+            self.tts_engaged = True
+
+            emit_event(
+                EventType.UI_LLM_CHUNK,
+                {"text": sentence, "is_first": is_first_chunk},
+            )
+            is_first_chunk = False
+
+        gen_ms = (time.perf_counter() - start_time) * 1000
+        emit_event(
+            EventType.UI_LLM_RESPONSE_DONE,
+            {
+                "text": full_response_text.strip(),
+                "gen_ms": gen_ms,
+            },
+        )
+        emit_event(EventType.LLM_RESPONSE, full_response_text.strip())
+        self.llm.history_add_response(full_response_text.strip())
+
+    def _idk_command(self):
+        self.cmd._play_random_sound("idk_cmd")
+
     def _operate(self, text: str) -> None:
         if not text:
             return
 
-        start_time = time.perf_counter()
-        full_response_text = ""
-        tts_engaged = False
+        self.tts_engaged = False
 
         try:
             emit_event(EventType.STT_SET_STATE, "WAITING")
             res_type, payload = self.cmd.operate(text)
 
             if res_type == "command" and payload is not None:
-                tts_engaged = True
+                self.tts_engaged = True
 
-            if not res_type:
-                token_stream = self.llm.stream_response(text)
-
-                is_first_chunk = True
-                for sentence in self._sentence_chunker(token_stream):
-                    full_response_text += sentence + " "
-
-                    emit_event(EventType.TTS_SPEAK, sentence)
-                    tts_engaged = True
-
-                    emit_event(
-                        EventType.UI_LLM_CHUNK,
-                        {"text": sentence, "is_first": is_first_chunk},
-                    )
-                    is_first_chunk = False
-
-                gen_ms = (time.perf_counter() - start_time) * 1000
-                emit_event(
-                    EventType.UI_LLM_RESPONSE_DONE,
-                    {
-                        "text": full_response_text.strip(),
-                        "gen_ms": gen_ms,
-                    },
-                )
-                emit_event(EventType.LLM_RESPONSE, full_response_text.strip())
-                self.llm.history_add_response(full_response_text.strip())
+            if not res_type:  # LLM
+                if self.llm.no_model:  # LLM model was not load for some reason
+                    self._idk_command()
+                else:
+                    self._stream_llm_response(text)
 
         finally:
-            if tts_engaged:
+            if self.tts_engaged:
                 wait_for(EventType.TTS_FREE)
             emit_event(EventType.STT_SET_STATE, "AWAKE")
             emit_event(EventType.OP_READY)
