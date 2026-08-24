@@ -46,8 +46,8 @@ Atlas runs completely offline, which means your hardware does all the heavy lift
 
     Run the automated environment setup script:
 
-    * **Windows:** run `install.bat`
-    * **Linux:** run `bash install.sh`
+    * **Windows:** run `scripts/install.bat`
+    * **Linux:** run `bash scripts/install.sh`
 
     Launch the assistant:
     ```bash
