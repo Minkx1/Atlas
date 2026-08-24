@@ -75,13 +75,6 @@ class KeyWordSpotter:
 
             self.stream = self.kws.create_stream()
 
-            def _event_reset(event):
-                if event.content == "SLEEPING":
-                    self.reset()
-
-            # subscribing to STT_CHANGED_STATE:SLEEPING to reset
-            EventManager().subscribe(EventType.STT_CHANGED_STATE, _event_reset)
-
             elapsed = (time.perf_counter() - _start) * 1000
             log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "SUCCESS")
             emit_event(EventType.KWS_LOADED, f"{elapsed}ms")

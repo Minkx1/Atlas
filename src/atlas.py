@@ -91,6 +91,16 @@ class Atlas:
         em.subscribe(EventType.TTS_FREE, lambda e: app.listener.unmute())
         em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_CONTINUE))
 
+        # STT
+        # subscribing to STT_CHANGED_STATE:SLEEPING to KWS reset
+        em.subscribe(
+            EventType.STT_CHANGED_STATE,
+            lambda e: self.kws.reset() if e.content == "SLEEPING" else None,
+        )
+        em.subscribe(
+            EventType.KWS_KEYWORD_DETECTED,
+            lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
+        )
         em.subscribe(
             EventType.STT_SET_STATE, lambda e: app.sr.set_state(LState(e.content))
         )
@@ -98,38 +108,13 @@ class Atlas:
             EventType.STT_TRANSCRIBED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, e.content),
         )
-        em.subscribe(
-            EventType.KWS_KEYWORD_DETECTED,
-            lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
-        )
 
+        # OP
         em.subscribe(EventType.OP_ASK_FINISH, lambda e: app._shutdown())
         em.subscribe(EventType.OP_RECEIVE_CMD, lambda e: app.operator.submit(e.content))
         em.subscribe(EventType.OP_READY, lambda e: emit_event(EventType.STT_CONTINUE))
 
-        # em.subscribe(EventType.UI_BANNER, lambda e: AssistantUI.print_banner())
-        # em.subscribe(
-        #     EventType.UI_STATE_CHANGE,
-        #     lambda e: AssistantUI.print_state_change(**e.content),
-        # )
-        # em.subscribe(
-        #     EventType.UI_TRANSCRIPTION,
-        #     lambda e: AssistantUI.print_transcription(**e.content),
-        # )
-        # em.subscribe(
-        #     EventType.UI_LLM_CHUNK,
-        #     lambda e: AssistantUI.print_llm_chunk(**e.content),
-        # )
-        # em.subscribe(
-        #     EventType.UI_LLM_RESPONSE,
-        #     lambda e: AssistantUI.print_llm_response(**e.content),
-        # )
-        # em.subscribe(
-        #     EventType.UI_ASSISTANT_SAY,
-        #     lambda e: AssistantUI.print_assistant_say(**e.content),
-        # )
-
-    def close(self):
+    def _close(self):
         try:
             log("Shutting down assistant...", "ATLAS", "INFO")
 
@@ -172,7 +157,7 @@ class Atlas:
             )
             sys.stdout.flush()
 
-    def main(self):
+    def _main(self):
         self.load_models()
 
         self.tts.start()
@@ -191,10 +176,11 @@ class Atlas:
         #     Event().wait(1.0)
 
     def start(self):
+        """Starts Atlas Assistant."""
         try:
-            self.main()
+            self._main()
         except Exception as e:  # noqa: BLE001
             print(f"[!] FATAL ERROR: {e}")
             sys.exit(1)
         finally:
-            self.close()
+            self._close()
