@@ -1,7 +1,6 @@
 import json
 import subprocess
 import threading
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -53,9 +52,21 @@ class Plugin:
 
     def _pump_stderr(self, stderr):
         """logs all errors/logs from stderr"""
-        for line in stderr:
-            if line["type"] == "log":
-                log(line["message"], line["source"], line["level"])
+        for raw in stderr:
+            raw: str = raw.rstrip("\n")
+            if not raw:
+                continue
+            try:
+                msg = json.loads(raw)
+                if msg.get("type") == "log":
+                    log(
+                        msg.get("message", ""),
+                        msg.get("source", self.manifest.id),
+                        msg.get("level", "INFO"),
+                    )
+                    continue
+            except json.JSONDecodeError:
+                log(raw, self.manifest.id, "DEBUG")
 
     def run(self, origin: str) -> None:
         # !NOTE
