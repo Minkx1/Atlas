@@ -20,7 +20,9 @@ def log(message: str, source: str = "say-time", level: str = "INFO"):
 
     stderr.write(
         dumps({"type": "log", "message": message, "source": source, "level": level})
+        + "\n"
     )
+    stderr.flush()
 
 
 import time
