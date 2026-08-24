@@ -1,0 +1,14 @@
+[plugin] # plugin's metadata
+id = "say-time"
+description = "Says what's the time is right now."
+triggers = [
+    "hey, what's the time",
+    "what's the time",
+    "what time is it",
+    "whats on the clock",
+]
+timeout = 5.0
+
+[execution]
+type = "python"  # "binary" | "python" | "script"
+file = "main.py"

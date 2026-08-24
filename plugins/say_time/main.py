@@ -1,7 +1,44 @@
-def main(origin: str):
-    import time
+def get_ctx() -> dict:
+    """Get context from `stdin`"""
+    import json
+    import sys
 
-    t = time.localtime(time.time())
-    s = f"{t.tm_hour}:{t.tm_min}"
+    return json.loads(sys.stdin.readline() or "{}")
 
-    print("!", s, end="", flush=True)
+
+def submit(data: dict):
+    """Submits data into IPC-channel"""
+    from json import dumps
+
+    print(dumps(data), flush=True)
+
+
+def log(message: str, source: str = "say-time", level: str = "INFO"):
+    """Logs info"""
+    from json import dumps
+    from sys import stderr
+
+    stderr.write(
+        dumps({"type": "log", "message": message, "source": source, "level": level})
+    )
+
+
+import time
+from random import choice
+
+sounds = ["Time is: {time}", "It is {time}"]
+
+
+def main():
+    context = get_ctx()
+
+    t = time.localtime()
+    res = {
+        "type": "say",
+        "text": choice(sounds).format(time=f"{t.tm_hour}:{t.tm_min:02d}"),
+    }
+    submit(res)
+
+
+if __name__ == "__main__":
+    main()

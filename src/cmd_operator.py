@@ -1,5 +1,6 @@
 import random
 import re
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -9,8 +10,9 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from .config import CONFIG_DIR, DATA_DIR, PLUGINS_DIR, cfg
+from .config import DATA_DIR, PLUGINS_DIR, cfg
 from .events import EventType, emit_event, log
+from .plugins import Plugin, PluginManifest
 
 
 class ONNXSentenceTransformer:
@@ -107,23 +109,10 @@ class ONNXSentenceTransformer:
 
 
 class CommandOperator:
-    class Plugin:
-        """Command class describes plugins: directories in /data/commands/ containing file `plugin.toml`"""
-
-        def __init__(self, root: Path, config: Path) -> None:
-            self.root: Path = root
-            self.config_path = config
-
-            self.id = None
-            self.description = "Unknown."
-
-            self.parse_config(self.config_path)
-
-        def parse_config(self, path: Path) -> None: ...
-
     def __init__(self) -> None:
         self.history: list[str] = []
         self.commands: dict[str, dict[str, list[dict[str, str]] | list[str]]] = {}
+        self.plugins: dict[str, Plugin] = {}
 
         self.triggers: dict[str, list[str]] = {
             "llm_query": [
@@ -189,16 +178,23 @@ class CommandOperator:
 
     def _load_plugins(self) -> None:
         if not PLUGINS_DIR.exists():
-            PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
             return
 
-        l: list[CommandOperator.Plugin] = []
+        for d in PLUGINS_DIR.iterdir():
+            if not d.is_dir():
+                continue
+            toml_path = d / "plugin.toml"
+            if not toml_path.exists():
+                continue
+            try:
+                manifest = PluginManifest.from_toml(toml_path)
+            except Exception as e:  # noqa: BLE001
+                log(f"Unable to parse {toml_path}: {e}", "OP", "ERROR")
+                continue
 
-        for dir in PLUGINS_DIR.iterdir():
-            if dir.is_dir():
-                toml = dir / "plugin.toml"
-                if toml.exists() and toml.is_file():
-                    l.append(CommandOperator.Plugin(PLUGINS_DIR, toml))
+            self.plugins[manifest.id] = Plugin(d, manifest)
+            self.triggers[manifest.id] = manifest.triggers
+            log(f"Loaded plugin: {manifest.id}", "OP", "INFO")
 
     def _precompute_embeddings(self) -> None:
         """Precomputes embeddings for triggers."""
@@ -313,6 +309,14 @@ class CommandOperator:
 
     def exec_command(self, intent: str) -> dict[str, str | None] | None:
         log(f"Executing intent: {intent}", "OP", "DEBUG")
+        if intent in self.plugins:
+            origin = self.history[-1] if self.history else ""
+            # running plugin process in separate thread
+            threading.Thread(
+                target=self.plugins[intent].run, args=(origin,), daemon=True
+            ).start()
+            return None
+
         payload = self._play_random_sound(intent)
 
         if intent == "farewell":
