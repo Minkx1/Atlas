@@ -8,7 +8,7 @@ from typing import Literal
 
 import tomllib
 
-# GENERAL CONFIGURATIONS
+# GENERAL CONFIGURATIONS : OS Name, Base directory and other directories
 
 OS_NAME = os.name
 if OS_NAME not in {"posix", "nt"}:
@@ -22,13 +22,18 @@ def get_base_dir() -> Path:
         if exe_dir.name == "bin":
             return exe_dir.parent
         return exe_dir
-    return Path(__file__).resolve().parent.parent  # /src/config.py parent.parent is /
+    return (
+        Path(__file__).resolve().parent.parent
+    )  # '/src/config.py'.parent.parent is '/'
 
 
-BASE_DIR = get_base_dir()
+BASE_DIR: Path = get_base_dir()
+
 DATA_DIR = BASE_DIR / "data"
-COMMANDS_DIR = BASE_DIR / "commands"
-DEFAULT_CONFIG_PATH = DATA_DIR / "config.toml"
+PLUGINS_DIR = BASE_DIR / "plugins"
+CONFIG_DIR = BASE_DIR / "config"
+
+DEFAULT_CONFIG_PATH = CONFIG_DIR / "config.toml"
 
 
 @dataclass
@@ -107,16 +112,13 @@ class OPConfig:
         base = Path(base_dir) if base_dir is not None else DATA_DIR
         return base / path
 
-    def load_commands(
-        self, base_dir: str | Path | None = None
-    ) -> dict[str, dict[str, str | list[str] | None]]:
-        path = self.get_commands_path(base_dir)
+    def load_commands(self) -> dict[str, dict[str, str | list[str] | None]]:
+        path = CONFIG_DIR / self.commands
         if not path.exists():
-            fallback = DATA_DIR / self.commands
-            if fallback.exists():
-                path = fallback
-            else:
-                return {}
+            raise FileNotFoundError(
+                "[!] `commands.json` file was not found! Please check path or consider downloading latest version from "
+                + "[github repository](https://github.com/Minkx1/Atlas)"
+            )
 
         with path.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
@@ -152,7 +154,7 @@ class AppConfig:
     stt: STTConfig = field(default_factory=STTConfig)
 
 
-def load_config(config_path: str = "data/config.toml") -> AppConfig:
+def load_config(config_path: str = "config/config.toml") -> AppConfig:
     path = Path(config_path)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -162,8 +164,8 @@ def load_config(config_path: str = "data/config.toml") -> AppConfig:
             )
         else:
             raise FileNotFoundError(
-                "[!] [config.toml] file was not found! Please consider downloading latest version from github repository"
-                + "(https://github.com/Minkx1/Atlas/tree/master/data/config.toml)"
+                "[!] `config.toml` file was not found! Please consider downloading latest version from [github repository]"
+                + "(https://github.com/Minkx1/Atlas)"
             )
         return load_config(str(path))
 

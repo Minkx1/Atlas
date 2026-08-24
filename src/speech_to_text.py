@@ -17,10 +17,10 @@ import numpy as np
 import sounddevice as sd
 
 if __name__ == "__main__":
-    from config import DATA_DIR, cfg
+    from config import CONFIG_DIR, DATA_DIR, cfg
     from events import EventManager, EventType, emit_event, log
 else:
-    from .config import DATA_DIR, cfg
+    from .config import CONFIG_DIR, DATA_DIR, cfg
     from .events import EventManager, EventType, emit_event, log
 
 # should make downloading Whisper models from HF faster
@@ -67,7 +67,7 @@ class KeyWordSpotter:
                 encoder=self.encoder,
                 decoder=self.decoder,
                 joiner=self.joiner,
-                keywords_file=f"{DATA_DIR / cfg.kws.keywords_file}",
+                keywords_file=f"{CONFIG_DIR / cfg.kws.keywords_file}",
                 num_threads=cfg.kws.num_threads,
                 keywords_threshold=cfg.kws.score_threshold,
                 feature_dim=80,

@@ -157,11 +157,10 @@ class Atlas:
             log("Shutdown complete.", "ATLAS", "INFO")
         except Exception as e:  # noqa: BLE001
             log(f"Error during shutdown: {type(e).__name__}: {e}", "ATLAS", "ERROR")
-
         finally:
             import sys
 
-            sys.stdout.write(
+            sys.stdout.write(  # Textual ui fix
                 "\x1b[?1000l"
                 "\x1b[?1003l"
                 "\x1b[?1015l\x1b[?1006l"
@@ -195,7 +194,6 @@ class Atlas:
         try:
             self.main()
         except Exception as e:  # noqa: BLE001
-            # console.print("[bold red]][!] ERROR[/]: " + str(e))
             print(f"[!] FATAL ERROR: {e}")
             sys.exit(1)
         finally:

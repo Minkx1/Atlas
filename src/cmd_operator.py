@@ -9,7 +9,7 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from .config import DATA_DIR, cfg
+from .config import CONFIG_DIR, DATA_DIR, PLUGINS_DIR, cfg
 from .events import EventType, emit_event, log
 
 
@@ -188,19 +188,17 @@ class CommandOperator:
                 )
 
     def _load_plugins(self) -> None:
-        cmd_dir = DATA_DIR / "commands"
-
-        if not cmd_dir.exists():
-            cmd_dir.mkdir(parents=True, exist_ok=True)
+        if not PLUGINS_DIR.exists():
+            PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
             return
 
         l: list[CommandOperator.Plugin] = []
 
-        for dir in cmd_dir.iterdir():
+        for dir in PLUGINS_DIR.iterdir():
             if dir.is_dir():
                 toml = dir / "plugin.toml"
                 if toml.exists() and toml.is_file():
-                    l.append(CommandOperator.Plugin(cmd_dir, toml))
+                    l.append(CommandOperator.Plugin(PLUGINS_DIR, toml))
 
     def _precompute_embeddings(self) -> None:
         """Precomputes embeddings for triggers."""
