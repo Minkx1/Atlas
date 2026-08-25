@@ -38,7 +38,7 @@ jobs:
           pip install .
 
       - name: Run Build Script
-        run: python build.py
+        run: python scripts/build.py
 
       - name: Handle Large Archives (Split if > 1.9GB)
         shell: bash
