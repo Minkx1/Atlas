@@ -27,7 +27,21 @@ BUILD_DIR = BASE_DIR / "build"
 OUT_DIST_DIR = DIST_DIR / APP_NAME
 
 FILES_TO_INCLUDE = ["README.md", "LICENSE"]
-DIRS_TO_INCLUDE = ["data"]
+DIRS_TO_INCLUDE = ["data", "config", "plugins", "runtime"]
+
+DIR_IGNORE_PATTERNS: dict[str, list[str]] = {
+    "data": [
+        "models",
+        ".cache",
+        "*.gguf",
+        "*.pt",
+        "*.bin",
+        "*.safetensors",
+        "logs",
+        "*.png",
+    ],
+    "plugins": [".venv", "venv", "*.pyc"],
+}
 
 UNNEEDED_EXTENSIONS = {
     ".pyi",
@@ -62,8 +76,15 @@ UNNEEDED_DIR_NAMES = {
     "site-packages/torch/test",
     "site-packages/numpy/tests",
 }
+_SIMPLE_UNNEEDED_DIRS = {n for n in UNNEEDED_DIR_NAMES if "/" not in n}
+_SUFFIX_UNNEEDED_DIRS = tuple(n for n in UNNEEDED_DIR_NAMES if "/" in n)
 
 PROBLEMATIC_LINUX_LIBS = {"libstdc++.so.6", "libgcc_s.so.1", "libm.so.6"}
+
+
+def log(message: str, level: str = "INFO"):
+    stream = sys.stderr if level in ("WARN", "ERROR") else sys.stdout
+    print(f"[{level}] {message}", file=stream)
 
 
 def parse_args():
@@ -79,6 +100,10 @@ def get_basename(cpu_only: bool) -> str:
     return f"{APP_NAME}-{VERSION}-{SYS_NAME}-{MACHINE}{suffix}"
 
 
+def get_exe_name() -> str:
+    return f"{APP_NAME}.exe" if SYS_NAME == "windows" else APP_NAME
+
+
 def clean(staging_dir: Path, full: bool = False):
     if full:
         for d in [DIST_DIR, BUILD_DIR]:
@@ -91,29 +116,29 @@ def clean(staging_dir: Path, full: bool = False):
         shutil.rmtree(staging_dir)
 
 
+def _should_prune_dir(path: Path, name: str) -> bool:
+    if name in _SIMPLE_UNNEEDED_DIRS:
+        return True
+    posix = path.as_posix()
+    return any(posix.endswith(suffix) for suffix in _SUFFIX_UNNEEDED_DIRS)
+
+
 def post_build_cleanup(dist_path: Path):
-    bad_subdirs = [
-        "bin/torch/test",
-        "bin/torch/bin",
-        "bin/torch/include",
-        "bin/torch/share",
-        "bin/numpy/tests",
-    ]
+    for root, dirs, _files in os.walk(dist_path, topdown=True):
+        current_path = Path(root)
+        for d in list(dirs):
+            if _should_prune_dir(current_path / d, d):
+                shutil.rmtree(current_path / d, ignore_errors=True)
+                dirs.remove(d)
 
-    for bad_dir in bad_subdirs:
-        target_dir = dist_path / bad_dir
-        if target_dir.exists():
-            shutil.rmtree(target_dir, ignore_errors=True)
-
-    for root, _, files in os.walk(dist_path):
+    for root, _dirs, files in os.walk(dist_path):
         current_path = Path(root)
         for file_name in files:
             file_path = current_path / file_name
 
             if (
                 file_path.suffix.lower() in UNNEEDED_EXTENSIONS
-                or SYS_NAME == "linux"
-                and file_path.name in PROBLEMATIC_LINUX_LIBS
+                or (SYS_NAME == "linux" and file_path.name in PROBLEMATIC_LINUX_LIBS)
                 or file_path.name in UNNEEDED_CUDA_LIBS
             ):
                 try:
@@ -131,28 +156,37 @@ def post_build_cleanup(dist_path: Path):
                     pass
 
     if SYS_NAME == "linux":
-        seen_hashes = {}
-        for root, _, files in os.walk(dist_path):
-            for file_name in files:
-                file_path = Path(root) / file_name
-
-                if file_path.is_symlink() or not file_path.is_file():
-                    continue
-
-                if file_path.stat().st_size > 500 * 1024:
-                    try:
-                        file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
-                        if file_hash in seen_hashes:
-                            original_path = seen_hashes[file_hash]
-                            file_path.unlink()
-                            os.link(original_path, file_path)
-                        else:
-                            seen_hashes[file_hash] = file_path
-                    except OSError:
-                        pass
+        _dedupe_by_hardlink(dist_path)
 
 
-def generate_build_info():
+def _dedupe_by_hardlink(dist_path: Path, min_size: int = 500 * 1024):
+    seen_hashes: dict[str, Path] = {}
+    for root, _dirs, files in os.walk(dist_path):
+        for file_name in files:
+            file_path = Path(root) / file_name
+
+            if file_path.is_symlink() or not file_path.is_file():
+                continue
+            if file_path.stat().st_size <= min_size:
+                continue
+
+            try:
+                file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
+            except OSError:
+                continue
+
+            original_path = seen_hashes.get(file_hash)
+            if original_path is not None:
+                try:
+                    file_path.unlink()
+                    os.link(original_path, file_path)
+                except OSError:
+                    pass
+            else:
+                seen_hashes[file_hash] = file_path
+
+
+def generate_build_info(cpu_only: bool) -> dict:
     git_hash = "unknown"
     try:
         git_hash = (
@@ -169,7 +203,18 @@ def generate_build_info():
         "build_date": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "platform": f"{SYS_NAME}-{MACHINE}",
         "python_version": platform.python_version(),
+        "cpu_only": cpu_only,
     }
+
+
+def verify_compiled_output():
+    exe_path = OUT_DIST_DIR / get_exe_name()
+    bin_path = OUT_DIST_DIR / "bin"
+
+    if not exe_path.exists():
+        raise FileNotFoundError(f"Executable not found: {exe_path}")
+    if not bin_path.exists():
+        raise FileNotFoundError(f"Binary file not found: {bin_path}")
 
 
 def compile_exe(cpu_only: bool = False):
@@ -212,50 +257,53 @@ def compile_exe(cpu_only: bool = False):
                 "--exclude-module=torch.cuda",
             ]
         )
-    # else:
-    # cmd.extend(["--collect-all=nvidia", "--collect-all=torch"])
-
     subprocess.run(cmd, check=True)
 
-    if OUT_DIST_DIR.exists():
-        post_build_cleanup(OUT_DIST_DIR)
+    verify_compiled_output()
+    post_build_cleanup(OUT_DIST_DIR)
 
 
-def make_compressed_archive(basename: str, staging_dir: Path):
+def _copy_included_dir(name: str, staging_dir: Path):
+    src = BASE_DIR / name
+    if not src.exists():
+        log(f"'{name}/' not found in {src}, skipping.", "WARN")
+        return
+
+    patterns = [*DIR_IGNORE_PATTERNS.get(name, []), "__pycache__", "*.pyc"]
+    shutil.copytree(
+        src,
+        staging_dir / name,
+        ignore=shutil.ignore_patterns(*patterns),
+        dirs_exist_ok=True,
+    )
+
+
+def _copy_included_files(staging_dir: Path):
+    for file_name in FILES_TO_INCLUDE:
+        file_path = BASE_DIR / file_name
+        if not file_path.exists():
+            log(f"'{file_name}' not found in {file_path}, skipping.", "WARN")
+            continue
+        shutil.copy(file_path, staging_dir / file_name)
+
+
+def make_compressed_archive(basename: str, staging_dir: Path, cpu_only: bool):
     staging_dir.mkdir(exist_ok=True)
 
     if OUT_DIST_DIR.exists():
         shutil.copytree(OUT_DIST_DIR, staging_dir, dirs_exist_ok=True)
+    else:
+        raise FileNotFoundError(
+            f"{OUT_DIST_DIR} відсутній — компіляцію не було виконано?"
+        )
 
     info_path = staging_dir / "build_info.json"
     with open(info_path, "w", encoding="utf-8") as f:
-        json.dump(generate_build_info(), f, indent=2)
+        json.dump(generate_build_info(cpu_only), f, indent=2)
 
-    for file_name in FILES_TO_INCLUDE:
-        file_path = BASE_DIR / file_name
-        if file_path.exists():
-            shutil.copy(file_path, staging_dir / file_name)
-
+    _copy_included_files(staging_dir)
     for dir_name in DIRS_TO_INCLUDE:
-        dir_path = BASE_DIR / dir_name
-        if dir_path.exists():
-            if dir_name == "data":
-                shutil.copytree(
-                    dir_path,
-                    staging_dir / dir_name,
-                    ignore=shutil.ignore_patterns(
-                        "models",
-                        ".cache",
-                        "*.gguf",
-                        "*.pt",
-                        "*.bin",
-                        "*.safetensors",
-                        "logs",
-                        "*.png",
-                    ),
-                )
-            else:
-                shutil.copytree(dir_path, staging_dir / dir_name)
+        _copy_included_dir(dir_name, staging_dir)
 
     archive_file = BASE_DIR / f"{basename}.tar.xz"
     compressed = False
@@ -276,14 +324,18 @@ def make_compressed_archive(basename: str, staging_dir: Path):
                 check=True,
             )
             compressed = True
-        except Exception:  # noqa: BLE001, S110
-            pass
+        except Exception:  # noqa: BLE001
+            log(
+                "System tar/xz didn't work, using python's tarfile.",
+                "WARN",
+            )
 
     if not compressed:
         with tarfile.open(archive_file, "w:xz") as tf:
             tf.add(staging_dir, arcname=staging_dir.name)
 
     shutil.rmtree(staging_dir)
+    log(f"Archive created: {archive_file}")
 
 
 if __name__ == "__main__":
@@ -295,7 +347,9 @@ if __name__ == "__main__":
         clean(staging_dir=staging_dir, full=args.full_clean)
         compile_exe(cpu_only=args.cpu_only)
         if not args.no_archive:
-            make_compressed_archive(basename=basename, staging_dir=staging_dir)
+            make_compressed_archive(
+                basename=basename, staging_dir=staging_dir, cpu_only=args.cpu_only
+            )
     except Exception as e:  # noqa: BLE001
-        print(f"Build failed: {e}", file=sys.stderr)
+        log(f"Build failed: {e}", "ERROR")
         sys.exit(1)

@@ -1,0 +1,29 @@
+[project]
+name = "atlas"
+version = "0.4.1"
+description = "A fast, private and 100% offline personal AI Voice Assistant."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Minkx1", email = "zakalata.mark@gmail.com" }]
+dependencies = [
+    "numpy",
+    "tokenizers",
+    "textual",
+    "rich",
+    "sounddevice",
+    "soundfile",
+    "faster-whisper",
+    "sherpa-onnx",
+    "piper-tts",
+    "llama-cpp-python",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.commitizen]
+version_scheme = "semver"
+version_provider = "pep621"
+update_changelog_on_bump = true
+version_files = ["src/__init__.py:__version__"]

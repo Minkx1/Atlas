@@ -35,7 +35,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
-          pip install -r requirements.txt
+          pip install .
 
       - name: Run Build Script
         run: python build.py
@@ -64,7 +64,7 @@ jobs:
             *.tar.xz
             *.tar.xz.*
             *.tar.gz
-            *.tag.gz.*
+            *.tar.gz.*
             *.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

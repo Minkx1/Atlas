@@ -1,0 +1,43 @@
+name: Bump version and Changelog
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  bump:
+    if: "!startsWith(github.event.head_commit.message, 'bump:')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Commitizen
+        run: pip install commitizen
+
+      - name: Configure Git
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create bump and changelog
+        run: |
+          cz bump --yes || (if [ $? -eq 21 ]; then echo "NO_BUMP=true" >> $GITHUB_ENV; else exit 1; fi)
+
+      - name: Push changes
+        if: env.NO_BUMP != 'true'
+        run: |
+          git push origin HEAD:main
+          git push origin --tags

@@ -23,7 +23,7 @@ python -m pip install --upgrade pip
 
 
 echo [Atlas] Installing required packages...
-pip install --no-cache-dir -r requirements.txt
+pip install . --no-cache-dir
 
 echo.
 echo [Atlas] Installation complete!
