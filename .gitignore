@@ -7,9 +7,10 @@ dist/
 .vscode/
 .idea/
 
-data/models/
-data/logs/
+data/
 *.tar.gz
 *.tar.xz
 *-x86_64
 bin/
+
+*.egg-info
