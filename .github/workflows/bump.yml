@@ -39,5 +39,5 @@ jobs:
       - name: Push changes
         if: env.NO_BUMP != 'true'
         run: |
-          git push origin HEAD:main
+          git push origin HEAD:${{ github.ref_name }}
           git push origin --tags
