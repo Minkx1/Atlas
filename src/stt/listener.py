@@ -14,7 +14,7 @@ from ..core.events import EventType, emit_event, log
 
 
 class Listener:
-    def __init__(self, chunk_processor: Callable[[np.ndarray]]) -> None:
+    def __init__(self, chunk_processor: Callable[[np.ndarray], None]) -> None:
         self.processor = chunk_processor
         self.audio_input_thread = Thread(
             target=self._audio_input, name="LISTENER_INPUT_THREAD", daemon=True
