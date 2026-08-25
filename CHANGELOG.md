@@ -1,3 +1,9 @@
+## v0.4.4 (2026-08-25)
+
+### Fix
+
+- Fixed Callable syntax error & added onnxruntime to dependencies in pyproject.toml
+
 ## v0.4.3 (2026-08-25)
 
 ### Refactor
