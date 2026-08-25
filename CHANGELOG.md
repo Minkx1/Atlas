@@ -1,3 +1,9 @@
+## v0.4.5 (2026-08-25)
+
+### Fix
+
+- Fixed SSL Certificate error in frezzed builds
+
 ## v0.4.4 (2026-08-25)
 
 ### Fix
