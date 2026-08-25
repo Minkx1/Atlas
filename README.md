@@ -1,13 +1,19 @@
 # Atlas
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/Minkx1/Atlas/releases)
 [![Release](https://img.shields.io/github/v/release/Minkx1/Atlas?color=success)](https://github.com/Minkx1/Atlas/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Atlas** is a fast, AI-powered, fully offline voice assistant written in Python. It gives you full control over your PC and assistant behavior through a flexible plugin architecture.
+**Atlas** is a fast, private and 100% offline personal AI Voice Assistant.
+
+## About
 
 ⚡ **Private · Offline · Highly Customizable**
+
+Atlas is a Jarvis-inspired local voice assistant built for blazingly-fast, offline desktop work. 
+Powered by a modular IPC plugin architecture and local AI, it handles daily workstation workflows while keeping your data strictly private and entirely on your machine.
+
 
 ## Main Features
 
