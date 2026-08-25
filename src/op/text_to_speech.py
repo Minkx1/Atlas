@@ -4,7 +4,6 @@ import json
 import queue
 import threading
 import time
-import urllib.request
 import wave
 from pathlib import Path
 
@@ -56,6 +55,16 @@ class TextToSpeech:
         emit_event(EventType.TTS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
 
     def _download_model(self):
+        import json
+        import shutil
+        import ssl
+        import urllib.request
+
+        # SSL Certificate fix
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
         model_path = DATA_DIR / cfg.tts.model_path
 
         model_key = model_path.stem
@@ -72,7 +81,7 @@ class TextToSpeech:
             req = urllib.request.Request(
                 VOICES_JSON_URL, headers={"User-Agent": "Mozilla/5.0"}
             )
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, context=ctx) as resp:
                 voices_data = json.loads(resp.read().decode("utf-8"))
 
             if model_key not in voices_data:
@@ -80,7 +89,6 @@ class TextToSpeech:
                     f"Model '{model_key}' not found in Piper voices index."
                 )
 
-            # 2. Знаходимо всі файли для цього голосу (.onnx та .onnx.json)
             files = voices_data[model_key].get("files", {})
 
             for rel_path in files:
@@ -94,10 +102,10 @@ class TextToSpeech:
                         download_url, headers={"User-Agent": "Mozilla/5.0"}
                     )
                     with (
-                        urllib.request.urlopen(file_req) as response,
+                        urllib.request.urlopen(file_req, context=ctx) as response,
                         open(target_path, "wb") as out_file,
                     ):
-                        out_file.write(response.read())
+                        shutil.copyfileobj(response, out_file)
 
             log(
                 f"PiperTTS model '{model_key}' downloaded successfully.",

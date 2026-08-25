@@ -27,15 +27,27 @@ class VAD:
         self.current_sample = 0
 
     def _download_model(self):
+        import shutil
+        import ssl
         import urllib.request
         from urllib.error import URLError
+
+        # SSL Certificate fix
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
 
         self.model_path.parent.mkdir(parents=True, exist_ok=True)
         url = "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
 
         try:
             print(f"[I] Downloading Silero VAD ONNX model from {url}...")
-            urllib.request.urlretrieve(url, self.model_path)
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with (
+                urllib.request.urlopen(req, context=ctx) as response,
+                open(self.model_path, "wb") as out_file,
+            ):
+                shutil.copyfileobj(response, out_file)
             print(f"[I] Model successfully installed to {self.model_path}")
         except (URLError, OSError) as e:
             if self.model_path.exists():

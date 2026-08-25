@@ -2,7 +2,6 @@
 #  sentence_transformer.py
 #
 
-import urllib.request
 from pathlib import Path
 from urllib.error import URLError
 
@@ -27,13 +26,28 @@ class ONNXSentenceTransformer:
         self.tokenizer_path = self.download_dir / "tokenizer.json"
 
     def _download_file(self, url: str, dest: Path):
+        import shutil
+        import ssl
+        import urllib.request
+
+        # SSL Certificate fix
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
         if dest.exists():
             return
 
         dest.parent.mkdir(parents=True, exist_ok=True)
 
         log(f"Downloading {dest.name}...", "OP", "INFO")
-        urllib.request.urlretrieve(url, dest)
+
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with (
+            urllib.request.urlopen(req, context=ctx) as response,
+            open(dest, "wb") as out_file,
+        ):
+            shutil.copyfileobj(response, out_file)
 
     def _download_model(self):
         base_url = f"https://huggingface.co/Xenova/{self.model_name}/resolve/main"

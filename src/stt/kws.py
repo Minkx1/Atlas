@@ -84,6 +84,7 @@ class KeyWordSpotter:
     @staticmethod
     def _download_sherpa_onnx_model(model_path: Path):
         import shutil
+        import ssl
         import tarfile
         import urllib.request
         from urllib.error import URLError
@@ -101,7 +102,17 @@ class KeyWordSpotter:
             model_path.parent.mkdir(parents=True, exist_ok=True)
 
             print(f"[I] Downloading Sherpa-ONNX KWS model from {url}...")
-            urllib.request.urlretrieve(url, archive_path)
+
+            # SSL Certificate fix
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
+            with (
+                urllib.request.urlopen(url, context=ctx) as response,
+                open(archive_path, "wb") as out_file,
+            ):
+                shutil.copyfileobj(response, out_file)
 
             print("[I] Extracting model archive...")
             with tarfile.open(archive_path, "r:bz2") as tar:
