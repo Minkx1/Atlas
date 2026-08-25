@@ -23,8 +23,8 @@ def get_base_dir() -> Path:
             return exe_dir.parent
         return exe_dir
     return (
-        Path(__file__).resolve().parent.parent
-    )  # '/src/config.py'.parent.parent is '/'
+        Path(__file__).resolve().parent.parent.parent
+    )  # '/src/core/config.py'.parent.parent.parent is '/'
 
 
 BASE_DIR: Path = get_base_dir()
@@ -192,3 +192,5 @@ def load_config(config_path: str = "config/config.toml") -> AppConfig:
 
 # Global config object
 cfg = load_config()
+
+__all__ = ["BASE_DIR", "CONFIG_DIR", "DATA_DIR", "OS_NAME", "PLUGINS_DIR", "cfg"]

@@ -13,13 +13,8 @@ import sounddevice as sd
 import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
-if __name__ == "__main__":
-    from config import DATA_DIR, cfg
-    from events import EventType, emit_event, log
-else:
-    from .config import DATA_DIR, cfg
-    from .events import EventType, emit_event, log
-
+from ..core.config import DATA_DIR, cfg
+from ..core.events import EventType, emit_event, log
 
 VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"

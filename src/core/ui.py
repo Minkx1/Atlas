@@ -9,12 +9,8 @@ from textual.events import Resize
 from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
-if __name__ == "__main__":
-    from config import cfg
-    from events import Event, EventManager, EventType, emit_event, log
-else:
-    from .config import cfg
-    from .events import Event, EventManager, EventType, emit_event, log
+from .config import cfg
+from .events import Event, EventManager, EventType, emit_event, log
 
 
 class AudioWaveform(Static):

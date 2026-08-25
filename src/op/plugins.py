@@ -6,7 +6,7 @@ from pathlib import Path
 
 import tomllib
 
-from .events import EventType, emit_event, log
+from ..core.events import EventType, emit_event, log
 
 
 @dataclass

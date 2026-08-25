@@ -3,6 +3,8 @@
 import sys
 import time
 
+from ..op import CommandOperator, Llama, Operator, TextToSpeech
+from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, SRState
 from .config import cfg
 from .events import (
     EventLogger,
@@ -11,9 +13,6 @@ from .events import (
     emit_event,
     log,
 )
-from .global_operator import LLM, CommandOperator, Operator
-from .speech_to_text import KeyWordSpotter, Listener, LState, SpeechRecognizer
-from .text_to_speech import TextToSpeech
 
 # from .ui import AssistantUI, console
 from .ui import UI
@@ -48,8 +47,8 @@ class Atlas:
 
         # Operator
         self.cmd = CommandOperator()
-        self.llm = LLM()
-        self.operator = Operator(self.cmd, self.llm)
+        self.llama = Llama()
+        self.operator = Operator(self.cmd, self.llama)
 
         self._setup_subscriptions()
 
@@ -67,7 +66,7 @@ class Atlas:
             self.tts.load()
 
             self.cmd.load()
-            self.llm.load()
+            self.llama.load()
 
             log("All models loaded successfully.", "ATLAS", "SUCCESS")
         except Exception as e:
@@ -102,7 +101,7 @@ class Atlas:
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
         )
         em.subscribe(
-            EventType.STT_SET_STATE, lambda e: app.sr.set_state(LState(e.content))
+            EventType.STT_SET_STATE, lambda e: app.sr.set_state(SRState(e.content))
         )
         em.subscribe(
             EventType.STT_TRANSCRIBED,
@@ -160,10 +159,10 @@ class Atlas:
     def _main(self):
         self.load_models()
 
-        self.tts.start()
-        self.operator.start()
         self.sr.start()
         self.listener.start()
+        self.tts.start()
+        self.operator.start()
 
         emit_event(EventType.UI_BANNER)
 
@@ -171,7 +170,6 @@ class Atlas:
         self.ui.run()  # this blocks main thread
 
         # from threading import Event
-
         # while self.alive:
         #     Event().wait(1.0)
 

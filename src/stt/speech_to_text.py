@@ -7,148 +7,15 @@ import os
 import queue
 import time
 from collections import deque
-from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
 from threading import Thread
 from typing import Literal
 
 import numpy as np
-import sounddevice as sd
 
-if __name__ == "__main__":
-    from config import CONFIG_DIR, DATA_DIR, cfg
-    from events import EventManager, EventType, emit_event, log
-else:
-    from .config import CONFIG_DIR, DATA_DIR, cfg
-    from .events import EventManager, EventType, emit_event, log
-
-# should make downloading Whisper models from HF faster
-os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
-
-
-class KeyWordSpotter:
-    """Sherpa-ONNX Keyword Spotter model.
-
-    Usage:
-    ```python
-    kws = KeyWordSpotter()
-
-    kw = kws.process_chunk(audio_chunk)
-    if kw:
-        print("Keyword was detected: " + kw)
-    ```
-    """
-
-    def __init__(self):
-        path: Path = DATA_DIR / cfg.kws.model_dir
-        self.tokens = str(path / "tokens.txt")
-        self.encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
-        self.decoder = str(path / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx")
-        self.joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
-
-        if not os.path.exists(self.tokens):
-            log(
-                f"No Sherpa model in: {path}. Donwloading...",
-                source="KWS",
-                level="WARN",
-            )
-            self._download_sherpa_onnx_model(path)
-
-    def load(self):
-        import sherpa_onnx
-
-        try:
-            _start = time.perf_counter()
-
-            log("Loading Sherpa-ONNX KWS model...", "KWS", "INFO")
-            self.kws = sherpa_onnx.KeywordSpotter(
-                tokens=self.tokens,
-                encoder=self.encoder,
-                decoder=self.decoder,
-                joiner=self.joiner,
-                keywords_file=f"{CONFIG_DIR / cfg.kws.keywords_file}",
-                num_threads=cfg.kws.num_threads,
-                keywords_threshold=cfg.kws.score_threshold,
-                feature_dim=80,
-            )
-
-            self.stream = self.kws.create_stream()
-
-            elapsed = (time.perf_counter() - _start) * 1000
-            log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "SUCCESS")
-            emit_event(EventType.KWS_LOADED, f"{elapsed}ms")
-        except Exception as e:
-            log(
-                f"Error loading KWS model: {type(e).__name__}: {e}",
-                "KWS",
-                "ERROR",
-            )
-            raise
-
-    @staticmethod
-    def _download_sherpa_onnx_model(model_path: Path):
-        import shutil
-        import tarfile
-        import urllib.request
-        from urllib.error import URLError
-
-        url = (
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
-            "kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2"
-        )
-        archive_name = "sherpa_kws_temp.tar.bz2"
-        archive_path = model_path.parent / archive_name
-        extracted_folder_name = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
-        extracted_path = model_path.parent / extracted_folder_name
-
-        try:
-            model_path.parent.mkdir(parents=True, exist_ok=True)
-
-            print(f"[I] Downloading Sherpa-ONNX KWS model from {url}...")
-            urllib.request.urlretrieve(url, archive_path)
-
-            print("[I] Extracting model archive...")
-            with tarfile.open(archive_path, "r:bz2") as tar:
-                tar.extractall(path=model_path.parent)
-
-            if model_path.exists():
-                shutil.rmtree(model_path)
-            extracted_path.rename(model_path)
-
-            print(f"[I] Model successfully installed to {model_path}")
-
-        except (URLError, tarfile.TarError, OSError) as e:
-            if extracted_path.exists():
-                shutil.rmtree(extracted_path, ignore_errors=True)
-            raise RuntimeError(
-                f"[!] Failed to download or extract Sherpa-ONNX model: {e}"
-            ) from e
-        finally:
-            if archive_path.exists():
-                archive_path.unlink()
-
-    def process_chunk(self, chunk_np: np.ndarray) -> str | None:
-        """Processes audio chunk. If keyword was spotted: returns it. Else: returns None."""
-        if not hasattr(self, "kws"):
-            raise RuntimeError("KWS was used before kws.load()")
-
-        chunk_np = chunk_np.squeeze(1) if chunk_np.ndim > 1 else chunk_np
-        self.stream.accept_waveform(cfg.audio.sample_rate, chunk_np)
-        while self.kws.is_ready(self.stream):
-            self.kws.decode_stream(self.stream)
-            result = self.kws.get_result(self.stream)
-            if result:
-                keyword = result.strip()
-                self.reset()
-                emit_event(EventType.KWS_KEYWORD_DETECTED, keyword)
-                return keyword
-        return None
-
-    def reset(self):
-        if not hasattr(self, "kws"):
-            raise RuntimeError("KWS was used before kws.load()")
-        self.stream = self.kws.create_stream()
+from ..core.config import DATA_DIR, cfg
+from ..core.events import EventManager, EventType, emit_event, log
 
 
 class VAD:
@@ -278,6 +145,9 @@ class VAD:
 
 class Whisper:
     def __init__(self):
+        # should make downloading Whisper models from HF faster
+        os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
+
         w = cfg.stt
         self.model_dir: Path = DATA_DIR / w.download_root
 
@@ -334,7 +204,7 @@ class Whisper:
         return text, int((time.perf_counter() - start_time) * 1000)
 
 
-class LState(StrEnum):
+class SRState(StrEnum):
     SLEEPING = "SLEEPING"
     AWAKE = "AWAKE"
     RECORDING = "RECORDING"
@@ -355,9 +225,9 @@ class SpeechRecognizer:
         )
 
         if cfg.stt.start_state == "AWAKE":
-            self.state = LState.AWAKE
+            self.state = SRState.AWAKE
         else:
-            self.state = LState.SLEEPING
+            self.state = SRState.SLEEPING
 
         self.awake_deadline = 0.0
 
@@ -368,10 +238,10 @@ class SpeechRecognizer:
     def is_deadline_expired(self) -> bool:
         return time.monotonic() > self.awake_deadline
 
-    def set_state(self, new_state: LState, detail: str | None = None) -> None:
+    def set_state(self, new_state: SRState, detail: str | None = None) -> None:
         if self.state != new_state:
             self.state = new_state
-            if new_state == LState.AWAKE:
+            if new_state == SRState.AWAKE:
                 self.update_deadline()
 
             emit_event(EventType.STT_CHANGED_STATE, new_state.value)
@@ -388,7 +258,7 @@ class SpeechRecognizer:
         em = EventManager()
         em.subscribe(
             EventType.KWS_KEYWORD_DETECTED,
-            lambda e: self.set_state(LState.AWAKE, f"Keyword: '{e.content}'"),
+            lambda e: self.set_state(SRState.AWAKE, f"Keyword: '{e.content}'"),
         )
 
     def start(self) -> None:
@@ -427,14 +297,14 @@ class SpeechRecognizer:
                 )
 
                 emit_event(EventType.STT_TRANSCRIBED, text)
-                self.set_state(LState.WAITING)
+                self.set_state(SRState.WAITING)
 
             self.audio_queue.task_done()
 
     def process(self, raw_chunk: np.ndarray) -> None:
         chunk = raw_chunk.squeeze(1) if raw_chunk.ndim > 1 else raw_chunk
 
-        self.preroll.append(chunk.copy()) if self.state != LState.WAITING else ...
+        self.preroll.append(chunk.copy()) if self.state != SRState.WAITING else ...
 
         match self.state.value:
             case "WAITING":
@@ -455,12 +325,12 @@ class SpeechRecognizer:
 
                     self.buffer.clear()
                     self.update_deadline()
-                    self.set_state(LState.AWAKE)
+                    self.set_state(SRState.AWAKE)
 
             case "AWAKE":
                 if self.is_deadline_expired():
                     self.set_state(
-                        LState.SLEEPING,
+                        SRState.SLEEPING,
                         detail=f"Timeout ({int(cfg.stt.awake_timeout)}s)",
                     )
                     return
@@ -468,71 +338,4 @@ class SpeechRecognizer:
                 vad_state = self.vad.process(chunk)
                 if vad_state == "start":
                     self.buffer = list(self.preroll)
-                    self.set_state(LState.RECORDING)
-
-
-class Listener:
-    def __init__(self, chunk_processor: Callable[[np.ndarray]]) -> None:
-        self.processor = chunk_processor
-        self.audio_input_thread = Thread(
-            target=self._audio_input, name="LISTENER_INPUT_THREAD", daemon=True
-        )
-
-        self._running = False
-        self._is_muted = False
-
-        self._last_wave_emit = 0.0
-        self._wave_fps_interval = 0.04  # passing audio wave data to UI
-
-    def _audio_input(self):
-        try:
-            with sd.InputStream(
-                samplerate=cfg.audio.sample_rate,
-                channels=cfg.audio.channels,
-                blocksize=cfg.audio.blocksize,
-                dtype=cfg.audio.dtype,
-            ) as stream:
-                while self._running:
-                    indata, _ = stream.read(cfg.audio.blocksize)
-
-                    if not self._is_muted:
-                        try:
-                            self.processor(indata)
-
-                            now = time.monotonic()
-                            if now - self._last_wave_emit >= self._wave_fps_interval:
-                                self._last_wave_emit = now
-                                audio_mono = indata[:, 0] if indata.ndim > 1 else indata
-                                rms = float(np.sqrt(np.mean(audio_mono**2)))
-                                emit_event(EventType.STT_AUDIOWAVE, rms)
-                        except Exception as e:
-                            log(
-                                f"Error processing audio chunk: {e}",
-                                "LISTENER",
-                                "ERROR",
-                            )
-                            raise
-
-        except Exception as e:
-            log(f"Microphone input error: {e}", "LISTENER", "ERROR")
-            raise
-
-    def start(self):
-        self._running = True
-        emit_event(EventType.STT_START)
-
-        self.audio_input_thread.start()
-
-    def mute(self):
-        self._is_muted = True
-
-    def unmute(self):
-        self._is_muted = False
-
-    def close(self):
-        self._running = False
-
-        if self.audio_input_thread is not None and self.audio_input_thread.is_alive():
-            self.audio_input_thread.join(timeout=2.0)
-
-        emit_event(EventType.STT_FINISH)
+                    self.set_state(SRState.RECORDING)
