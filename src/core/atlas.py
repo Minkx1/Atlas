@@ -4,7 +4,7 @@ import sys
 import time
 
 from ..op import CommandOperator, Llama, Operator, TextToSpeech
-from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, SRState
+from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
 from .config import cfg
 from .events import (
     EventLogger,
@@ -35,10 +35,14 @@ class Atlas:
         # STT Pipeline
         self.kws = KeyWordSpotter()
         self.sr = SpeechRecognizer()
+        self.sm = StateMachine()
 
         def audio_process(audio_chunk):
             self.kws.process_chunk(audio_chunk)
-            self.sr.process(audio_chunk)
+            self.sm.update()
+
+            allow_rec = self.sm.allow_speech_recognition()
+            self.sr.process(audio_chunk, allow_rec)
 
         self.listener = Listener(audio_process)
 
@@ -94,14 +98,22 @@ class Atlas:
         # subscribing to STT_CHANGED_STATE:SLEEPING to KWS reset
         em.subscribe(
             EventType.STT_CHANGED_STATE,
-            lambda e: self.kws.reset() if e.content == "SLEEPING" else None,
+            lambda e: app.kws.reset() if e.content == "SLEEPING" else None,
         )
         em.subscribe(
             EventType.KWS_KEYWORD_DETECTED,
             lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
         )
         em.subscribe(
-            EventType.STT_SET_STATE, lambda e: app.sr.set_state(SRState(e.content))
+            EventType.KWS_KEYWORD_DETECTED,
+            lambda e: app.sm.set_state(State.AWAKE, f"Keyword: '{e.content}'"),
+        )
+
+        em.subscribe(EventType.VAD_START, lambda e: app.sm.set_state(State.RECORDING))
+        em.subscribe(EventType.VAD_END, lambda e: app.sm.set_state(State.AWAKE))
+
+        em.subscribe(
+            EventType.STT_SET_STATE, lambda e: app.sm.set_state(State(e.content))
         )
         em.subscribe(
             EventType.STT_TRANSCRIBED,

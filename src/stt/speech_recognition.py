@@ -7,7 +7,6 @@ import os
 import queue
 import time
 from collections import deque
-from enum import StrEnum
 from pathlib import Path
 from threading import Thread
 from typing import Literal
@@ -15,7 +14,7 @@ from typing import Literal
 import numpy as np
 
 from ..core.config import DATA_DIR, cfg
-from ..core.events import EventManager, EventType, emit_event, log
+from ..core.events import EventType, emit_event, log
 
 
 class VAD:
@@ -204,13 +203,6 @@ class Whisper:
         return text, int((time.perf_counter() - start_time) * 1000)
 
 
-class SRState(StrEnum):
-    SLEEPING = "SLEEPING"
-    AWAKE = "AWAKE"
-    RECORDING = "RECORDING"
-    WAITING = "WAITING"
-
-
 class SpeechRecognizer:
     def __init__(self):
         self.vad = VAD()
@@ -220,46 +212,17 @@ class SpeechRecognizer:
         self.buffer: list[np.ndarray] = []
         self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
+        self._recording = False
+        self.sample_rate = cfg.audio.sample_rate
+        self.min_command_ms = cfg.stt.min_command_ms
+
         self.stt_worker_thread = Thread(
             target=self._stt_worker, name="STT_WORKER_THREAD", daemon=True
         )
 
-        if cfg.stt.start_state == "AWAKE":
-            self.state = SRState.AWAKE
-        else:
-            self.state = SRState.SLEEPING
-
-        self.awake_deadline = 0.0
-
-    def update_deadline(self) -> None:
-        """Updates deadline when needed, so it is not reached during talking or processing."""
-        self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
-
-    def is_deadline_expired(self) -> bool:
-        return time.monotonic() > self.awake_deadline
-
-    def set_state(self, new_state: SRState, detail: str | None = None) -> None:
-        if self.state != new_state:
-            self.state = new_state
-            if new_state == SRState.AWAKE:
-                self.update_deadline()
-
-            emit_event(EventType.STT_CHANGED_STATE, new_state.value)
-
-            payload = {"state": new_state.value}
-            if detail:
-                payload["detail"] = detail
-            emit_event(EventType.UI_STATE_CHANGE, payload)
-
     def load(self):
         self.vad.load()
         self.whisper.load()
-
-        em = EventManager()
-        em.subscribe(
-            EventType.KWS_KEYWORD_DETECTED,
-            lambda e: self.set_state(SRState.AWAKE, f"Keyword: '{e.content}'"),
-        )
 
     def start(self) -> None:
         self.stt_worker_thread.start()
@@ -297,45 +260,40 @@ class SpeechRecognizer:
                 )
 
                 emit_event(EventType.STT_TRANSCRIBED, text)
-                self.set_state(SRState.WAITING)
 
             self.audio_queue.task_done()
 
-    def process(self, raw_chunk: np.ndarray) -> None:
+    def process(self, raw_chunk: np.ndarray, allow_recording: bool):
         chunk = raw_chunk.squeeze(1) if raw_chunk.ndim > 1 else raw_chunk
 
-        self.preroll.append(chunk.copy()) if self.state != SRState.WAITING else ...
+        self.preroll.append(chunk.copy())
+        vad_state = self.vad.process(chunk)
 
-        match self.state.value:
-            case "WAITING":
-                self.update_deadline()
-                return
-            case "SLEEPING":
-                return
-            case "RECORDING":
-                self.buffer.append(chunk)
-                vad_state = self.vad.process(chunk)
-                if vad_state == "end":
-                    if self.buffer:
-                        full_audio = np.concatenate(self.buffer)
-                        listen_ms = (len(full_audio) / cfg.audio.sample_rate) * 1000.0
+        if not allow_recording:
+            if self._recording:
+                self._recording = False
+                self.buffer.clear()
+            return vad_state
 
-                        if listen_ms > cfg.stt.min_command_ms:
-                            self.audio_queue.put((full_audio, listen_ms))
+        if vad_state == "start":
+            self._recording = True
+            self.buffer = list(self.preroll)
+            emit_event(EventType.VAD_START)
 
-                    self.buffer.clear()
-                    self.update_deadline()
-                    self.set_state(SRState.AWAKE)
+        elif vad_state == "speaking" and self._recording:
+            self.buffer.append(chunk)
 
-            case "AWAKE":
-                if self.is_deadline_expired():
-                    self.set_state(
-                        SRState.SLEEPING,
-                        detail=f"Timeout ({int(cfg.stt.awake_timeout)}s)",
-                    )
-                    return
+        elif vad_state == "end" and self._recording:
+            self._recording = False
+            self.buffer.append(chunk)
+            if self.buffer:
+                full_audio = np.concatenate(self.buffer)
+                listen_ms = (len(full_audio) / self.sample_rate) * 1000.0
 
-                vad_state = self.vad.process(chunk)
-                if vad_state == "start":
-                    self.buffer = list(self.preroll)
-                    self.set_state(SRState.RECORDING)
+                if listen_ms > self.min_command_ms:
+                    self.audio_queue.put((full_audio, listen_ms))
+
+            self.buffer.clear()
+            emit_event(EventType.VAD_END)
+
+        return vad_state
