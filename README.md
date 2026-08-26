@@ -1,5 +1,17 @@
 # Atlas
 
+<p align="center">
+  <img src="docs/assets/atlas.svg" alt="Atlas Logo" width="200">
+</p>
+
+<h1 align="center">Atlas</h1>
+
+<p align="center">
+  <em>A fast, AI-powered, fully offline voice assistant.</em>
+</p>
+
+---
+
 [![Release](https://img.shields.io/github/v/release/Minkx1/Atlas?color=success)](https://github.com/Minkx1/Atlas/releases)
 [![License](https://img.shields.io/github/license/Minkx1/Atlas)](https://github.com/Minkx1/Atlas/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
