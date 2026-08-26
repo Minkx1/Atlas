@@ -1,6 +1,7 @@
 # text_to_speech.py
 
 import json
+import math
 import queue
 import threading
 import time
@@ -8,6 +9,7 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import scipy.signal
 import sounddevice as sd
 import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
@@ -165,10 +167,43 @@ class TextToSpeech:
                 )
 
                 samplerate = audio_chunks[0].sample_rate
+
+                target_sr = 48000
+                if samplerate != target_sr:
+                    gcd = math.gcd(target_sr, samplerate)
+                    audio_array = scipy.signal.resample_poly(
+                        audio_array, target_sr // gcd, samplerate // gcd
+                    )
+                    samplerate = target_sr
+
                 silence = np.zeros(
                     int(samplerate * cfg.tts.silence_duration), dtype=audio_array.dtype
                 )
                 padded_audio = np.concatenate((silence, audio_array))
+
+                log(
+                    f"PortAudio library: {getattr(sd, '_libname', 'unknown')}",
+                    "TTS",
+                    "INFO",
+                )
+
+                log(
+                    f"Default device: {sd.default.device}",
+                    "TTS",
+                    "INFO",
+                )
+
+                log(
+                    f"Default samplerate: {sd.default.samplerate}",
+                    "TTS",
+                    "INFO",
+                )
+
+                # log(
+                #     f"Devices:\n{sd.query_devices()}",
+                #     "TTS",
+                #     "INFO",
+                # )
 
                 sd.play(padded_audio, samplerate=samplerate)
                 sd.wait()
@@ -219,6 +254,33 @@ class TextToSpeech:
         try:
             log(f"Playing audio: {path.name}", "TTS", "DEBUG")
             audio, samplerate = sf.read(path)
+
+            target_sr = 48000  # Стандартна частота, яку з'їсть будь-яка ОС
+            if samplerate != target_sr:
+                gcd = math.gcd(target_sr, samplerate)
+                up = target_sr // gcd
+                down = samplerate // gcd
+
+                axis = 0 if audio.ndim > 1 else -1
+                audio = scipy.signal.resample_poly(audio, up, down, axis=axis)
+                samplerate = target_sr
+
+            log(
+                f"Audio: {path.name}, shape={audio.shape}, dtype={audio.dtype}, sr={samplerate}",
+                "TTS",
+                "INFO",
+            )
+
+            log(
+                f"Output device: {sd.default.device}",
+                "TTS",
+                "INFO",
+            )
+
+            sd.check_output_settings(
+                samplerate=samplerate,
+                channels=audio.shape[1] if audio.ndim > 1 else 1,
+            )
 
             if audio.ndim > 1:  # if stereo file
                 silence = np.zeros(
