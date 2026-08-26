@@ -1,3 +1,9 @@
+## v0.4.8 (2026-08-26)
+
+### Fix
+
+- Added audio-resampling for TTS
+
 ## v0.4.7 (2026-08-26)
 
 ### Fix
