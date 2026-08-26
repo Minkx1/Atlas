@@ -137,12 +137,9 @@ class CommandOperator:
 
         if not intent:
             return None, None
-        elif intent.startswith("!"):  # user command
-            self.exec_user(intent, cmd)
-            return "user", None
-        else:
-            payload = self.exec_command(intent)
-            return "command", payload
+
+        payload = self.exec_command(intent)
+        return "command", payload
 
     def _detect_intent(self, cmd_clean: str) -> str | None:
         if not cmd_clean:
@@ -284,6 +281,3 @@ class CommandOperator:
 
         log(f"No sounds available for category: {category}", "OP", "WARN")
         return None
-
-    def exec_user(self, intent: str, cmd: str) -> bool:
-        return False

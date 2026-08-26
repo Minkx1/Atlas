@@ -30,7 +30,7 @@ class PluginManifest:
             id=plugin["id"],
             description=plugin.get("description", "Unknown."),
             triggers=plugin.get("triggers", []),
-            timeout=plugin.get("timeout", 0.0),
+            timeout=execution.get("timeout", 0.0),
             exec_type=execution.get("type", "binary"),
             exec_file=execution.get("file", ""),
         )

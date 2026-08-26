@@ -7,8 +7,8 @@ triggers = [
     "what time is it",
     "whats on the clock",
 ]
-timeout = 5.0
 
 [execution]
 type = "python"  # "binary" | "python" | "script"
 file = "main.py"
+timeout = 5.0
