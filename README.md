@@ -4,8 +4,6 @@
   <img src="docs/assets/atlas.svg" alt="Atlas Logo" width="200">
 </p>
 
-<h1 align="center">Atlas</h1>
-
 <p align="center">
   <em>A fast, AI-powered, fully offline voice assistant.</em>
 </p>
