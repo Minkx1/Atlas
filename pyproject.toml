@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 authors = [{ name = "Minkx1", email = "zakalata.mark@gmail.com" }]
 dependencies = [
     "numpy",
+    "scipy",
     "onnxruntime",
     "tokenizers",
     "textual",
