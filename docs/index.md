@@ -2,6 +2,14 @@
 
 **Atlas** is a fast, AI-powered, fully offline voice assistant. It was built with one primary goal: to provide a smart, low-latency assistant that respects your privacy and integrates deeply with your operating system.
 
+## Philosophy
+
+Atlas is built on **three core principles** to serve as a truly useful voice assistant:
+
+- **Fast**: Achieves sub-second response times (500–1000 ms) for instant, natural interaction without network lag.
+- **Personal**: Operates 100% offline with complete user control over plugins, triggers, permissions, and privacy.
+- **Assistant**: Acts as an intelligent system executor that retains context and handles complex local workflows instead of just matching basic keywords.
+
 ## How it Works
 
 Atlas operates entirely on your local machine using an optimized pipeline of AI models:
