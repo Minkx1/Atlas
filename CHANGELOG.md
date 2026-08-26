@@ -1,3 +1,9 @@
+## v0.4.6 (2026-08-26)
+
+### Refactor
+
+- **Plugin**: Moved plugin 'timeout' from [plugin] to [execution], style changes to CMD_OP
+
 ## v0.4.5 (2026-08-25)
 
 ### Fix
