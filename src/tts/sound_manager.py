@@ -108,6 +108,10 @@ class SoundManager:
         emit_event(EventType.TTS_BUSY)
         self.play_audio(payload)
 
+    def interrupt(self) -> None:
+        """Stops sound playback."""
+        sd.stop()
+
     def _get_current_state(self) -> dict:
         """Returns structured dict of current TTS settings and formatted sounds."""
         c = cfg.tts

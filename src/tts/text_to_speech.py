@@ -156,6 +156,15 @@ class TextToSpeech:
 
             self.queue.task_done()
 
+    def interrupt(self) -> None:
+        """Stops current playback and clears the TTS queue."""
+        log("TTS Interrupted!", "TTS", "INFO")
+        with self.queue.mutex:
+            self.queue.queue.clear()
+
+        sd.stop()
+        self._set_busy(False)
+
     def _set_busy(self, value: bool) -> None:
         emit_event(EventType.TTS_BUSY) if value == True else emit_event(
             EventType.TTS_FREE
