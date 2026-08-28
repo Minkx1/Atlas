@@ -1,9 +1,9 @@
+#
 # text_to_speech.py
+#
 
-import json
 import math
 import queue
-import random
 import threading
 import time
 import wave

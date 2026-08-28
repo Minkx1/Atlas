@@ -227,10 +227,10 @@ class UI(App):
             with Container(id="central-panel") as center:
                 center.border_title = "STATUS"
                 logo = r"""[#00d7ff]
-   ___    __  __           
-  /   |  / / / /___ ______ 
- / /| | / __/ / __ `/ ___/ 
-/ ___ |/ /_/ / /_/ (__  )  
+    ___    __  __           
+   /   |  / / / /___ ______ 
+  / /| | / __/ / __ `/ ___/ 
+ / ___ |/ /_/ / /_/ (__  )  
 /_/  |_|\__/_/\__,_/____/  
 [/#00d7ff]"""
                 yield Static(logo, id="image-box")

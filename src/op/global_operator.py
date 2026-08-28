@@ -8,7 +8,7 @@ import re
 import threading
 import time
 
-from ..core.events import EventType, emit_event, wait_for
+from ..core.events import EventType, emit_event
 from .cmd_operator import CommandOperator
 from .llama import Llama
 
