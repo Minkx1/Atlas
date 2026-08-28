@@ -6,13 +6,6 @@ from collections.abc import Callable
 
 from pynput import keyboard
 
-_MAIN = __name__ == "__main__"
-
-if _MAIN:
-    from events import log
-else:
-    from .events import log
-
 
 class KeyBindManager:
     def __init__(self) -> None:
