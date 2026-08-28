@@ -13,6 +13,7 @@ dependencies = [
     "hf_xet",
     "textual",
     "rich",
+    "pynput",
     "sounddevice",
     "soundfile",
     "faster-whisper",
