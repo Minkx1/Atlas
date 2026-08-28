@@ -25,6 +25,10 @@ else:
     from core.events import EventType, emit_event, log
 
 
+# disables HF warning on Windows
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
+
 class VAD:
     def __init__(self) -> None:
         self.is_speaking = False
