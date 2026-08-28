@@ -1,3 +1,9 @@
+## v0.4.9 (2026-08-28)
+
+### Refactor
+
+- Complete refactor of OP -> TTS pipeline and other general things
+
 ## v0.4.8 (2026-08-26)
 
 ### Fix
