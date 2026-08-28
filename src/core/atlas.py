@@ -14,6 +14,7 @@ from .events import (
     emit_event,
     log,
 )
+from .keybinds import KeyBindManager
 
 # from .ui import AssistantUI, console
 from .ui import UI
@@ -32,6 +33,12 @@ class Atlas:
                 f" ===== New Session: [{time.strftime('%H:%M:%S', time.localtime(time.time()))}] | SUCCESS ===== \n",
                 time.time(),
             )
+
+        self.keybinds = KeyBindManager()
+        self.keybinds.register_keybind(
+            cfg.kws.awake_keybind,
+            lambda: emit_event(EventType.KWS_KEYWORD_DETECTED, "{HotKey}"),
+        )
 
         # STT Pipeline
         self.kws = KeyWordSpotter()
@@ -161,6 +168,8 @@ class Atlas:
         try:
             log("Shutting down assistant...", "ATLAS", "INFO")
 
+            self.keybinds.close()
+
             if getattr(self, "listener", None):
                 self.listener.close()
                 log("Listener closed.", "ATLAS", "DEBUG")
@@ -203,6 +212,7 @@ class Atlas:
     def _main(self):
         self.load_models()
 
+        self.keybinds.start()
         self.sr.start()
         self.listener.start()
         self.tts.start()

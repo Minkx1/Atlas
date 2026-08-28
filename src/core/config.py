@@ -46,6 +46,7 @@ class AudioConfig:
 
 @dataclass
 class KWSConfig:
+    awake_keybind: str = "<ctrl>+<alt>+w"
     model_dir: str = "models/sherpa_onnx_kws"  # DATA_DIR / "keywords.txt"
     keywords_file: str = "keywords.txt"  # DATA_DIR / "keywords.txt"
     num_threads: int = 1
