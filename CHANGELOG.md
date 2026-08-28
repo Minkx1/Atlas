@@ -1,3 +1,9 @@
+## v0.4.10 (2026-08-28)
+
+### Fix
+
+- Fixed Windows symlink warning from HF Hub
+
 ## v0.4.9 (2026-08-28)
 
 ### Refactor
