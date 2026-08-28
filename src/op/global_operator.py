@@ -101,9 +101,9 @@ class Operator:
 
         try:
             emit_event(EventType.STT_SET_STATE, "WAITING")
-            res_type, payload = self.cmd.operate(text)
+            res_type = self.cmd.operate(text)
 
-            if res_type == "command" and payload is not None:
+            if res_type == "command":
                 self.tts_engaged = True
 
             if not res_type:  # LLM
@@ -113,7 +113,8 @@ class Operator:
                     self._stream_llm_response(text)
 
         finally:
-            if self.tts_engaged:
-                wait_for(EventType.TTS_FREE)
-            emit_event(EventType.STT_SET_STATE, "AWAKE")
-            emit_event(EventType.OP_READY)
+            ...
+        #     if self.tts_engaged:
+        #         wait_for(EventType.TTS_FREE)
+        #     emit_event(EventType.STT_SET_STATE, "AWAKE")
+        #     emit_event(EventType.OP_READY)

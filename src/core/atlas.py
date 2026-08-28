@@ -3,8 +3,9 @@
 import sys
 import time
 
-from ..op import CommandOperator, Llama, Operator, TextToSpeech
+from ..op import CommandOperator, Llama, Operator
 from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
+from ..tts import SoundManager, TextToSpeech
 from .config import cfg
 from .events import (
     EventLogger,
@@ -38,7 +39,9 @@ class Atlas:
         self.sm = StateMachine()
 
         def audio_process(audio_chunk):
-            self.kws.process_chunk(audio_chunk)
+            kw = self.kws.process_chunk(audio_chunk)
+            if kw:
+                emit_event(EventType.KWS_KEYWORD_DETECTED, kw)
             self.sm.update()
 
             allow_rec = self.sm.allow_speech_recognition()
@@ -47,6 +50,7 @@ class Atlas:
         self.listener = Listener(audio_process)
 
         # TTS
+        self.sound_manager = SoundManager()
         self.tts = TextToSpeech()
 
         # Operator
@@ -68,6 +72,7 @@ class Atlas:
             self.sr.load()
 
             self.tts.load()
+            self.sound_manager.load()
 
             self.cmd.load()
             self.llama.load()
@@ -88,11 +93,28 @@ class Atlas:
 
         # TTS
         em.subscribe(EventType.TTS_SPEAK, lambda e: app.tts.speak(e.content))
-        em.subscribe(EventType.TTS_PLAY_SOUND, lambda e: app.tts.play_sound(e.content))
+        em.subscribe(
+            EventType.TTS_TEXT_TO_FILE, lambda e: app.tts._text_to_file(**e.content)
+        )
+        em.subscribe(
+            EventType.SM_PLAY_SOUND, lambda e: app.sound_manager.play_sound(e.content)
+        )
+        em.subscribe(
+            EventType.SM_PLAY_CATEGORY,
+            lambda e: app.sound_manager.play_category(e.content),
+        )
 
-        em.subscribe(EventType.TTS_BUSY, lambda e: app.listener.mute())
-        em.subscribe(EventType.TTS_FREE, lambda e: app.listener.unmute())
-        em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_CONTINUE))
+        em.subscribe(EventType.TTS_BUSY, lambda e: emit_event(EventType.STT_MUTE))
+        em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_UNMUTE))
+
+        em.subscribe(EventType.STT_MUTE, lambda e: app.listener.mute())
+
+        def handle_unmute(e):
+            app.listener.unmute()
+            app.sm.update_deadline()
+            emit_event(EventType.STT_SET_STATE, "AWAKE")
+
+        em.subscribe(EventType.STT_UNMUTE, handle_unmute)
 
         # STT
         # subscribing to STT_CHANGED_STATE:SLEEPING to KWS reset
@@ -123,7 +145,6 @@ class Atlas:
         # OP
         em.subscribe(EventType.OP_ASK_FINISH, lambda e: app._shutdown())
         em.subscribe(EventType.OP_RECEIVE_CMD, lambda e: app.operator.submit(e.content))
-        em.subscribe(EventType.OP_READY, lambda e: emit_event(EventType.STT_CONTINUE))
 
     def _close(self):
         try:

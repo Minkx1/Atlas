@@ -3,13 +3,21 @@
 #
 
 import os
+import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
-from ..core.config import CONFIG_DIR, DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.config import CONFIG_DIR, DATA_DIR, cfg
+    from ..core.events import EventType, emit_event, log
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.config import CONFIG_DIR, DATA_DIR, cfg
+    from core.events import EventType, emit_event, log
 
 
 class KeyWordSpotter:
@@ -63,8 +71,8 @@ class KeyWordSpotter:
                 decoder=self.decoder,
                 joiner=self.joiner,
                 keywords_file=f"{self.keywords_file}",
-                num_threads=cfg.kws.num_threads,
-                keywords_threshold=cfg.kws.score_threshold,
+                num_threads=self.num_threads,
+                keywords_threshold=self.keywords_threshold,
                 feature_dim=80,
             )
 
@@ -147,7 +155,6 @@ class KeyWordSpotter:
             if result:
                 keyword = result.strip()
                 self.reset()
-                emit_event(EventType.KWS_KEYWORD_DETECTED, keyword)
                 return keyword
         return None
 
@@ -155,3 +162,7 @@ class KeyWordSpotter:
         if not hasattr(self, "kws"):
             raise RuntimeError("KWS was used before kws.load()")
         self.stream = self.kws.create_stream()
+
+
+if _MAIN:
+    print("Testing 'KWS' module...")

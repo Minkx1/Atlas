@@ -2,12 +2,20 @@
 #  state_machine.py
 #
 
+import sys
 import time
 from enum import StrEnum
-from typing import Literal
+from pathlib import Path
 
-from ..core.config import cfg
-from ..core.events import EventType, emit_event
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.config import cfg
+    from ..core.events import EventType, emit_event
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.config import cfg
+    from core.events import EventType, emit_event
 
 
 class State(StrEnum):
@@ -61,3 +69,7 @@ class StateMachine:
 
     def allow_speech_recognition(self) -> bool:
         return self.state not in {State.WAITING, State.SLEEPING}
+
+
+if _MAIN:
+    ...

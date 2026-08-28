@@ -2,6 +2,7 @@
 #  sentence_transformer.py
 #
 
+import sys
 from pathlib import Path
 from urllib.error import URLError
 
@@ -9,8 +10,15 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from ..core.config import DATA_DIR
-from ..core.events import log
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.config import DATA_DIR
+    from ..core.events import log
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.config import DATA_DIR
+    from core.events import log
 
 
 class ONNXSentenceTransformer:
@@ -119,3 +127,7 @@ class ONNXSentenceTransformer:
             return embeddings[0]
 
         return embeddings
+
+
+if _MAIN:
+    ...

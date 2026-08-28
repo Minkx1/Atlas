@@ -1,13 +1,22 @@
+import sys
 import time
 from collections.abc import Callable
+from pathlib import Path
 from threading import Thread
 
 import numpy as np
 import sounddevice as sd
 from scipy.signal import resample_poly
 
-from ..core.config import cfg
-from ..core.events import EventType, emit_event, log
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.config import cfg
+    from ..core.events import EventType, emit_event, log
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.config import cfg
+    from core.events import EventType, emit_event, log
 
 
 class Listener:
@@ -131,3 +140,7 @@ class Listener:
             self.audio_input_thread.join(timeout=2.0)
 
         emit_event(EventType.STT_FINISH)
+
+
+if _MAIN:
+    ...

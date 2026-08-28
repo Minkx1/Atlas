@@ -1,4 +1,3 @@
-import random
 import re
 import threading
 import time
@@ -18,16 +17,7 @@ class CommandOperator:
         self.commands: dict[str, dict[str, list[dict[str, str]] | list[str]]] = {}
         self.plugins: dict[str, Plugin] = {}
 
-        self.triggers: dict[str, list[str]] = {
-            "llm_query": [
-                "what is",
-                "how to",
-                "tell me about",
-                "explain",
-                "write a code",
-                "can you",
-            ],
-        }
+        self.triggers: dict[str, list[str]] = {}
 
         self.intent_threshold = 0.60
         self.margin = 0.05
@@ -120,26 +110,26 @@ class CommandOperator:
     def _eval_cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
         return float(np.dot(vec1, vec2))
 
-    def operate(self, cmd: str) -> tuple[str | None, dict | None]:
-        """Returns tuple: (command_type, payload)"""
+    def operate(self, cmd: str) -> str | None:
+        """Returns tuple: command_type"""
         self.history.append(cmd)
 
         if cmd == "!EVENT_KEYWORD_DETECTED":
             log("Keyword detected directly!", "OP", "DEBUG")
-            payload = self.exec_command("greet")
-            return "command", payload
+            self.exec_command("greet")
+            return "command"
 
         cmd_clean = re.sub(r"[^\w\s]", "", cmd.lower()).strip()
         if not cmd_clean:
-            return None, None
+            return None
 
         intent = self._detect_intent(cmd_clean)
 
         if not intent:
-            return None, None
+            return None
 
-        payload = self.exec_command(intent)
-        return "command", payload
+        self.exec_command(intent)
+        return "command"
 
     def _detect_intent(self, cmd_clean: str) -> str | None:
         if not cmd_clean:
@@ -218,66 +208,12 @@ class CommandOperator:
             ).start()
             return None
 
-        payload = self._play_random_sound(intent)
+        self._play_random_sound(intent)
 
         if intent == "farewell":
             emit_event(EventType.OP_ASK_FINISH)
         elif intent == "sleep":
             emit_event(EventType.STT_SET_STATE, "SLEEPING")
 
-        return payload
-
-    def _play_random_sound(self, category: str) -> dict[str, str | None] | None:
-        conf = self.commands.get(category, {})
-        sounds = conf.get("sounds", [])
-
-        log(
-            f"Fetching sound for '{category}'.",
-            "OP",
-            "DEBUG",
-        )
-
-        if isinstance(sounds, list) and sounds:
-            sound = random.choice(sounds)
-
-            path_str = ""
-            text_str = ""
-
-            if isinstance(sound, dict):
-                path_str = sound.get("path", "")
-                text_str = sound.get("text", "")
-            elif isinstance(sound, str):
-                path_str = sound
-            else:
-                log(
-                    f"Invalid sound type in config for '{category}': {type(sound)}",
-                    "OP",
-                    "WARN",
-                )
-
-            if text_str:
-                try:
-                    text_str = text_str.format(username=cfg.username, name=cfg.name)
-                except KeyError as e:
-                    log(
-                        f"Formatting text failed for sound '{text_str}': Missing key {e}",
-                        "OP",
-                        "DEBUG",
-                    )
-
-            if path_str:
-                path = Path(path_str)
-                if not path.is_absolute():
-                    path = DATA_DIR / "sounds" / path
-
-                log(
-                    f"Playing sound payload: {path_str} | text: {text_str}",
-                    "OP",
-                    "DEBUG",
-                )
-                payload = {"path": str(path), "text": text_str if text_str else None}
-                emit_event(EventType.TTS_PLAY_SOUND, payload)
-                return payload
-
-        log(f"No sounds available for category: {category}", "OP", "WARN")
-        return None
+    def _play_random_sound(self, category: str):
+        emit_event(EventType.SM_PLAY_CATEGORY, category)

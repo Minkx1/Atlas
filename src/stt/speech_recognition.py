@@ -5,6 +5,7 @@
 
 import os
 import queue
+import sys
 import time
 from collections import deque
 from pathlib import Path
@@ -13,8 +14,15 @@ from typing import Literal
 
 import numpy as np
 
-from ..core.config import DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.config import DATA_DIR, cfg
+    from ..core.events import EventType, emit_event, log
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.config import DATA_DIR, cfg
+    from core.events import EventType, emit_event, log
 
 
 class VAD:
@@ -309,3 +317,7 @@ class SpeechRecognizer:
             emit_event(EventType.VAD_END)
 
         return vad_state
+
+
+if _MAIN:
+    ...

@@ -1,12 +1,19 @@
 import json
 import subprocess
+import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import tomllib
 
-from ..core.events import EventType, emit_event, log
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.events import EventType, emit_event, log
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.events import EventType, emit_event, log
 
 
 @dataclass
@@ -155,3 +162,7 @@ class Plugin:
                 "PLUGIN",
                 "WARN",
             )
+
+
+if _MAIN:
+    ...

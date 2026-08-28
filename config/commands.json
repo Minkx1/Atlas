@@ -354,5 +354,16 @@
                 "text": "Command not recognized."
             }
         ]
+    },
+    "llm_query": {
+        "triggers": [
+            "what is",
+            "how to",
+            "tell me about",
+            "explain",
+            "write a code",
+            "can you"
+        ],
+        "sounds": []
     }
 }

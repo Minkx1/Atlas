@@ -3,12 +3,21 @@
 #
 
 import os
+import sys
 import time
+from pathlib import Path
 
 import llama_cpp
 
-from ..core.config import DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+_MAIN = __name__ == "__main__"
+if not _MAIN:
+    from ..core.config import DATA_DIR, cfg
+    from ..core.events import EventType, emit_event, log
+else:
+    # changing execution dir to src/ for proper importing
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from core.config import DATA_DIR, cfg
+    from core.events import EventType, emit_event, log
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -175,3 +184,7 @@ class Llama:
 
     def __del__(self):
         self.close()
+
+
+if _MAIN:
+    ...
