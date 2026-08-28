@@ -30,7 +30,6 @@ class Listener:
         )
 
         self._running = False
-        self._is_muted = False
 
         self._last_wave_emit = 0.0
         self._wave_fps_interval = 0.04
@@ -86,9 +85,6 @@ class Listener:
                 while self._running:
                     indata, _ = stream.read(cfg.audio.blocksize)
 
-                    if self._is_muted:
-                        continue
-
                     try:
                         if input_sr != target_sr:
                             audio = resample_poly(
@@ -126,12 +122,6 @@ class Listener:
         self._running = True
         emit_event(EventType.STT_START)
         self.audio_input_thread.start()
-
-    def mute(self):
-        self._is_muted = True
-
-    def unmute(self):
-        self._is_muted = False
 
     def close(self):
         self._running = False

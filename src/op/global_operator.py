@@ -23,6 +23,8 @@ class Operator:
             target=self._operator_worker, name="OPERATOR_THREAD", daemon=True
         )
 
+        self.interrupt_flag = threading.Event()
+
     def start(self):
         self._running = True
         self.worker_thread.start()
@@ -33,6 +35,9 @@ class Operator:
 
     def submit(self, text: str):
         self.command_queue.put(text)
+
+    def interrupt(self):
+        self.interrupt_flag.set()
 
     @staticmethod
     def _sentence_chunker(token_stream):
@@ -64,10 +69,14 @@ class Operator:
         start_time = time.perf_counter()
         full_response_text = ""
 
+        self.interrupt_flag.clear()
         token_stream = self.llm.stream_response(text)
 
         is_first_chunk = True
         for sentence in self._sentence_chunker(token_stream):
+            if self.interrupt_flag.is_set():  # Interruption
+                break
+
             full_response_text += sentence + " "
 
             emit_event(EventType.TTS_SPEAK, sentence)
@@ -113,8 +122,5 @@ class Operator:
                     self._stream_llm_response(text)
 
         finally:
-            ...
-        #     if self.tts_engaged:
-        #         wait_for(EventType.TTS_FREE)
-        #     emit_event(EventType.STT_SET_STATE, "AWAKE")
-        #     emit_event(EventType.OP_READY)
+            if not self.tts_engaged:
+                emit_event(EventType.STT_SET_STATE, "AWAKE")

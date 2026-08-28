@@ -104,17 +104,26 @@ class Atlas:
             lambda e: app.sound_manager.play_category(e.content),
         )
 
-        em.subscribe(EventType.TTS_BUSY, lambda e: emit_event(EventType.STT_MUTE))
-        em.subscribe(EventType.TTS_FREE, lambda e: emit_event(EventType.STT_UNMUTE))
+        em.subscribe(EventType.TTS_BUSY, lambda e: app.sm.set_state(State.WAITING))
 
-        em.subscribe(EventType.STT_MUTE, lambda e: app.listener.mute())
-
-        def handle_unmute(e):
-            app.listener.unmute()
+        def handle_tts_free(e):
+            app.sm.set_state(State.AWAKE)
             app.sm.update_deadline()
-            emit_event(EventType.STT_SET_STATE, "AWAKE")
 
-        em.subscribe(EventType.STT_UNMUTE, handle_unmute)
+        em.subscribe(EventType.TTS_FREE, handle_tts_free)
+
+        em.subscribe(EventType.OP_INTERRUPT, lambda e: app.tts.interrupt())
+        em.subscribe(EventType.OP_INTERRUPT, lambda e: app.sound_manager.interrupt())
+        em.subscribe(EventType.OP_INTERRUPT, lambda e: app.operator.interrupt())
+
+        # em.subscribe(EventType.STT_MUTE, lambda e: app.listener.mute())
+
+        # def handle_unmute(e):
+        #     app.listener.unmute()
+        #     app.sm.update_deadline()
+        #     emit_event(EventType.STT_SET_STATE, "AWAKE")
+
+        # em.subscribe(EventType.STT_UNMUTE, handle_unmute)
 
         # STT
         # subscribing to STT_CHANGED_STATE:SLEEPING to KWS reset
@@ -122,14 +131,16 @@ class Atlas:
             EventType.STT_CHANGED_STATE,
             lambda e: app.kws.reset() if e.content == "SLEEPING" else None,
         )
-        em.subscribe(
-            EventType.KWS_KEYWORD_DETECTED,
-            lambda e: emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED"),
-        )
-        em.subscribe(
-            EventType.KWS_KEYWORD_DETECTED,
-            lambda e: app.sm.set_state(State.AWAKE, f"Keyword: '{e.content}'"),
-        )
+
+        def handle_kw_detected(e):
+            if app.sm.state == State.WAITING:
+                emit_event(EventType.OP_INTERRUPT)
+                app.sm.set_state(State.AWAKE, f"Interrupted: {e.content}")
+            else:
+                emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED")
+                app.sm.set_state(State.AWAKE, f"Keyword: {e.content}")
+
+        em.subscribe(EventType.KWS_KEYWORD_DETECTED, handle_kw_detected)
 
         em.subscribe(EventType.VAD_START, lambda e: app.sm.set_state(State.RECORDING))
         em.subscribe(EventType.VAD_END, lambda e: app.sm.set_state(State.AWAKE))
