@@ -8,6 +8,7 @@ dist/
 .idea/
 
 data/
+data/sounds/
 *.tar.gz
 *.tar.xz
 *-x86_64
