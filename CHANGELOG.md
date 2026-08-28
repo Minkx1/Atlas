@@ -1,3 +1,9 @@
+## v0.5.0 (2026-08-28)
+
+### Feat
+
+- Added ability to barge-in mid-speech.
+
 ## v0.4.10 (2026-08-28)
 
 ### Fix

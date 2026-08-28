@@ -1,3 +1,3 @@
 from .core.atlas import Atlas
 
-__version__ = "0.4.10"
+__version__ = "0.5.0"
