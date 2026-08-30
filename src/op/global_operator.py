@@ -79,8 +79,7 @@ class Operator:
 
             full_response_text += sentence + " "
 
-            emit_event(EventType.TTS_SPEAK, sentence)
-            self.tts_engaged = True
+            emit_event(EventType.OP_LLM_CHUNK, sentence)
 
             emit_event(
                 EventType.UI_LLM_CHUNK,
@@ -99,28 +98,17 @@ class Operator:
         emit_event(EventType.LLM_RESPONSE, full_response_text.strip())
         self.llm.history_add_response(full_response_text.strip())
 
-    def _idk_command(self):
-        self.cmd._play_random_sound("idk_cmd")
-
     def _operate(self, text: str) -> None:
         if not text:
             return
 
-        self.tts_engaged = False
+        emit_event(EventType.OP_START)
+        res_type = self.cmd.operate(text)
 
-        try:
-            emit_event(EventType.STT_SET_STATE, "WAITING")
-            res_type = self.cmd.operate(text)
+        if not res_type:  # LLM
+            if self.llm.no_model:  # LLM model was not load for some reason
+                emit_event(EventType.OP_INTENT, "idk_cmd")
+            else:
+                self._stream_llm_response(text)
 
-            if res_type == "command":
-                self.tts_engaged = True
-
-            if not res_type:  # LLM
-                if self.llm.no_model:  # LLM model was not load for some reason
-                    self._idk_command()
-                else:
-                    self._stream_llm_response(text)
-
-        finally:
-            if not self.tts_engaged:
-                emit_event(EventType.STT_SET_STATE, "AWAKE")
+        emit_event(EventType.OP_FINISH)

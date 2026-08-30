@@ -99,16 +99,9 @@ class Atlas:
         app = self
 
         # TTS
-        em.subscribe(EventType.TTS_SPEAK, lambda e: app.tts.speak(e.content))
         em.subscribe(
-            EventType.TTS_TEXT_TO_FILE, lambda e: app.tts._text_to_file(**e.content)
-        )
-        em.subscribe(
-            EventType.SM_PLAY_SOUND, lambda e: app.sound_manager.play_sound(e.content)
-        )
-        em.subscribe(
-            EventType.SM_PLAY_CATEGORY,
-            lambda e: app.sound_manager.play_category(e.content),
+            EventType.SOUNDS_GENERATE_SOUND,
+            lambda e: app.tts._text_to_file(**e.content),
         )
 
         em.subscribe(EventType.TTS_BUSY, lambda e: app.sm.set_state(State.WAITING))
@@ -119,21 +112,28 @@ class Atlas:
 
         em.subscribe(EventType.TTS_FREE, handle_tts_free)
 
-        em.subscribe(EventType.OP_INTERRUPT, lambda e: app.tts.interrupt())
-        em.subscribe(EventType.OP_INTERRUPT, lambda e: app.sound_manager.interrupt())
-        em.subscribe(EventType.OP_INTERRUPT, lambda e: app.operator.interrupt())
+        def handle_interrupt(e):
+            app.tts.interrupt()
+            app.sound_manager.interrupt()
+            app.operator.interrupt()
 
-        # em.subscribe(EventType.STT_MUTE, lambda e: app.listener.mute())
+        em.subscribe(EventType.OP_INTERRUPT, handle_interrupt)
+        em.subscribe(EventType.OP_START, lambda e: self.sm.set_state(State.WAITING))
 
-        # def handle_unmute(e):
-        #     app.listener.unmute()
-        #     app.sm.update_deadline()
-        #     emit_event(EventType.STT_SET_STATE, "AWAKE")
+        def handle_intent(event):
+            intent: str = event.content
+            app.sound_manager.play_category(intent)
 
-        # em.subscribe(EventType.STT_UNMUTE, handle_unmute)
+            if intent == "farewell":
+                app._shutdown()
+            if intent == "sleep":
+                app.sm.set_state(State.SLEEPING)
+
+        em.subscribe(EventType.OP_INTENT, handle_intent)
+
+        em.subscribe(EventType.OP_LLM_CHUNK, lambda e: app.tts.speak(e.content))
 
         # STT
-        # subscribing to STT_CHANGED_STATE:SLEEPING to KWS reset
         em.subscribe(
             EventType.STT_CHANGED_STATE,
             lambda e: app.kws.reset() if e.content == "SLEEPING" else None,
@@ -144,7 +144,9 @@ class Atlas:
                 emit_event(EventType.OP_INTERRUPT)
                 app.sm.set_state(State.AWAKE, f"Interrupted: {e.content}")
             else:
-                emit_event(EventType.OP_RECEIVE_CMD, "!EVENT_KEYWORD_DETECTED")
+                # app.operator.submit("!EVENT_KEYWORD_DETECTED")
+                log(f"Keyword detected directly: {e.content}.", level="INFO")
+                emit_event(EventType.OP_INTENT, "greet")
                 app.sm.set_state(State.AWAKE, f"Keyword: {e.content}")
 
         em.subscribe(EventType.KWS_KEYWORD_DETECTED, handle_kw_detected)
@@ -153,16 +155,9 @@ class Atlas:
         em.subscribe(EventType.VAD_END, lambda e: app.sm.set_state(State.AWAKE))
 
         em.subscribe(
-            EventType.STT_SET_STATE, lambda e: app.sm.set_state(State(e.content))
-        )
-        em.subscribe(
             EventType.STT_TRANSCRIBED,
-            lambda e: emit_event(EventType.OP_RECEIVE_CMD, e.content),
+            lambda e: app.operator.submit(e.content),
         )
-
-        # OP
-        em.subscribe(EventType.OP_ASK_FINISH, lambda e: app._shutdown())
-        em.subscribe(EventType.OP_RECEIVE_CMD, lambda e: app.operator.submit(e.content))
 
     def _close(self):
         try:

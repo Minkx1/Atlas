@@ -198,7 +198,7 @@ class SoundManager:
 
                 log(f"Generating sound: {path_str}", "TTS", "INFO")
                 emit_event(
-                    EventType.TTS_TEXT_TO_FILE,
+                    EventType.SOUNDS_GENERATE_SOUND,
                     {"text": formatted_text.strip(), "path": full_path},
                 )
 

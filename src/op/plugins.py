@@ -139,7 +139,8 @@ class Plugin:
 
         match msg.get("type"):
             case "say":
-                emit_event(EventType.TTS_SPEAK, msg.get("text", ""))
+                # mimics originally-designed event to call `tts.speak(...)`
+                emit_event(EventType.OP_LLM_CHUNK, msg.get("text", ""))
                 emit_event(EventType.UI_ASSISTANT_SAY, {"text": msg.get("text", "")})
             case "event":
                 self._forward_event(msg)

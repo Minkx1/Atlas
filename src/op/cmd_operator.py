@@ -113,11 +113,6 @@ class CommandOperator:
         """Returns tuple: command_type"""
         self.history.append(cmd)
 
-        if cmd == "!EVENT_KEYWORD_DETECTED":
-            log("Keyword detected directly!", "OP", "DEBUG")
-            self.exec_command("greet")
-            return "command"
-
         cmd_clean = re.sub(r"[^\w\s]", "", cmd.lower()).strip()
         if not cmd_clean:
             return None
@@ -207,12 +202,4 @@ class CommandOperator:
             ).start()
             return None
 
-        self._play_random_sound(intent)
-
-        if intent == "farewell":
-            emit_event(EventType.OP_ASK_FINISH)
-        elif intent == "sleep":
-            emit_event(EventType.STT_SET_STATE, "SLEEPING")
-
-    def _play_random_sound(self, category: str):
-        emit_event(EventType.SM_PLAY_CATEGORY, category)
+        emit_event(EventType.OP_INTENT, intent)

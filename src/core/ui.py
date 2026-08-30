@@ -263,7 +263,7 @@ class UI(App):
         em = EventManager()
         em.subscribe(EventType.STT_CHANGED_STATE, self.event_stt_changed_state)
         em.subscribe(EventType.STT_AUDIOWAVE, self.on_audio_wave)
-        em.subscribe(EventType.OP_RECEIVE_CMD, self.event_on_received_command)
+        em.subscribe(EventType.STT_TRANSCRIBED, self.event_on_received_command)
 
         em.subscribe(EventType.DEBUG_LOG, self.event_on_debug_log)
         em.subscribe(EventType.UI_LLM_CHUNK, self.event_on_llm_chunk)
@@ -362,12 +362,11 @@ class UI(App):
 
     def event_on_received_command(self, event: Event):
         def f():
-            if not str(event.content).startswith("!EVENT"):
-                user_text = rf"> [#00d7ff]{event.content}[/#00d7ff]"
+            user_text = rf"> [#00d7ff]{event.content}[/#00d7ff]"
 
-                msg_label = Label(user_text, classes="chat-message")
-                self.dialog.mount(msg_label)
-                msg_label.scroll_visible()  # auto-scroll
+            msg_label = Label(user_text, classes="chat-message")
+            self.dialog.mount(msg_label)
+            msg_label.scroll_visible()  # auto-scroll
 
         self.safe_call(f)
 
@@ -391,7 +390,7 @@ class UI(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.input.value = ""
-        emit_event(EventType.OP_RECEIVE_CMD, event.value)
+        emit_event(EventType.STT_TRANSCRIBED, event.value)
 
 
 if __name__ == "__main__":
