@@ -67,7 +67,7 @@ class Atlas:
 
         self._setup_subscriptions()
 
-    def _shutdown(self):
+    def shutdown(self):
         self.alive = False
         if hasattr(self, "ui") and getattr(self.ui, "is_running", False):
             self.ui.call_from_thread(self.ui.exit)
@@ -125,7 +125,7 @@ class Atlas:
             app.sound_manager.play_category(intent)
 
             if intent == "farewell":
-                app._shutdown()
+                app.shutdown()
             if intent == "sleep":
                 app.sm.set_state(State.SLEEPING)
 
@@ -184,7 +184,7 @@ class Atlas:
             if hasattr(self, "sr"):
                 self.sr.close()
 
-            self._shutdown()
+            self.shutdown()
             self.events.flush_and_stop()
             log("Shutdown complete.", "ATLAS", "INFO")
         except Exception as e:  # noqa: BLE001
