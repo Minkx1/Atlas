@@ -1,3 +1,9 @@
+## v0.6.1 (2026-08-30)
+
+### Refactor
+
+- **events**: Refactor of core Event system
+
 ## v0.6.0 (2026-08-28)
 
 ### Feat
