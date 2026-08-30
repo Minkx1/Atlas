@@ -22,9 +22,35 @@ dependencies = [
     "llama-cpp-python",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Minkx1/Atlas"
+Repository = "https://github.com/Minkx1/Atlas"
+Documentation = "https://minkx1.github.io/Atlas/"
+Issues = "https://github.com/Minkx1/Atlas/issues"
+Changelog = "https://github.com/Minkx1/Atlas/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff", "pyinstaller", "commitizen"]
+
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "DTZ", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
 
 [tool.commitizen]
 version_scheme = "semver"
