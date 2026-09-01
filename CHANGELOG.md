@@ -1,3 +1,9 @@
+## v0.6.3 (2026-09-01)
+
+### Fix
+
+- Update keybinds.py with lazy pynput import
+
 ## v0.6.2 (2026-09-01)
 
 ### Fix
