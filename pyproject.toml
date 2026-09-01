@@ -58,4 +58,4 @@ version_provider = "pep621"
 tag_format = "v$version"
 major_version_zero = true
 update_changelog_on_bump = true
-version_files = ["src/__init__.py:__version__"]
+version_files = ["src/_version.py:__version__"]

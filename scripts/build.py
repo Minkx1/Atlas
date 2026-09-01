@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-from src import __version__
+from src._version import __version__
 
 APP_NAME = "atlas"
 ENTRY_POINT = "main.py"
