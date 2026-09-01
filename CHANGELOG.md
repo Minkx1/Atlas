@@ -1,3 +1,9 @@
+## v0.6.2 (2026-09-01)
+
+### Fix
+
+- Moved unnecessary breaking imports from build.py
+
 ## v0.6.1 (2026-08-30)
 
 ### Refactor
