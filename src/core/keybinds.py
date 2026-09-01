@@ -4,11 +4,10 @@
 
 from collections.abc import Callable
 
-from pynput import keyboard
-
 
 class KeyBindManager:
     def __init__(self) -> None:
+        from pynput import keyboard
         self.keybinds: dict[str, list[Callable[[], None]]] = {}
         self._listener: keyboard.GlobalHotKeys | None = None
 
@@ -17,7 +16,8 @@ class KeyBindManager:
             self.close()
 
         hotkeys_map = {kb: (lambda k=kb: self._dispatch(k)) for kb in self.keybinds}
-
+        
+        from pynput import keyboard
         self._listener = keyboard.GlobalHotKeys(hotkeys_map)
         self._listener.start()
 
