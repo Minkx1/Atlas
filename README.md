@@ -11,6 +11,7 @@
 ---
 
 [![Release](https://img.shields.io/github/v/release/Minkx1/Atlas?color=success)](https://github.com/Minkx1/Atlas/releases)
+[![CI](https://github.com/Minkx1/Atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Minkx1/Atlas/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/Minkx1/Atlas)](https://github.com/Minkx1/Atlas/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Minkx1/Atlas/releases)

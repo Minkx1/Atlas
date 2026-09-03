@@ -9,8 +9,9 @@ Thank you for your interest in contributing to Atlas!
 3. Install the development dependencies:
 
    ```bash
-   pip install .
+   pip install ".[dev]"
    ```
+
 4. Create a branch for your changes:
 
    ```bash
@@ -26,6 +27,16 @@ Run the linter:
 ```bash
 ruff check .
 ```
+
+Run the test suite with coverage:
+
+```bash
+pytest --cov=src --cov-report=term-missing
+```
+
+The normal test suite uses mocks and small fixtures. It must not require local
+LLM or speech model downloads. Performance experiments belong in the manual
+benchmark workflow and are not part of pull-request CI.
 
 If your change affects formatting or code quality, make sure the relevant checks pass before opening a pull request.
 
