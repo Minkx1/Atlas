@@ -1,6 +1,5 @@
 import re
 import threading
-import time
 
 import numpy as np
 
@@ -22,8 +21,6 @@ class CommandOperator:
         self.margin = 0.05
 
     def load(self):
-        _start = time.perf_counter()
-
         self.model = ONNXSentenceTransformer(  # embedding model
             "all-MiniLM-L6-v2", DATA_DIR / "models" / "sentence-transformer"
         )
@@ -35,11 +32,7 @@ class CommandOperator:
         self._load_plugins()
         self._precompute_embeddings()
 
-        log(
-            f"Embeddings & commands loaded in: {(time.perf_counter() - _start) * 1000}ms",
-            "OP",
-            "INFO",
-        )
+        log("Embeddings and commands loaded.", "OP", "INFO")
 
     def _load_commands(self) -> None:
         """Loads all triggers and intents from commands config."""
@@ -81,7 +74,7 @@ class CommandOperator:
                 continue
             try:
                 manifest = PluginManifest.from_toml(toml_path)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log(f"Unable to parse {toml_path}: {e}", "OP", "ERROR")
                 continue
 
@@ -202,4 +195,4 @@ class CommandOperator:
             ).start()
             return None
 
-        emit_event(EventType.OP_INTENT, intent)
+        emit_event(EventType.OP_INTENT, {"intent": intent})

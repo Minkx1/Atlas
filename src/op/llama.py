@@ -4,7 +4,6 @@
 
 import os
 import sys
-import time
 from pathlib import Path
 
 import llama_cpp
@@ -24,7 +23,7 @@ _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
 if _orig_llama_del:
 
     def _silent_llama_del(self):
-        try:
+        try:  # noqa: SIM105
             _orig_llama_del(self)  # type: ignore
         except (TypeError, AttributeError, NameError, ImportError):
             pass
@@ -35,13 +34,12 @@ if _orig_llama_del:
 class Llama:
     class _LLM_Response:
         def __init__(
-            self, text: str, prompt_tokens: int, completion_tokens: int, gen_ms: float
+            self, text: str, prompt_tokens: int, completion_tokens: int
         ) -> None:
             self.text = text
             self.prompt_tokens = prompt_tokens
             self.completion_tokens = completion_tokens
             self.total_tokens = prompt_tokens + completion_tokens
-            self.gen_ms = gen_ms
 
     def __init__(self) -> None:
         l = cfg.llm
@@ -62,7 +60,6 @@ class Llama:
 
     def load(self):
         try:
-            _start = time.perf_counter()
             log(f"Loading LLM model: {self.model_path.name}...", "LLM", "INFO")
             if not self.model_path.exists():
                 log(
@@ -80,9 +77,7 @@ class Llama:
                 n_gpu_layers=0,
                 verbose=False,
             )
-            elapsed = (time.perf_counter() - _start) * 1000
-            log(f"LLM model loaded in {elapsed:.0f}ms", "LLM", "INFO")
-            emit_event(EventType.LLM_LOADED, f"{elapsed}ms")
+            emit_event(EventType.LLM_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading LLM model: {type(e).__name__}: {e}",
@@ -99,8 +94,6 @@ class Llama:
         try:
             log(f"LLM: Getting response for: {message}...", "LLM", "DEBUG")
             self.history.append({"role": "user", "content": message})
-            start_time = time.perf_counter()
-
             response = self.llama.create_chat_completion(  # type: ignore
                 messages=self.history,  # type: ignore
                 max_tokens=self.max_tokens,
@@ -109,20 +102,13 @@ class Llama:
                 stop=self.stop,
             )
 
-            gen_ms = (time.perf_counter() - start_time) * 1000
             text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
             usage = response["usage"]  # type: ignore
 
-            log(
-                f"LLM response generated in {gen_ms:.0f}ms ({usage.get('completion_tokens', 0)} tokens)",
-                "LLM",
-                "DEBUG",
-            )
             return Llama._LLM_Response(
                 text=text,
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 completion_tokens=usage.get("completion_tokens", 0),
-                gen_ms=gen_ms,
             )
         except Exception as e:
             log(

@@ -49,7 +49,7 @@ class StateMachine:
             if new_state == State.AWAKE:
                 self.update_deadline()
 
-            emit_event(EventType.STT_CHANGED_STATE, new_state.value)
+            emit_event(EventType.STT_CHANGED_STATE, {"state": new_state.value})
 
             payload = {"state": new_state.value}
             if detail:

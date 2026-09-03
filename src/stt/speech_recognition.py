@@ -6,7 +6,6 @@
 import os
 import queue
 import sys
-import time
 from collections import deque
 from pathlib import Path
 from threading import Thread
@@ -70,7 +69,6 @@ class VAD:
         import onnxruntime as ort
 
         try:
-            _start = time.perf_counter()
             log("Loading Silero VAD ONNX model...", "VAD", "INFO")
 
             if not self.model_path.exists():
@@ -89,9 +87,8 @@ class VAD:
 
             self.reset_state()
 
-            elapsed = (time.perf_counter() - _start) * 1000
-            log(f"VAD model loaded in {elapsed:.0f}ms", "VAD", "SUCCESS")
-            emit_event(EventType.VAD_LOADED, f"{elapsed}ms")
+            log("VAD model loaded.", "VAD", "SUCCESS")
+            emit_event(EventType.VAD_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading VAD model: {type(e).__name__}: {e}",
@@ -188,7 +185,6 @@ class Whisper:
             else:
                 log(f"Using Whisper model from {self.model_dir}", "STT", "DEBUG")
 
-            _start = time.perf_counter()
             log(f"Loading Whisper model: {w.model_size}...", "STT", "INFO")
             self.model = WhisperModel(
                 w.model_size,
@@ -198,9 +194,8 @@ class Whisper:
                 num_workers=1,
                 download_root=str(self.model_dir),
             )
-            elapsed = (time.perf_counter() - _start) * 1000
-            log(f"Whisper model loaded in {elapsed:.0f}ms", "STT", "SUCCESS")
-            emit_event(EventType.WHISPER_LOADED, f"{elapsed}ms")
+            log("Whisper model loaded.", "STT", "SUCCESS")
+            emit_event(EventType.WHISPER_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading Whisper model: {type(e).__name__}: {e}",
@@ -209,13 +204,12 @@ class Whisper:
             )
             raise
 
-    def transcribe(self, audio_array: np.ndarray) -> tuple[str, int]:
-        """Turns Spech(audio array) into a text. Returns (text, time_to_process)."""
+    def transcribe(self, audio_array: np.ndarray) -> str:
+        """Turn a speech audio array into text."""
         if not hasattr(self, "model"):
             raise RuntimeError("Whisper was used before whisper.load()")
 
         w = cfg.stt
-        start_time = time.perf_counter()
         segments, _ = self.model.transcribe(
             audio=audio_array,
             beam_size=w.beam_size,
@@ -224,7 +218,7 @@ class Whisper:
             condition_on_previous_text=False,
         )
         text = " ".join([segment.text for segment in segments]).strip()
-        return text, int((time.perf_counter() - start_time) * 1000)
+        return text
 
 
 class SpeechRecognizer:
@@ -266,9 +260,8 @@ class SpeechRecognizer:
             if item is None:
                 break
 
-            audio_array, listen_ms = item
-            text, recog_ms = self.whisper.transcribe(audio_array)
-            rtf = recog_ms / listen_ms
+            audio_array, _ = item
+            text = self.whisper.transcribe(audio_array)
 
             text = text.strip()
 
@@ -277,13 +270,10 @@ class SpeechRecognizer:
                     EventType.UI_TRANSCRIPTION,
                     {
                         "text": text,
-                        "listen_ms": listen_ms,
-                        "recog_ms": recog_ms,
-                        "rtf": rtf,
                     },
                 )
 
-                emit_event(EventType.STT_TRANSCRIBED, text)
+                emit_event(EventType.STT_TRANSCRIBED, {"text": text})
 
             self.audio_queue.task_done()
 
@@ -302,7 +292,7 @@ class SpeechRecognizer:
         if vad_state == "start":
             self._recording = True
             self.buffer = list(self.preroll)
-            emit_event(EventType.VAD_START)
+            emit_event(EventType.VAD_START, {})
 
         elif vad_state == "speaking" and self._recording:
             self.buffer.append(chunk)
@@ -318,7 +308,7 @@ class SpeechRecognizer:
                     self.audio_queue.put((full_audio, listen_ms))
 
             self.buffer.clear()
-            emit_event(EventType.VAD_END)
+            emit_event(EventType.VAD_END, {})
 
         return vad_state
 

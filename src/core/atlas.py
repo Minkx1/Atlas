@@ -1,13 +1,13 @@
 # atlas.py
 
 import sys
-import time
 
 from ..op import CommandOperator, Llama, Operator
 from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
 from ..tts import SoundManager, TextToSpeech
 from .config import cfg
 from .events import (
+    CommandType,
     EventLogger,
     EventManager,
     EventType,
@@ -29,6 +29,8 @@ class Atlas:
 
         if cfg.log:
             self.logger = EventLogger()
+            import time
+
             self.logger._write_file(
                 f" ===== New Session: [{time.strftime('%H:%M:%S', time.localtime(time.time()))}] | SUCCESS ===== \n",
                 time.time(),
@@ -37,7 +39,7 @@ class Atlas:
         self.keybinds = KeyBindManager()
         self.keybinds.register_keybind(
             cfg.kws.awake_keybind,
-            lambda: emit_event(EventType.KWS_KEYWORD_DETECTED, "{HotKey}"),
+            lambda: emit_event(EventType.KWS_KEYWORD_DETECTED, {"keyword": "{HotKey}"}),
         )
 
         # STT Pipeline
@@ -48,7 +50,7 @@ class Atlas:
         def audio_process(audio_chunk):
             kw = self.kws.process_chunk(audio_chunk)
             if kw:
-                emit_event(EventType.KWS_KEYWORD_DETECTED, kw)
+                emit_event(EventType.KWS_KEYWORD_DETECTED, {"keyword": kw})
             self.sm.update()
 
             allow_rec = self.sm.allow_speech_recognition()
@@ -101,7 +103,17 @@ class Atlas:
         # TTS
         em.subscribe(
             EventType.SOUNDS_GENERATE_SOUND,
-            lambda e: app.tts._text_to_file(**e.content),
+            lambda e: app.tts._text_to_file(**e.payload),
+        )
+
+        em.subscribe(CommandType.TTS_SPEAK, lambda e: app.tts.speak(e.payload["text"]))
+        em.subscribe(
+            CommandType.TTS_PLAY_SOUND,
+            lambda e: app.sound_manager.play_sound(e.payload),
+        )
+        em.subscribe(
+            CommandType.OP_SUBMIT,
+            lambda e: app.operator.submit(e.payload["text"]),
         )
 
         em.subscribe(EventType.TTS_BUSY, lambda e: app.sm.set_state(State.WAITING))
@@ -121,7 +133,7 @@ class Atlas:
         em.subscribe(EventType.OP_START, lambda e: self.sm.set_state(State.WAITING))
 
         def handle_intent(event):
-            intent: str = event.content
+            intent: str = event.payload["intent"]
             app.sound_manager.play_category(intent)
 
             if intent == "farewell":
@@ -131,23 +143,23 @@ class Atlas:
 
         em.subscribe(EventType.OP_INTENT, handle_intent)
 
-        em.subscribe(EventType.OP_LLM_CHUNK, lambda e: app.tts.speak(e.content))
+        em.subscribe(EventType.OP_LLM_CHUNK, lambda e: app.tts.speak(e.payload["text"]))
 
         # STT
         em.subscribe(
             EventType.STT_CHANGED_STATE,
-            lambda e: app.kws.reset() if e.content == "SLEEPING" else None,
+            lambda e: app.kws.reset() if e.payload.get("state") == "SLEEPING" else None,
         )
 
         def handle_kw_detected(e):
             if app.sm.state == State.WAITING:
-                emit_event(EventType.OP_INTERRUPT)
-                app.sm.set_state(State.AWAKE, f"Interrupted: {e.content}")
+                emit_event(EventType.OP_INTERRUPT, {})
+                app.sm.set_state(State.AWAKE, f"Interrupted: {e.payload['keyword']}")
             else:
                 # app.operator.submit("!EVENT_KEYWORD_DETECTED")
-                log(f"Keyword detected directly: {e.content}.", level="INFO")
-                emit_event(EventType.OP_INTENT, "greet")
-                app.sm.set_state(State.AWAKE, f"Keyword: {e.content}")
+                log(f"Keyword detected directly: {e.payload['keyword']}.", level="INFO")
+                emit_event(EventType.OP_INTENT, {"intent": "greet"})
+                app.sm.set_state(State.AWAKE, f"Keyword: {e.payload['keyword']}")
 
         em.subscribe(EventType.KWS_KEYWORD_DETECTED, handle_kw_detected)
 
@@ -156,7 +168,7 @@ class Atlas:
 
         em.subscribe(
             EventType.STT_TRANSCRIBED,
-            lambda e: app.operator.submit(e.content),
+            lambda e: app.operator.submit(e.payload["text"]),
         )
 
     def _close(self):
@@ -187,7 +199,7 @@ class Atlas:
             self.shutdown()
             self.events.flush_and_stop()
             log("Shutdown complete.", "ATLAS", "INFO")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log(f"Error during shutdown: {type(e).__name__}: {e}", "ATLAS", "ERROR")
         finally:
             import sys
@@ -213,7 +225,7 @@ class Atlas:
         self.tts.start()
         self.operator.start()
 
-        emit_event(EventType.UI_BANNER)
+        emit_event(EventType.UI_BANNER, {})
 
         self.ui = UI(app=self)
         self.ui.run()  # this blocks main thread
@@ -226,7 +238,7 @@ class Atlas:
         """Starts Atlas Assistant."""
         try:
             self._main()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"[!] FATAL ERROR: {e}")
             sys.exit(1)
         finally:

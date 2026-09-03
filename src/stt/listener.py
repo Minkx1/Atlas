@@ -104,7 +104,7 @@ class Listener:
                             audio_mono = audio[:, 0] if audio.ndim > 1 else audio
 
                             rms = float(np.sqrt(np.mean(audio_mono**2)))
-                            emit_event(EventType.STT_AUDIOWAVE, rms)
+                            emit_event(EventType.STT_AUDIOWAVE, {"rms": rms})
 
                     except Exception as e:
                         log(
@@ -120,7 +120,7 @@ class Listener:
 
     def start(self):
         self._running = True
-        emit_event(EventType.STT_START)
+        emit_event(EventType.STT_START, {})
         self.audio_input_thread.start()
 
     def close(self):
@@ -129,7 +129,7 @@ class Listener:
         if self.audio_input_thread is not None and self.audio_input_thread.is_alive():
             self.audio_input_thread.join(timeout=2.0)
 
-        emit_event(EventType.STT_FINISH)
+        emit_event(EventType.STT_FINISH, {})
 
 
 if _MAIN:

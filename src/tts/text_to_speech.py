@@ -5,7 +5,6 @@
 import math
 import queue
 import threading
-import time
 import wave
 from pathlib import Path
 
@@ -55,17 +54,16 @@ class TextToSpeech:
         self.use_cuda = cfg.tts.use_cuda
 
     def load(self):
-        _start = time.perf_counter()
         self.voice = PiperVoice.load(
             self.path, use_cuda=self.use_cuda, download_dir=self.path.parent
         )
         # self._generate_basic_sounds()
         log(
-            f"TTS model loaded in {(time.perf_counter() - _start) * 1000:.0f}ms",
+            "TTS model loaded.",
             "TTS",
             "SUCCESS",
         )
-        emit_event(EventType.TTS_LOADED, f"{(time.perf_counter() - _start) * 1000}ms")
+        emit_event(EventType.TTS_LOADED, {})
 
     def start(self):
         if not hasattr(self, "voice"):
@@ -166,9 +164,7 @@ class TextToSpeech:
         self._set_busy(False)
 
     def _set_busy(self, value: bool) -> None:
-        emit_event(EventType.TTS_BUSY) if value == True else emit_event(
-            EventType.TTS_FREE
-        )
+        emit_event(EventType.TTS_BUSY if value else EventType.TTS_FREE, {})
         with self._busy_lock:
             self._busy = value
 
@@ -200,7 +196,7 @@ class TextToSpeech:
                 sd.play(padded_audio, samplerate=samplerate)
                 sd.wait()
                 log("TTS playback completed.", "TTS", "DEBUG")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log(
                     f"Error during TTS synthesis: {type(e).__name__}: {e}",
                     "TTS",
@@ -235,7 +231,7 @@ class TextToSpeech:
             else:
                 log(f"Unsupported output format: {path.suffix}", "TTS", "ERROR")
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log(
                 f"Error generating audio {path.name}: {type(e).__name__}: {e}",
                 "TTS",

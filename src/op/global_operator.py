@@ -6,7 +6,6 @@
 import queue
 import re
 import threading
-import time
 
 from ..core.events import EventType, emit_event
 from .cmd_operator import CommandOperator
@@ -31,6 +30,9 @@ class Operator:
 
     def close(self):
         self._running = False
+        self.command_queue.put(None)
+        if self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=2.0)
         self.llm.close()
 
     def submit(self, text: str):
@@ -66,7 +68,6 @@ class Operator:
             self.command_queue.task_done()
 
     def _stream_llm_response(self, text: str):
-        start_time = time.perf_counter()
         full_response_text = ""
 
         self.interrupt_flag.clear()
@@ -79,7 +80,7 @@ class Operator:
 
             full_response_text += sentence + " "
 
-            emit_event(EventType.OP_LLM_CHUNK, sentence)
+            emit_event(EventType.OP_LLM_CHUNK, {"text": sentence})
 
             emit_event(
                 EventType.UI_LLM_CHUNK,
@@ -87,28 +88,26 @@ class Operator:
             )
             is_first_chunk = False
 
-        gen_ms = (time.perf_counter() - start_time) * 1000
         emit_event(
             EventType.UI_LLM_RESPONSE_DONE,
             {
                 "text": full_response_text.strip(),
-                "gen_ms": gen_ms,
             },
         )
-        emit_event(EventType.LLM_RESPONSE, full_response_text.strip())
+        emit_event(EventType.LLM_RESPONSE, {"text": full_response_text.strip()})
         self.llm.history_add_response(full_response_text.strip())
 
     def _operate(self, text: str) -> None:
         if not text:
             return
 
-        emit_event(EventType.OP_START)
+        emit_event(EventType.OP_START, {})
         res_type = self.cmd.operate(text)
 
         if not res_type:  # LLM
             if self.llm.no_model:  # LLM model was not load for some reason
-                emit_event(EventType.OP_INTENT, "idk_cmd")
+                emit_event(EventType.OP_INTENT, {"intent": "idk_cmd"})
             else:
                 self._stream_llm_response(text)
 
-        emit_event(EventType.OP_FINISH)
+        emit_event(EventType.OP_FINISH, {})

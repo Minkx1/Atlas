@@ -9,11 +9,11 @@ import tomllib
 
 _MAIN = __name__ == "__main__"
 if not _MAIN:
-    from ..core.events import EventType, emit_event, log
+    from ..core.events import CommandType, EventType, command, emit_event, log
 else:
     # changing execution dir to src/ for proper importing
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.events import EventType, emit_event, log
+    from core.events import CommandType, EventType, command, emit_event, log
 
 
 @dataclass
@@ -140,7 +140,7 @@ class Plugin:
         match msg.get("type"):
             case "say":
                 # mimics originally-designed event to call `tts.speak(...)`
-                emit_event(EventType.OP_LLM_CHUNK, msg.get("text", ""))
+                command(CommandType.TTS_SPEAK, {"text": msg.get("text", "")})
                 emit_event(EventType.UI_ASSISTANT_SAY, {"text": msg.get("text", "")})
             case "event":
                 self._forward_event(msg)
@@ -156,7 +156,7 @@ class Plugin:
     def _forward_event(self, msg: dict):
         name = msg.get("name")
         try:
-            emit_event(EventType(name), msg.get("content"))
+            emit_event(EventType(name), msg.get("content") or {})
         except ValueError:
             log(
                 f"Plugin '{self.manifest.id}' emitted uknown event: {name}",

@@ -105,7 +105,7 @@ class AudioWaveform(Static):
 
 tcss = """
 Screen {
-    background: #000000; 
+    background: #000000;
 }
 
 #main-app {
@@ -133,9 +133,9 @@ Screen {
 
 #left-panel, #right-panel, #central-panel {
     height: 100%;
-    border: round #1e3668; 
+    border: round #1e3668;
     border-title-align: center;
-    border-title-color: #00d7ff; 
+    border-title-color: #00d7ff;
     border-title-style: bold;
     background: transparent;
 }
@@ -143,7 +143,7 @@ Screen {
 #central-panel {
     align: center middle;
     padding: 1;
-    border: round #244687; 
+    border: round #244687;
 }
 
 RichLog {
@@ -174,7 +174,7 @@ RichLog {
 Input {
     dock: bottom;
     border: none;
-    border-top: solid #1e3668; 
+    border-top: solid #1e3668;
     background: transparent;
     padding: 0 1;
     width: 100%;
@@ -201,11 +201,11 @@ Input:focus {
 }
 
 AudioWaveform {
-    height: 4; 
+    height: 4;
     content-align: center middle;
     text-align: center;
     width: 100%;
-    overflow: hidden; 
+    overflow: hidden;
 }
 """
 
@@ -279,7 +279,7 @@ class UI(App):
 
     def event_stt_changed_state(self, event: Event):
         def _():
-            state_str = event.content
+            state_str = event.payload.get("state", "")
 
             if state_str in {"SLEEPING", "WAITING"}:
                 self.audiowave.is_listening = False
@@ -302,17 +302,14 @@ class UI(App):
         self.safe_call(_)
 
     def on_audio_wave(self, event: Event):
-        wave_data = event.content
+        wave_data = event.payload.get("rms", 0.0)
         self.safe_call(self.audiowave.push_volume, wave_data)
 
     def event_on_debug_log(self, event: Event):
         """This method is called from EVENT_DISPATCHER thread"""
-        if not isinstance(event.content, dict):
-            return
-
-        level = event.content.get("level", "INFO").upper()
-        source = event.content.get("source", "SYS")
-        message = event.content.get("message", "")
+        level = event.payload.get("level", "INFO").upper()
+        source = event.payload.get("source", "SYS")
+        message = event.payload.get("message", "")
 
         timestamp = time.strftime("%H:%M:%S", time.localtime(event.timestamp))
 
@@ -333,8 +330,8 @@ class UI(App):
 
     def event_on_llm_chunk(self, event: Event):
         def f():
-            chunk_text = event.content["text"]
-            is_first = event.content["is_first"]
+            chunk_text = event.payload["text"]
+            is_first = event.payload["is_first"]
 
             if is_first:
                 self._current_assistant_text = rf": {chunk_text}"
@@ -353,7 +350,7 @@ class UI(App):
 
     def event_on_assistant_say(self, event: Event):
         def f():
-            text = rf": {event.content['text']}"
+            text = rf": {event.payload['text']}"
             msg_label = Label(text, classes="chat-message")
             self.dialog.mount(msg_label)
             msg_label.scroll_visible()
@@ -362,7 +359,7 @@ class UI(App):
 
     def event_on_received_command(self, event: Event):
         def f():
-            user_text = rf"> [#00d7ff]{event.content}[/#00d7ff]"
+            user_text = rf"> [#00d7ff]{event.payload['text']}[/#00d7ff]"
 
             msg_label = Label(user_text, classes="chat-message")
             self.dialog.mount(msg_label)
@@ -390,7 +387,7 @@ class UI(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.input.value = ""
-        emit_event(EventType.STT_TRANSCRIBED, event.value)
+        emit_event(EventType.STT_TRANSCRIBED, {"text": event.value})
 
 
 if __name__ == "__main__":

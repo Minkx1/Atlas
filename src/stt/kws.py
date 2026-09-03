@@ -4,7 +4,6 @@
 
 import os
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
@@ -62,8 +61,6 @@ class KeyWordSpotter:
         import sherpa_onnx
 
         try:
-            _start = time.perf_counter()
-
             log("Loading Sherpa-ONNX KWS model...", "KWS", "INFO")
             self.kws = sherpa_onnx.KeywordSpotter(
                 tokens=self.tokens,
@@ -78,9 +75,8 @@ class KeyWordSpotter:
 
             self.stream = self.kws.create_stream()
 
-            elapsed = (time.perf_counter() - _start) * 1000
-            log(f"KWS model loaded in {elapsed:.0f}ms", "KWS", "SUCCESS")
-            emit_event(EventType.KWS_LOADED, f"{elapsed}ms")
+            log("KWS model loaded.", "KWS", "SUCCESS")
+            emit_event(EventType.KWS_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading KWS model: {type(e).__name__}: {e}",

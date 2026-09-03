@@ -82,8 +82,8 @@ class SoundManager:
             sd.play(padded_audio, samplerate)
             sd.wait()
 
-            emit_event(EventType.TTS_FREE)
-        except Exception as e:  # noqa: BLE001
+            emit_event(EventType.TTS_FREE, {})
+        except Exception as e:
             log(
                 f"Error playing audio {path.name}: {type(e).__name__}: {e}",
                 "TTS",
@@ -105,7 +105,7 @@ class SoundManager:
         elif isinstance(payload, str):
             payload = Path(payload)
 
-        emit_event(EventType.TTS_BUSY)
+        emit_event(EventType.TTS_BUSY, {})
         self.play_audio(payload)
 
     def interrupt(self) -> None:
@@ -171,7 +171,7 @@ class SoundManager:
         old_state = {"settings": {}, "sounds": {}}
         if manifest_file.exists():
             try:
-                with open(manifest_file, "r", encoding="utf-8") as f:
+                with open(manifest_file, encoding="utf-8") as f:
                     old_state = json.load(f)
             except json.JSONDecodeError:
                 log("Manifest file is corrupted. Regenerating all.", "TTS", "WARN")
