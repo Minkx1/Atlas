@@ -1,3 +1,9 @@
+## v0.6.4 (2026-09-03)
+
+### Refactor
+
+- **core**: Event system refactored once more adding commands and CommandType + async callbacks and proper lifecycle of main components
+
 ## v0.6.3 (2026-09-01)
 
 ### Fix
