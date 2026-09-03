@@ -1,77 +1,103 @@
-# Installation
+# Install Atlas
 
-This guide will walk you through the system requirements and the installation process for Atlas on different OS.
+Atlas supports two paths: download a packaged build, or run the source tree for development and plugin work.
 
-## System Requirements
+## Before you begin
 
-Atlas runs completely offline, which means your hardware does all the heavy lifting.
+| Resource | Baseline | Comfortable setup |
+| --- | --- | --- |
+| CPU | 4 x86_64 cores | 8+ cores |
+| Memory | 4 GB RAM | 8 GB RAM or more |
+| Storage | About 5 GB for core models | 10 GB+ with a local LLM |
+| Operating system | Linux or Windows | Linux for easiest development |
+| Python from source | 3.10 or newer | 3.11 |
 
-| Component | Minimum | Recommended |
-| :--- | :--- | :--- |
-| **CPU** | 4-Core x86_64 | 8-Core CPU / Dedicated GPU |
-| **RAM / VRAM** | 4 GB RAM | 8 GB RAM / 6+ GB VRAM |
-| **Disk Space** | ~5 GB (base models) | ~10 GB+ (custom LLMs) |
+A compatible microphone and speakers are required for the full assistant experience.
 
----
+## Packaged release
 
-## Installation Methods
+1. Download the archive for your operating system from [GitHub Releases](https://github.com/Minkx1/Atlas/releases).
+2. Extract it into a dedicated directory.
+3. Run `./Atlas` on Linux or `Atlas.exe` on Windows.
+4. Complete the model setup below.
 
-=== "Method I: Pre-compiled Release"
+The packaged build does not require a separate Python installation.
 
-    This is the easiest way to get started. You don't need Python installed.
+## From source
 
-    1. Go to the [Releases page](https://github.com/Minkx1/Atlas/releases) and download the latest release for your OS.
-    2. Extract the archive into a dedicated folder.
-    3. Run `Atlas.exe` (Windows) or the `./Atlas` binary (Linux).
-    4. Proceed to the [First Launch & Models](#first-launch-models) section below.
-
-=== "Method II: Building from Source"
-
-    Recommended if you want to modify the code, develop plugins, or run *Atlas* in your own Python environment.
-
-    **Prerequisites:**
-    
-    * **Python 3.9+** and **Git**
-    * *(Linux only)* Audio drivers & dependencies:
-        ```bash
-        sudo apt-get install -y libportaudio2 portaudio19-dev libasound2-dev
-        ```
-
-    **Setup:**
+=== "Linux"
 
     ```bash
     git clone https://github.com/Minkx1/Atlas.git
     cd Atlas
-    ```
-
-    Run the automated environment setup script:
-
-    * **Windows:** run `scripts/install.bat`
-    * **Linux:** run `bash scripts/install.sh`
-
-    Launch the assistant:
-    ```bash
+    sudo apt-get install -y libportaudio2 portaudio19-dev libasound2-dev
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install --upgrade pip
+    python -m pip install ".[dev]"
     python main.py
     ```
 
----
+=== "Windows"
 
-## First Launch & Models
+    ```powershell
+    git clone https://github.com/Minkx1/Atlas.git
+    cd Atlas
+    py -3.11 -m venv .venv
+    .venv\Scripts\activate
+    python -m pip install --upgrade pip
+    python -m pip install ".[dev]"
+    python main.py
+    ```
 
-Whether you run *Atlas* from a release or from source, it comes **without** the heavy neural network models pre-installed to save bandwidth.
+    You can also use `scripts/install.bat` for the initial setup.
 
-On your **very first launch**, *Atlas* will automatically download the necessary core neural-netowrk modes into the `data/models/` directory.
+!!! tip "Development install"
+    The `[dev]` extra includes pytest, coverage, Ruff, PyInstaller and Commitizen. Normal runtime users only need the package dependencies.
 
-!!! note "Core Models Download"
-    This requires an internet connection and will download approximately ~1 GB of data. Subsequent launches will be almost instantaneous and completely offline.
+## Model locations
 
-### Setting up the LLM
+Atlas keeps runtime data below `data/`:
 
-!!! warning "Manual LLM Installation Required"
-    Atlas **DOES NOT** automatically download the Large Language Model (LLM). You must provide one yourself.
+| Model or asset | Location |
+| --- | --- |
+| Whisper cache | `data/models/faster-whisper/` |
+| Silero VAD | `data/models/vad/silero_vad.onnx` |
+| Sherpa-ONNX KWS | `data/models/sherpa_onnx_kws/` |
+| Piper voice | `data/models/piper/` |
+| Sentence transformer | `data/models/sentence-transformer/` |
+| Optional LLM | `data/models/llm_models/*.gguf` |
 
-To make Atlas *smart*, you need to download a compatible `.gguf` model:
+Some speech models download on first use when absent. The LLM is manual: place a compatible `.gguf` file in `data/models/llm_models/` and set `llm.model_path` in `config/config.toml`.
 
-1. Download a model (e.g., `Llama-3.2-3B-Instruct` or similar) in `.gguf` format from HuggingFace.
-2. Place the downloaded `.gguf` file manually into the `data/models/llm_models/` directory.
-3. Start Atlas and say **"Atlas"** to activate it!
+!!! warning "First launch can require internet"
+    Model acquisition is an installation concern. Once the files are present, Atlas can run without network access. Keep model licenses and redistribution terms with any build you share.
+
+## Configuration loop
+
+```mermaid
+flowchart LR
+    A[config/config.toml] --> B[Load AppConfig]
+    B --> C[Construct components]
+    C --> D[Load local models]
+    D --> E[Start workers]
+    E --> F[Run Atlas]
+```
+
+The most useful first settings are:
+
+- `stt.start_state`: usually `SLEEPING`;
+- `stt.model_size` and `stt.device`;
+- `tts.model_path` and `tts.length_scale`;
+- `llm.model_path`;
+- `kws.awake_keybind` for keyboard wake-up.
+
+## Verify the development setup
+
+```bash
+ruff check .
+pytest --cov=src --cov-report=term-missing
+mkdocs build --strict
+```
+
+The regular test suite should not download large models. Model-heavy experiments belong in manual benchmark runs.
