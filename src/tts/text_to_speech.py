@@ -1,5 +1,6 @@
 #
-# text_to_speech.py
+# tts / text_to_speech.py
+# Uses PiperTTS model to dynamically speak text
 #
 
 import math
@@ -132,14 +133,14 @@ class TextToSpeech:
 
         except Exception as e:
             log(
-                f"Failed to download PiperTTS model '{model_key}': {type(e).__name__}: {e}",
+                f"Failed to download Piper '{model_key}': {type(e).__name__}: {e}",
                 "TTS",
                 "ERROR",
             )
             raise
 
     def _tts_worker(self):
-        """Background thread that gathers sentences(text chunks) from queue and voices them."""
+        """Background thread that gathers text chunks from queue and voices them."""
         while True:
             value = self.queue.get()
             if value is None:
@@ -244,9 +245,3 @@ class TextToSpeech:
     def close(self):
         self.queue.put(None)
         self.worker_thread.join()
-
-
-if __name__ == "__main__":
-    tts = TextToSpeech()
-    tts._download_model()
-    # tts.load()

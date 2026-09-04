@@ -1,19 +1,17 @@
+#
+# op / plugins.py
+# Plugin loading and runtime system
+#
+
 import json
 import subprocess
-import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import tomllib
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.events import CommandType, EventType, command, emit_event, log
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.events import CommandType, EventType, command, emit_event, log
+from ..core.events import CommandType, EventType, command, emit_event, log
 
 
 @dataclass
@@ -76,9 +74,6 @@ class Plugin:
                 log(raw, self.manifest.id, "DEBUG")
 
     def run(self, origin: str) -> None:
-        # !NOTE
-        # ALWAYS call from separate PLUGIN-THREAD!!!
-
         # creating process
         try:
             proc = subprocess.Popen(
@@ -163,7 +158,3 @@ class Plugin:
                 "PLUGIN",
                 "WARN",
             )
-
-
-if _MAIN:
-    ...

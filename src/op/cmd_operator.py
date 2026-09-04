@@ -1,3 +1,8 @@
+#
+# op / cmd_operator.py
+# Loads and manipulaties commands and plugins
+#
+
 import re
 import threading
 
@@ -150,7 +155,8 @@ class CommandOperator:
         second_best_intent = sorted_intents[1][0] if len(sorted_intents) > 1 else "None"
 
         log(
-            f"Intent check '{cmd_clean}': Best: {best_intent} ({best_score:.3f}), 2nd: {second_best_intent} ({second_best_score:.3f})",
+            f"Intent check '{cmd_clean}': Best: {best_intent} ({best_score:.3f}), "
+            f"2nd: {second_best_intent} ({second_best_score:.3f})",
             "OP",
             "DEBUG",
         )
@@ -165,20 +171,23 @@ class CommandOperator:
 
             if is_confident:
                 log(
-                    f"Found confident intent: {best_intent} (Score: {best_score:.3f}, Margin: {margin:.3f})",
+                    f"Found confident intent: {best_intent} (Score: {best_score:.3f}, "
+                    f"Margin: {margin:.3f})",
                     "OP",
                     "DEBUG",
                 )
                 return best_intent
             else:
                 log(
-                    f"Rejected intent '{best_intent}': Margin too low ({margin:.3f} < {self.margin})",
+                    f"Rejected intent '{best_intent}': Margin too low"
+                    f"({margin:.3f} < {self.margin})",
                     "OP",
                     "DEBUG",
                 )
         else:
             log(
-                f"Rejected intent '{best_intent}': Score too low ({best_score:.3f} < {self.intent_threshold})",
+                f"Rejected intent '{best_intent}': Score too low"
+                f"({best_score:.3f} < {self.intent_threshold})",
                 "OP",
                 "DEBUG",
             )

@@ -1,12 +1,11 @@
 #
-# sound_manager.py
+# tts / sound_manager.py
+# Saves and manages sounds in data / sounds /
 #
-
 
 import json
 import math
 import random
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -14,15 +13,8 @@ import scipy.signal
 import sounddevice as sd
 import soundfile as sf
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.config import DATA_DIR, cfg
-    from ..core.events import EventType, emit_event, log
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.config import DATA_DIR, cfg
-    from core.events import EventType, emit_event, log
+from ..core.config import DATA_DIR, cfg
+from ..core.events import EventType, emit_event, log
 
 
 class SoundManager:
@@ -51,7 +43,8 @@ class SoundManager:
                 samplerate = target_sr
 
             log(
-                f"Audio: {path.name}, shape={audio.shape}, dtype={audio.dtype}, sr={samplerate}",
+                f"Audio: {path.name}, shape={audio.shape}"
+                f" dtype={audio.dtype}, sr={samplerate}",
                 "TTS",
                 "INFO",
             )
@@ -91,7 +84,7 @@ class SoundManager:
             )
 
     def play_sound(self, payload: Path | dict[str, str | Path | None]) -> None:
-        """Plays `payload`: if Path - play_audio(payload), else - prints text to UI and play_audio(payload['path'])."""
+        """Plays sound from payload."""
         if isinstance(payload, dict):
             path = payload.get("path") or payload.get("sound")
             text = payload.get("text")
@@ -242,7 +235,7 @@ class SoundManager:
                     text_str = text_str.format(username=cfg.username, name=cfg.name)
                 except KeyError as e:
                     log(
-                        f"Formatting text failed for sound '{text_str}': Missing key {e}",
+                        f"Formatting text failed for '{text_str}': Missing key {e}",
                         "OP",
                         "DEBUG",
                     )

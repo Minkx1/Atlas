@@ -9,8 +9,8 @@ from textual.events import Resize
 from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
-from .config import cfg
-from .events import Event, EventManager, EventType, emit_event, log
+from ..core.config import cfg
+from ..core.events import Event, EventManager, EventType, emit_event, log
 
 
 class AudioWaveform(Static):
@@ -231,7 +231,7 @@ class UI(App):
    /   |  / / / /___ ______ 
   / /| | / __/ / __ `/ ___/ 
  / ___ |/ /_/ / /_/ (__  )  
-/_/  |_|\__/_/\__,_/____/  
+/_/  |_|\__/_/\__,_/____/   
 [/#00d7ff]"""
                 yield Static(logo, id="image-box")
                 yield Static("[dim #a0a0a0]SLEEPING[/dim #a0a0a0]", id="status-text")
@@ -323,7 +323,8 @@ class UI(App):
         }
         color = color_map.get(level, "white")
 
-        formatted_msg = f"[[#00d7ff]{timestamp}[/#00d7ff]] [[bold]{source}[/bold]] [{color}][{level}][/{color}]: {message}"
+        formatted_msg = f"[[#00d7ff]{timestamp}[/#00d7ff]] [[bold]{source}[/bold]]"
+        f"[{color}][{level}][/{color}]: {message}"
 
         # transport writing to Textual main thread
         self.safe_call(self.event_log.write, formatted_msg)

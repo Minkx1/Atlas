@@ -1,11 +1,11 @@
 #
-# speech_to_text.py
-# SoundDevice.InputStream[microphone] -> KeyWordSpotter[Sherpa ONNX KWS] -> Voice Activity Detector[Silero VAD] + STT[faster-whisper] -> "recognized text"
+# stt / speech_recognition.py
+# Unites Silero VAD with Faster-Whisper recognition models to process audio chunks and
+# recognize spoken text as fast as possible
 #
 
 import os
 import queue
-import sys
 from collections import deque
 from pathlib import Path
 from threading import Thread
@@ -13,18 +13,10 @@ from typing import Literal
 
 import numpy as np
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.config import DATA_DIR, cfg
-    from ..core.events import EventType, emit_event, log
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.config import DATA_DIR, cfg
-    from core.events import EventType, emit_event, log
+from ..core.config import DATA_DIR, cfg
+from ..core.events import EventType, emit_event, log
 
-
-# disables HF warning on Windows
+# disables HF symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
 
@@ -178,7 +170,7 @@ class Whisper:
             w = cfg.stt
             if not self.model_dir.exists():
                 log(
-                    f"No Faster-Whisper model found in {self.model_dir}. Downloading...",
+                    f"Faster-Whisper model not found: {self.model_dir}. Downloading...",
                     "STT",
                     "INFO",
                 )
@@ -311,7 +303,3 @@ class SpeechRecognizer:
             emit_event(EventType.VAD_END, {})
 
         return vad_state
-
-
-if _MAIN:
-    ...

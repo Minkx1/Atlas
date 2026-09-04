@@ -1,4 +1,8 @@
-# config.py
+#
+# core / config.py
+# Contains core configuration and settings for the application
+#
+
 import json
 import os
 import sys
@@ -95,7 +99,7 @@ class TTSConfig:
 @dataclass
 class LLMConfig:
     model_path: str = "models/llm/gemma2_2b."
-    initial_prompt: str = "You are an AI Voice Assistant 'Atlas'. Answer briefly and concisely in English. "
+    initial_prompt: str = "You are an AI Voice Assistant 'Atlas'. Answer briefly and concisely in English."  # noqa: E501
     context_tokens: int = 2048
     max_msg_tokens: int = 512
     temperature: float = 0.7
@@ -117,8 +121,8 @@ class OPConfig:
         path = CONFIG_DIR / self.commands
         if not path.exists():
             raise FileNotFoundError(
-                "[!] `commands.json` file was not found! Please check path or consider downloading latest version from "
-                + "[github repository](https://github.com/Minkx1/Atlas)"
+                "[!] `commands.json` file was not found! Please check path or consider "
+                "downloading latest version from [github repository](https://github.com/Minkx1/Atlas)"
             )
 
         with path.open("r", encoding="utf-8") as handle:
@@ -165,7 +169,8 @@ def load_config(config_path: str = "config/config.toml") -> AppConfig:
             )
         else:
             raise FileNotFoundError(
-                "[!] `config.toml` file was not found! Please consider downloading latest version from [github repository]"
+                "[!] `config.toml` file was not found! Please consider downloading "
+                "latest version from [github repository]"
                 + "(https://github.com/Minkx1/Atlas)"
             )
         return load_config(str(path))

@@ -1,4 +1,7 @@
-# events.py
+#
+# core / events.py
+# Contains core event system
+#
 
 import queue
 import threading

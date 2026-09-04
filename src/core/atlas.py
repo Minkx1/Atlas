@@ -1,10 +1,14 @@
-# atlas.py
+#
+# core / atlas.py
+# Main Atlas entry point and orchestrator for the application
+#
 
 import sys
 
 from ..op import CommandOperator, Llama, Operator
 from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
 from ..tts import SoundManager, TextToSpeech
+from ..utils import UI, KeyBindManager
 from .config import cfg
 from .events import (
     CommandType,
@@ -14,10 +18,6 @@ from .events import (
     emit_event,
     log,
 )
-from .keybinds import KeyBindManager
-
-# from .ui import AssistantUI, console
-from .ui import UI
 
 
 class Atlas:
@@ -31,8 +31,9 @@ class Atlas:
             self.logger = EventLogger()
             import time
 
+            timestamp = time.strftime("%H:%M:%S", time.localtime(time.time()))
             self.logger._write_file(
-                f" ===== New Session: [{time.strftime('%H:%M:%S', time.localtime(time.time()))}] | SUCCESS ===== \n",
+                f" ===== New Atlas Session: [{timestamp}] | SUCCESS ===== \n",
                 time.time(),
             )
 

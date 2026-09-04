@@ -8,6 +8,9 @@ from collections.abc import Callable
 class KeyBindManager:
     def __init__(self) -> None:
         from pynput import keyboard
+
+        self._keyboard = keyboard
+
         self.keybinds: dict[str, list[Callable[[], None]]] = {}
         self._listener: keyboard.GlobalHotKeys | None = None
 
@@ -16,9 +19,8 @@ class KeyBindManager:
             self.close()
 
         hotkeys_map = {kb: (lambda k=kb: self._dispatch(k)) for kb in self.keybinds}
-        
-        from pynput import keyboard
-        self._listener = keyboard.GlobalHotKeys(hotkeys_map)
+
+        self._listener = self._keyboard.GlobalHotKeys(hotkeys_map)
         self._listener.start()
 
     def close(self) -> None:
@@ -30,7 +32,7 @@ class KeyBindManager:
         for cb in self.keybinds.get(keybind, []):
             try:
                 cb()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 print(f"Error handling '{keybind}': {e}", "KeyBind", "ERROR")
 
     def register_keybind(self, keybind: str, callback: Callable) -> None:

@@ -1,32 +1,23 @@
 #
-# llama.py
+# op / llama.py
+# Wrapper for Llama-cpp-python
 #
 
 import os
-import sys
-from pathlib import Path
+from contextlib import suppress
 
 import llama_cpp
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.config import DATA_DIR, cfg
-    from ..core.events import EventType, emit_event, log
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.config import DATA_DIR, cfg
-    from core.events import EventType, emit_event, log
+from ..core.config import DATA_DIR, cfg
+from ..core.events import EventType, emit_event, log
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
 if _orig_llama_del:
 
     def _silent_llama_del(self):
-        try:  # noqa: SIM105
+        with suppress(TypeError, AttributeError, NameError, ImportError):
             _orig_llama_del(self)  # type: ignore
-        except (TypeError, AttributeError, NameError, ImportError):
-            pass
 
     llama_cpp.Llama.__del__ = _silent_llama_del
 
@@ -42,13 +33,11 @@ class Llama:
             self.total_tokens = prompt_tokens + completion_tokens
 
     def __init__(self) -> None:
-        l = cfg.llm
-
-        self.model_path = DATA_DIR / l.model_path
-        self.initial_prompt = l.initial_prompt
-        self.context_tokens = l.context_tokens
-        self.max_tokens = l.max_msg_tokens
-        self.temperature = l.temperature
+        self.model_path = DATA_DIR / cfg.llm.model_path
+        self.initial_prompt = cfg.llm.initial_prompt
+        self.context_tokens = cfg.llm.context_tokens
+        self.max_tokens = cfg.llm.max_msg_tokens
+        self.temperature = cfg.llm.temperature
 
         self.repeat_penalty = 1.15
         self.stop = ["\nUser:", "User:", "<|im_end|>"]
@@ -172,5 +161,18 @@ class Llama:
         self.close()
 
 
-if _MAIN:
-    ...
+if __name__ == "__main__":
+    llm = Llama()
+    print("Loading model...")
+    llm.load()
+    print("Loading complete!")
+    while True:
+        try:
+            for tok in llm.stream_response(input("> ")):
+                print(tok, sep="", end="", flush=True)
+            print()
+        except KeyboardInterrupt:
+            print("\nQuiting...")
+            break
+
+    llm.close()

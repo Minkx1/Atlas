@@ -1,6 +1,6 @@
 #
-# global_operator.py
-# Global Operator: processes and operates commands
+# op / global_operator.py
+# Global Operator: processes and operates all commands, that come from STT
 #
 
 import queue

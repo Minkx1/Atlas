@@ -1,21 +1,13 @@
 #
-#  state_machine.py
+# stt / state_machine.py
+# Responsible for proper state changing/saving and callbacks
 #
 
-import sys
 import time
 from enum import StrEnum
-from pathlib import Path
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.config import cfg
-    from ..core.events import EventType, emit_event
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.config import cfg
-    from core.events import EventType, emit_event
+from ..core.config import cfg
+from ..core.events import EventType, emit_event
 
 
 class State(StrEnum):
@@ -37,7 +29,7 @@ class StateMachine:
         self.awake_deadline = 0.0
 
     def update_deadline(self) -> None:
-        """Updates deadline when needed, so it is not reached during talking or processing."""
+        """Updates deadline to prevent going to sleep during talking or processing."""
         self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
 
     def is_deadline_expired(self) -> bool:
@@ -69,7 +61,3 @@ class StateMachine:
 
     def allow_speech_recognition(self) -> bool:
         return self.state not in {State.WAITING, State.SLEEPING}
-
-
-if _MAIN:
-    ...

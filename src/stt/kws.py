@@ -1,22 +1,16 @@
 #
-#  kws.py
+# kws.py
+# Sherpa-ONNX KeyWordSpotter model, that takes audio data from listener and
+# returns keyword if one was spotted
 #
 
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.config import CONFIG_DIR, DATA_DIR, cfg
-    from ..core.events import EventType, emit_event, log
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.config import CONFIG_DIR, DATA_DIR, cfg
-    from core.events import EventType, emit_event, log
+from ..core.config import CONFIG_DIR, DATA_DIR, cfg
+from ..core.events import EventType, emit_event, log
 
 
 class KeyWordSpotter:
@@ -139,7 +133,7 @@ class KeyWordSpotter:
                 archive_path.unlink()
 
     def process_chunk(self, chunk_np: np.ndarray) -> str | None:
-        """Processes audio chunk. If keyword was spotted: returns it. Else: returns None."""
+        """Processes audio chunk. Returns keyword if spotted or None."""
         if not hasattr(self, "kws"):
             raise RuntimeError("KWS was used before kws.load()")
 
@@ -158,7 +152,3 @@ class KeyWordSpotter:
         if not hasattr(self, "kws"):
             raise RuntimeError("KWS was used before kws.load()")
         self.stream = self.kws.create_stream()
-
-
-if _MAIN:
-    print("Testing 'KWS' module...")

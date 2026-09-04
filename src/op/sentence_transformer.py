@@ -1,8 +1,8 @@
 #
-#  sentence_transformer.py
+# op / sentence_transformer.py
+# Own ONNX-runtime wrapper for SentenceTransformer models using `tokenizers`
 #
 
-import sys
 from pathlib import Path
 from urllib.error import URLError
 
@@ -10,19 +10,12 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-_MAIN = __name__ == "__main__"
-if not _MAIN:
-    from ..core.config import DATA_DIR
-    from ..core.events import log
-else:
-    # changing execution dir to src/ for proper importing
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from core.config import DATA_DIR
-    from core.events import log
+from ..core.config import DATA_DIR
+from ..core.events import log
 
 
 class ONNXSentenceTransformer:
-    """Lightweight replacement for sentence-transformers using ONNX & Rust tokenizers."""
+    """Lightweight replacement for sentence-transformers using ONNX & Rust tokenizers"""
 
     def __init__(
         self, model_name: str = "all-MiniLM-L6-v2", download_dir: Path | None = None
@@ -127,7 +120,3 @@ class ONNXSentenceTransformer:
             return embeddings[0]
 
         return embeddings
-
-
-if _MAIN:
-    ...
