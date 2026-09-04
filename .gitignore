@@ -15,3 +15,7 @@ data/sounds/
 bin/
 
 *.egg-info
+
+.coverage
+coverage.xml
+htmlcov/

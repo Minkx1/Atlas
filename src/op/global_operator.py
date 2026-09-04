@@ -3,6 +3,8 @@
 # Global Operator: processes and operates all commands, that come from STT
 #
 
+from __future__ import annotations
+
 import queue
 import re
 import threading
