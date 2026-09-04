@@ -6,10 +6,13 @@
 import queue
 import re
 import threading
+from typing import TYPE_CHECKING
 
 from ..core.events import EventType, emit_event
-from .cmd_operator import CommandOperator
-from .llama import Llama
+
+if TYPE_CHECKING:
+    from .cmd_operator import CommandOperator
+    from .llama import Llama
 
 
 class Operator:
