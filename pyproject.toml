@@ -3,7 +3,7 @@ name = "atlas"
 version = "0.6.4"
 description = "A fast, private and 100% offline personal AI Voice Assistant."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Minkx1", email = "zakalata.mark@gmail.com" }]
 dependencies = [
     "numpy",
