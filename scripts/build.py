@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from importlib.metadata import version
 from pathlib import Path
 
 # changing root from scripts/ to /
@@ -15,12 +16,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-
-from src._version import __version__
-
 APP_NAME = "atlas"
 ENTRY_POINT = "main.py"
-VERSION = __version__
+VERSION = version(APP_NAME)
 
 SYS_NAME = platform.system().lower()
 MACHINE = platform.machine().lower()
@@ -344,7 +342,7 @@ def make_compressed_archive(basename: str, staging_dir: Path, cpu_only: bool):
     log(f"Archive created: {archive_file}")
 
 
-if __name__ == "__main__":
+def main() -> None:
     args = parse_args()
     basename = get_basename(args.cpu_only)
     staging_dir = BASE_DIR / basename
@@ -356,6 +354,10 @@ if __name__ == "__main__":
             make_compressed_archive(
                 basename=basename, staging_dir=staging_dir, cpu_only=args.cpu_only
             )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log(f"Build failed: {e}", "ERROR")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
