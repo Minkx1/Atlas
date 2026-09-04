@@ -36,6 +36,10 @@ dev = ["pytest", "pytest-cov", "ruff", "pyinstaller", "commitizen"]
 requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"
