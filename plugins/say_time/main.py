@@ -1,3 +1,7 @@
+import time
+from random import choice
+
+
 def get_ctx() -> dict:
     """Get context from `stdin`"""
     import json
@@ -25,14 +29,11 @@ def log(message: str, source: str = "say-time", level: str = "INFO"):
     stderr.flush()
 
 
-import time
-from random import choice
-
 sounds = ["Time is: {time}", "It is {time}"]
 
 
 def main():
-    context = get_ctx()
+    get_ctx()
 
     t = time.localtime()
     res = {

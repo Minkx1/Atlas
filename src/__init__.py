@@ -1,1 +1,1 @@
-from .core.atlas import Atlas
+from .core.atlas import Atlas as Atlas

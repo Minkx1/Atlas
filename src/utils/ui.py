@@ -227,11 +227,11 @@ class UI(App):
             with Container(id="central-panel") as center:
                 center.border_title = "STATUS"
                 logo = r"""[#00d7ff]
-    ___    __  __           
-   /   |  / / / /___ ______ 
-  / /| | / __/ / __ `/ ___/ 
- / ___ |/ /_/ / /_/ (__  )  
-/_/  |_|\__/_/\__,_/____/   
+    ___    __  __
+   /   |  / / / /___ ______
+  / /| | / __/ / __ `/ ___/
+ / ___ |/ /_/ / /_/ (__  )
+/_/  |_|\__/_/\__,_/____/
 [/#00d7ff]"""
                 yield Static(logo, id="image-box")
                 yield Static("[dim #a0a0a0]SLEEPING[/dim #a0a0a0]", id="status-text")

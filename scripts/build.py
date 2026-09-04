@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from contextlib import suppress
 from importlib.metadata import version
 from pathlib import Path
 
@@ -145,19 +146,15 @@ def post_build_cleanup(dist_path: Path):
                 or (SYS_NAME == "linux" and file_path.name in PROBLEMATIC_LINUX_LIBS)
                 or file_path.name in UNNEEDED_CUDA_LIBS
             ):
-                try:
+                with suppress(OSError):
                     file_path.unlink()
-                except OSError:
-                    pass
             elif SYS_NAME == "linux" and file_path.suffix == ".so":
-                try:
+                with suppress(Exception):
                     subprocess.run(
                         ["strip", "--strip-unneeded", str(file_path)],
                         stderr=subprocess.DEVNULL,
                         check=False,
                     )
-                except Exception:  # noqa: BLE001, S110
-                    pass
 
     if SYS_NAME == "linux":
         _dedupe_by_hardlink(dist_path)
@@ -192,14 +189,12 @@ def _dedupe_by_hardlink(dist_path: Path, min_size: int = 500 * 1024):
 
 def generate_build_info(cpu_only: bool) -> dict:
     git_hash = "unknown"
-    try:
+    with suppress(Exception):
         git_hash = (
             subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
             .decode()
             .strip()
         )
-    except Exception:  # noqa: BLE001, S110
-        pass
 
     return {
         "version": VERSION,
@@ -328,7 +323,7 @@ def make_compressed_archive(basename: str, staging_dir: Path, cpu_only: bool):
                 check=True,
             )
             compressed = True
-        except Exception:  # noqa: BLE001
+        except Exception:
             log(
                 "System tar/xz didn't work, using python's tarfile.",
                 "WARN",
