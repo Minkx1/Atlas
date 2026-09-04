@@ -1,3 +1,9 @@
+## v0.6.5 (2026-09-04)
+
+### Fix
+
+- fixed minimum required py version
+
 ## v0.6.4 (2026-09-03)
 
 ### Refactor
