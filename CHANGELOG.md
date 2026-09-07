@@ -1,3 +1,9 @@
+## v0.6.6 (2026-09-07)
+
+### Refactor
+
+- **core**: added module system, event implementation refactor and tests changes
+
 ## v0.6.5 (2026-09-04)
 
 ### Fix
