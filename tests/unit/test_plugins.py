@@ -33,10 +33,12 @@ timeout = 3.5
     )
 
 
-def test_plugin_say_message_emits_tts_command_and_ui_event(tmp_path: Path):
-    plugin = Plugin(tmp_path, PluginManifest(id="demo"))
+def test_plugin_say_message_emits_tts_command_and_ui_event(
+    tmp_path: Path, event_manager: EventManager
+):
+    plugin = Plugin(tmp_path, PluginManifest(id="demo"), event_manager)
     received = []
-    manager = EventManager()
+    manager = event_manager
     manager.subscribe(CommandType.TTS_SPEAK, received.append)
     manager.subscribe(EventType.UI_ASSISTANT_SAY, received.append)
 

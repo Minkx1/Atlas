@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from ..core.config import CONFIG_DIR, DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 
 
 class KeyWordSpotter:
@@ -28,11 +28,14 @@ class KeyWordSpotter:
 
     def __init__(
         self,
+        events: EventManager | None = None,
         model_dir: str = cfg.kws.model_dir,
         keywords_file: Path = CONFIG_DIR / cfg.kws.keywords_file,
         num_threads: int = cfg.kws.num_threads,
         keywords_threshold: float = cfg.kws.score_threshold,
     ):
+        self.events = events or EventManager()
+
         path: Path = DATA_DIR / model_dir
         self.tokens = str(path / "tokens.txt")
         self.encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
@@ -70,7 +73,7 @@ class KeyWordSpotter:
             self.stream = self.kws.create_stream()
 
             log("KWS model loaded.", "KWS", "SUCCESS")
-            emit_event(EventType.KWS_LOADED, {})
+            self.events.emit(EventType.KWS_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading KWS model: {type(e).__name__}: {e}",

@@ -7,7 +7,7 @@ import time
 from enum import StrEnum
 
 from ..core.config import cfg
-from ..core.events import EventType, emit_event
+from ..core.events import EventManager, EventType
 
 
 class State(StrEnum):
@@ -18,7 +18,9 @@ class State(StrEnum):
 
 
 class StateMachine:
-    def __init__(self) -> None:
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+
         self.state = State.SLEEPING
 
         if cfg.stt.start_state == "AWAKE":
@@ -41,12 +43,12 @@ class StateMachine:
             if new_state == State.AWAKE:
                 self.update_deadline()
 
-            emit_event(EventType.STT_CHANGED_STATE, {"state": new_state.value})
+            self.events.emit(EventType.STT_CHANGED_STATE, {"state": new_state.value})
 
             payload = {"state": new_state.value}
             if detail:
                 payload["detail"] = detail
-            emit_event(EventType.UI_STATE_CHANGE, payload)
+            self.events.emit(EventType.UI_STATE_CHANGE, payload)
 
     def update(self) -> None:
         if self.state == State.WAITING:

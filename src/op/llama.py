@@ -9,7 +9,7 @@ from contextlib import suppress
 import llama_cpp
 
 from ..core.config import DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -32,7 +32,9 @@ class Llama:
             self.completion_tokens = completion_tokens
             self.total_tokens = prompt_tokens + completion_tokens
 
-    def __init__(self) -> None:
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+
         self.model_path = DATA_DIR / cfg.llm.model_path
         self.initial_prompt = cfg.llm.initial_prompt
         self.context_tokens = cfg.llm.context_tokens
@@ -66,7 +68,7 @@ class Llama:
                 n_gpu_layers=0,
                 verbose=False,
             )
-            emit_event(EventType.LLM_LOADED, {})
+            self.events.emit(EventType.LLM_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading LLM model: {type(e).__name__}: {e}",

@@ -5,7 +5,11 @@ from src.core.events import EventManager
 
 @pytest.fixture(autouse=True)
 def clean_event_manager():
-    EventManager().flush_and_stop()
+    manager = EventManager()
     yield
-    EventManager().flush_and_stop()
+    manager.flush_and_stop()
 
+
+@pytest.fixture
+def event_manager():
+    return EventManager()

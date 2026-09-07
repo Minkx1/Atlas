@@ -1,27 +1,29 @@
 #
-# op / global_operator.py
-# Global Operator: processes and operates all commands, that come from STT
+# op / module.py
 #
 
-from __future__ import annotations
+# from __future__ import annotations
 
 import queue
 import re
 import threading
-from typing import TYPE_CHECKING
 
-from ..core.events import EventType, emit_event
-
-if TYPE_CHECKING:
-    from .cmd_operator import CommandOperator
-    from .llama import Llama
+from ..core.events import CommandType, EventManager, EventType
+from ..core.module import Module, on_event
+from .cmd_operator import CommandOperator
+from .llama import Llama
 
 
-class Operator:
-    def __init__(self, cmd: CommandOperator, llm: Llama) -> None:
+class OpModule(Module):
+    name = "op"
+
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+        self._register_events(self.events)
+
         self._running = False
-        self.cmd = cmd
-        self.llm = llm
+        self.cmd = CommandOperator(self.events)
+        self.llm = Llama(self.events)
         self.command_queue: queue.Queue[str | None] = queue.Queue()
         self.worker_thread = threading.Thread(
             target=self._operator_worker, name="OPERATOR_THREAD", daemon=True
@@ -29,22 +31,7 @@ class Operator:
 
         self.interrupt_flag = threading.Event()
 
-    def start(self):
-        self._running = True
-        self.worker_thread.start()
-
-    def close(self):
-        self._running = False
-        self.command_queue.put(None)
-        if self.worker_thread.is_alive():
-            self.worker_thread.join(timeout=2.0)
-        self.llm.close()
-
-    def submit(self, text: str):
-        self.command_queue.put(text)
-
-    def interrupt(self):
-        self.interrupt_flag.set()
+    # Class methods
 
     @staticmethod
     def _sentence_chunker(token_stream):
@@ -85,34 +72,61 @@ class Operator:
 
             full_response_text += sentence + " "
 
-            emit_event(EventType.OP_LLM_CHUNK, {"text": sentence})
+            self.events.emit(EventType.OP_LLM_CHUNK, {"text": sentence})
 
-            emit_event(
+            self.events.emit(
                 EventType.UI_LLM_CHUNK,
                 {"text": sentence, "is_first": is_first_chunk},
             )
             is_first_chunk = False
 
-        emit_event(
+        self.events.emit(
             EventType.UI_LLM_RESPONSE_DONE,
             {
                 "text": full_response_text.strip(),
             },
         )
-        emit_event(EventType.LLM_RESPONSE, {"text": full_response_text.strip()})
+        self.events.emit(EventType.LLM_RESPONSE, {"text": full_response_text.strip()})
         self.llm.history_add_response(full_response_text.strip())
 
     def _operate(self, text: str) -> None:
         if not text:
             return
 
-        emit_event(EventType.OP_START, {})
+        self.events.emit(EventType.OP_START, {})
         res_type = self.cmd.operate(text)
 
         if not res_type:  # LLM
             if self.llm.no_model:  # LLM model was not load for some reason
-                emit_event(EventType.OP_INTENT, {"intent": "idk_cmd"})
+                self.events.emit(EventType.OP_INTENT, {"intent": "idk_cmd"})
             else:
                 self._stream_llm_response(text)
 
-        emit_event(EventType.OP_FINISH, {})
+        self.events.emit(EventType.OP_FINISH, {})
+
+    # Module methods
+
+    def start(self):
+        self._running = True
+        self.worker_thread.start()
+
+    def load(self):
+        self.llm.load()
+        self.cmd.load()
+
+    def close(self):
+        self._running = False
+        self.command_queue.put(None)
+        if self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=2.0)
+        self.llm.close()
+
+    # Events
+
+    @on_event(CommandType.OP_SUBMIT, EventType.STT_TRANSCRIBED)
+    def submit(self, text: str = "", **kwargs):
+        self.command_queue.put(text)
+
+    @on_event(EventType.OP_INTERRUPT)
+    def interrupt(self, **kwargs):
+        self.interrupt_flag.set()

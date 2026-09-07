@@ -14,11 +14,13 @@ import sounddevice as sd
 import soundfile as sf
 
 from ..core.config import DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 
 
 class SoundManager:
-    def __init__(self) -> None:
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+
         self.commands = cfg.op.load_commands() or {}
         self.silence_duration = cfg.tts.silence_duration
 
@@ -75,7 +77,7 @@ class SoundManager:
             sd.play(padded_audio, samplerate)
             sd.wait()
 
-            emit_event(EventType.TTS_FREE, {})
+            self.events.emit(EventType.TTS_FREE, {})
         except Exception as e:
             log(
                 f"Error playing audio {path.name}: {type(e).__name__}: {e}",
@@ -91,14 +93,14 @@ class SoundManager:
 
             formatted_text = str(text).format(username=cfg.username, name=cfg.name)
             if formatted_text:
-                emit_event(EventType.UI_ASSISTANT_SAY, {"text": formatted_text})
+                self.events.emit(EventType.UI_ASSISTANT_SAY, {"text": formatted_text})
             if not path:
                 return
             payload = Path(path)
         elif isinstance(payload, str):
             payload = Path(payload)
 
-        emit_event(EventType.TTS_BUSY, {})
+        self.events.emit(EventType.TTS_BUSY, {})
         self.play_audio(payload)
 
     def interrupt(self) -> None:
@@ -190,7 +192,7 @@ class SoundManager:
                     continue
 
                 log(f"Generating sound: {path_str}", "TTS", "INFO")
-                emit_event(
+                self.events.emit(
                     EventType.SOUNDS_GENERATE_SOUND,
                     {"text": formatted_text.strip(), "path": full_path},
                 )

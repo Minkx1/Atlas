@@ -2,21 +2,21 @@ from src.core.events import EventManager, EventType
 from src.stt.state_machine import State, StateMachine
 
 
-def test_state_machine_starts_sleeping_when_configured(monkeypatch):
+def test_state_machine_starts_sleeping_when_configured(monkeypatch, event_manager):
     from src.stt import state_machine
 
     monkeypatch.setattr(state_machine.cfg.stt, "start_state", "SLEEPING")
 
-    assert StateMachine().state is State.SLEEPING
+    assert StateMachine(event_manager).state is State.SLEEPING
 
 
-def test_awake_state_emits_state_events(monkeypatch):
+def test_awake_state_emits_state_events(monkeypatch, event_manager):
     from src.stt import state_machine
 
     monkeypatch.setattr(state_machine.cfg.stt, "start_state", "SLEEPING")
-    machine = StateMachine()
+    machine = StateMachine(event_manager)
     received = []
-    manager = EventManager()
+    manager = event_manager
     manager.subscribe(EventType.STT_CHANGED_STATE, received.append)
     manager.subscribe(EventType.UI_STATE_CHANGE, received.append)
 

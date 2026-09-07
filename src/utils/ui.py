@@ -10,7 +10,7 @@ from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
 from ..core.config import cfg
-from ..core.events import Event, EventManager, EventType, emit_event, log
+from ..core.events import Event, EventManager, EventType, log
 
 
 class AudioWaveform(Static):
@@ -214,9 +214,10 @@ class UI(App):
     TITLE = "Atlas"
     CSS = tcss
 
-    def __init__(self, app=None, **kwargs):
+    def __init__(self, events: EventManager | None = None, app=None, **kwargs):
         super().__init__(**kwargs)
         self.atlas = app
+        self.events = events or EventManager()
 
     def compose(self) -> ComposeResult:
         with Container(id="main-app"):
@@ -260,14 +261,13 @@ class UI(App):
         self.set_interval(1.0, self.update_clock)
         self.update_clock()
 
-        em = EventManager()
-        em.subscribe(EventType.STT_CHANGED_STATE, self.event_stt_changed_state)
-        em.subscribe(EventType.STT_AUDIOWAVE, self.on_audio_wave)
-        em.subscribe(EventType.STT_TRANSCRIBED, self.event_on_received_command)
+        self.events.subscribe(EventType.STT_CHANGED_STATE, self.event_stt_changed_state)
+        self.events.subscribe(EventType.STT_AUDIOWAVE, self.on_audio_wave)
+        self.events.subscribe(EventType.STT_TRANSCRIBED, self.event_on_received_command)
 
-        em.subscribe(EventType.DEBUG_LOG, self.event_on_debug_log)
-        em.subscribe(EventType.UI_LLM_CHUNK, self.event_on_llm_chunk)
-        em.subscribe(EventType.UI_ASSISTANT_SAY, self.event_on_assistant_say)
+        self.events.subscribe(EventType.DEBUG_LOG, self.event_on_debug_log)
+        self.events.subscribe(EventType.UI_LLM_CHUNK, self.event_on_llm_chunk)
+        self.events.subscribe(EventType.UI_ASSISTANT_SAY, self.event_on_assistant_say)
 
     def safe_call(self, fn, *args, **kwargs):
         if getattr(self, "is_running", False):
@@ -388,7 +388,7 @@ class UI(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.input.value = ""
-        emit_event(EventType.STT_TRANSCRIBED, {"text": event.value})
+        self.events.emit(EventType.STT_TRANSCRIBED, {"text": event.value})
 
 
 if __name__ == "__main__":

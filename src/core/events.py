@@ -84,6 +84,7 @@ class CommandType(StrEnum):
     TTS_SPEAK = "TTS_SPEAK"
     TTS_PLAY_SOUND = "TTS_PLAY_SOUND"
     OP_SUBMIT = "OP_SUBMIT"
+    SET_STATE = "SET_STATE"
 
 
 Payload = dict[str, Any]

@@ -12,11 +12,16 @@ import sounddevice as sd
 from scipy.signal import resample_poly
 
 from ..core.config import cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 
 
 class Listener:
-    def __init__(self, chunk_processor: Callable[[np.ndarray], None]) -> None:
+    def __init__(
+        self,
+        chunk_processor: Callable[[np.ndarray], None],
+        events: EventManager | None = None,
+    ) -> None:
+        self.events = events or EventManager()
         self.processor = chunk_processor
 
         self.audio_input_thread = Thread(
@@ -101,7 +106,7 @@ class Listener:
                             audio_mono = audio[:, 0] if audio.ndim > 1 else audio
 
                             rms = float(np.sqrt(np.mean(audio_mono**2)))
-                            emit_event(EventType.STT_AUDIOWAVE, {"rms": rms})
+                            self.events.emit(EventType.STT_AUDIOWAVE, {"rms": rms})
 
                     except Exception as e:
                         log(
@@ -117,7 +122,7 @@ class Listener:
 
     def start(self):
         self._running = True
-        emit_event(EventType.STT_START, {})
+        self.events.emit(EventType.STT_START, {})
         self.audio_input_thread.start()
 
     def close(self):
@@ -126,4 +131,4 @@ class Listener:
         if self.audio_input_thread is not None and self.audio_input_thread.is_alive():
             self.audio_input_thread.join(timeout=2.0)
 
-        emit_event(EventType.STT_FINISH, {})
+        self.events.emit(EventType.STT_FINISH, {})

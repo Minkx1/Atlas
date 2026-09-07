@@ -5,9 +5,14 @@
 
 import sys
 
-from ..op import CommandOperator, Llama, Operator
-from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
-from ..tts import SoundManager, TextToSpeech
+# from ..op import CommandOperator, Llama, Operator
+from ..op import OpModule
+
+# from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
+from ..stt import SttModule
+
+# from ..tts import SoundManager, TextToSpeech
+from ..tts import TtsModule
 from ..utils import UI, KeyBindManager
 from .config import cfg
 from .events import (
@@ -15,6 +20,7 @@ from .events import (
     EventLogger,
     EventManager,
     EventType,
+    command,
     emit_event,
     log,
 )
@@ -22,7 +28,7 @@ from .events import (
 
 class Atlas:
     def __init__(self) -> None:
-        # light components
+        # Events and Logger
         self.events = EventManager()
         self.alive = True
         self.logger = None
@@ -37,36 +43,21 @@ class Atlas:
                 time.time(),
             )
 
+        # Utils
+
         self.keybinds = KeyBindManager()
         self.keybinds.register_keybind(
             cfg.kws.awake_keybind,
             lambda: emit_event(EventType.KWS_KEYWORD_DETECTED, {"keyword": "{HotKey}"}),
         )
 
-        # STT Pipeline
-        self.kws = KeyWordSpotter()
-        self.sr = SpeechRecognizer()
-        self.sm = StateMachine()
+        self.ui = UI(app=self, events=self.events)
 
-        def audio_process(audio_chunk):
-            kw = self.kws.process_chunk(audio_chunk)
-            if kw:
-                emit_event(EventType.KWS_KEYWORD_DETECTED, {"keyword": kw})
-            self.sm.update()
+        # Modules
 
-            allow_rec = self.sm.allow_speech_recognition()
-            self.sr.process(audio_chunk, allow_rec)
-
-        self.listener = Listener(audio_process)
-
-        # TTS
-        self.sound_manager = SoundManager()
-        self.tts = TextToSpeech()
-
-        # Operator
-        self.cmd = CommandOperator()
-        self.llama = Llama()
-        self.operator = Operator(self.cmd, self.llama)
+        self.stt_module = SttModule(self.events)
+        self.tts_module = TtsModule(self.events)
+        self.op_module = OpModule(self.events)
 
         self._setup_subscriptions()
 
@@ -78,14 +69,17 @@ class Atlas:
     def load_models(self):
         try:
             log("Starting model loading...", "ATLAS", "INFO")
-            self.kws.load()
-            self.sr.load()
+            # self.kws.load()
+            # self.sr.load()
+            self.stt_module.load()
 
-            self.tts.load()
-            self.sound_manager.load()
+            self.tts_module.load()
+            # self.tts.load()
+            # self.sound_manager.load()
 
-            self.cmd.load()
-            self.llama.load()
+            self.op_module.load()
+            # self.cmd.load()
+            # self.llama.load()
 
             log("All models loaded successfully.", "ATLAS", "SUCCESS")
         except Exception as e:
@@ -98,79 +92,17 @@ class Atlas:
 
     def _setup_subscriptions(self):
         """Subscribe all nececessary callbacks for events."""
-        em = EventManager()
-        app = self
-
-        # TTS
-        em.subscribe(
-            EventType.SOUNDS_GENERATE_SOUND,
-            lambda e: app.tts._text_to_file(**e.payload),
-        )
-
-        em.subscribe(CommandType.TTS_SPEAK, lambda e: app.tts.speak(e.payload["text"]))
-        em.subscribe(
-            CommandType.TTS_PLAY_SOUND,
-            lambda e: app.sound_manager.play_sound(e.payload),
-        )
-        em.subscribe(
-            CommandType.OP_SUBMIT,
-            lambda e: app.operator.submit(e.payload["text"]),
-        )
-
-        em.subscribe(EventType.TTS_BUSY, lambda e: app.sm.set_state(State.WAITING))
-
-        def handle_tts_free(e):
-            app.sm.set_state(State.AWAKE)
-            app.sm.update_deadline()
-
-        em.subscribe(EventType.TTS_FREE, handle_tts_free)
-
-        def handle_interrupt(e):
-            app.tts.interrupt()
-            app.sound_manager.interrupt()
-            app.operator.interrupt()
-
-        em.subscribe(EventType.OP_INTERRUPT, handle_interrupt)
-        em.subscribe(EventType.OP_START, lambda e: self.sm.set_state(State.WAITING))
 
         def handle_intent(event):
             intent: str = event.payload["intent"]
-            app.sound_manager.play_category(intent)
+            self.tts_module.play_category(intent)
 
             if intent == "farewell":
-                app.shutdown()
+                self.shutdown()
             if intent == "sleep":
-                app.sm.set_state(State.SLEEPING)
+                command(CommandType.SET_STATE, {"state": "SLEEPING"})
 
-        em.subscribe(EventType.OP_INTENT, handle_intent)
-
-        em.subscribe(EventType.OP_LLM_CHUNK, lambda e: app.tts.speak(e.payload["text"]))
-
-        # STT
-        em.subscribe(
-            EventType.STT_CHANGED_STATE,
-            lambda e: app.kws.reset() if e.payload.get("state") == "SLEEPING" else None,
-        )
-
-        def handle_kw_detected(e):
-            if app.sm.state == State.WAITING:
-                emit_event(EventType.OP_INTERRUPT, {})
-                app.sm.set_state(State.AWAKE, f"Interrupted: {e.payload['keyword']}")
-            else:
-                # app.operator.submit("!EVENT_KEYWORD_DETECTED")
-                log(f"Keyword detected directly: {e.payload['keyword']}.", level="INFO")
-                emit_event(EventType.OP_INTENT, {"intent": "greet"})
-                app.sm.set_state(State.AWAKE, f"Keyword: {e.payload['keyword']}")
-
-        em.subscribe(EventType.KWS_KEYWORD_DETECTED, handle_kw_detected)
-
-        em.subscribe(EventType.VAD_START, lambda e: app.sm.set_state(State.RECORDING))
-        em.subscribe(EventType.VAD_END, lambda e: app.sm.set_state(State.AWAKE))
-
-        em.subscribe(
-            EventType.STT_TRANSCRIBED,
-            lambda e: app.operator.submit(e.payload["text"]),
-        )
+        self.events.subscribe(EventType.OP_INTENT, handle_intent)
 
     def _close(self):
         try:
@@ -178,24 +110,15 @@ class Atlas:
 
             self.keybinds.close()
 
-            if getattr(self, "listener", None):
-                self.listener.close()
-                log("Listener closed.", "ATLAS", "DEBUG")
-
-            if getattr(self, "operator", None):
-                self.operator.close()
+            if getattr(self, "stt_module", None):
+                self.stt_module.close()
+                log("STT closed.", "ATLAS", "DEBUG")
+            if getattr(self, "op_module", None):
+                self.op_module.close()
                 log("Operator closed.", "ATLAS", "DEBUG")
-            if getattr(self, "tts", None):
-                self.tts.close()
+            if getattr(self, "tts_module", None):
+                self.tts_module.close()
                 log("TTS closed.", "ATLAS", "DEBUG")
-
-            if hasattr(self, "kws"):
-                if hasattr(self.kws, "stream"):
-                    del self.kws.stream
-                if hasattr(self.kws, "kws"):
-                    del self.kws.kws
-            if hasattr(self, "sr"):
-                self.sr.close()
 
             self.shutdown()
             self.events.flush_and_stop()
@@ -221,14 +144,12 @@ class Atlas:
         self.load_models()
 
         self.keybinds.start()
-        self.sr.start()
-        self.listener.start()
-        self.tts.start()
-        self.operator.start()
+        self.stt_module.start()
+        self.tts_module.start()
+        self.op_module.start()
 
         emit_event(EventType.UI_BANNER, {})
 
-        self.ui = UI(app=self)
         self.ui.run()  # this blocks main thread
 
         # from threading import Event

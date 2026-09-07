@@ -14,14 +14,16 @@ from typing import Literal
 import numpy as np
 
 from ..core.config import DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 
 # disables HF symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
 
 class VAD:
-    def __init__(self) -> None:
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+
         self.is_speaking = False
         self.model_path: Path = DATA_DIR / cfg.vad.model_path
 
@@ -80,7 +82,7 @@ class VAD:
             self.reset_state()
 
             log("VAD model loaded.", "VAD", "SUCCESS")
-            emit_event(EventType.VAD_LOADED, {})
+            self.events.emit(EventType.VAD_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading VAD model: {type(e).__name__}: {e}",
@@ -156,7 +158,9 @@ class VAD:
 
 
 class Whisper:
-    def __init__(self):
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+
         # should make downloading Whisper models from HF faster
         os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
@@ -187,7 +191,7 @@ class Whisper:
                 download_root=str(self.model_dir),
             )
             log("Whisper model loaded.", "STT", "SUCCESS")
-            emit_event(EventType.WHISPER_LOADED, {})
+            self.events.emit(EventType.WHISPER_LOADED, {})
         except Exception as e:
             log(
                 f"Error loading Whisper model: {type(e).__name__}: {e}",
@@ -214,9 +218,11 @@ class Whisper:
 
 
 class SpeechRecognizer:
-    def __init__(self):
-        self.vad = VAD()
-        self.whisper = Whisper()
+    def __init__(self, events: EventManager | None = None) -> None:
+        self.events = events or EventManager()
+
+        self.vad = VAD(self.events)
+        self.whisper = Whisper(self.events)
 
         self.preroll = deque(maxlen=cfg.vad.preroll_blocks)
         self.buffer: list[np.ndarray] = []
@@ -258,14 +264,14 @@ class SpeechRecognizer:
             text = text.strip()
 
             if text:
-                emit_event(
+                self.events.emit(
                     EventType.UI_TRANSCRIPTION,
                     {
                         "text": text,
                     },
                 )
 
-                emit_event(EventType.STT_TRANSCRIBED, {"text": text})
+                self.events.emit(EventType.STT_TRANSCRIBED, {"text": text})
 
             self.audio_queue.task_done()
 
@@ -284,7 +290,7 @@ class SpeechRecognizer:
         if vad_state == "start":
             self._recording = True
             self.buffer = list(self.preroll)
-            emit_event(EventType.VAD_START, {})
+            self.events.emit(EventType.VAD_START, {})
 
         elif vad_state == "speaking" and self._recording:
             self.buffer.append(chunk)
@@ -300,6 +306,6 @@ class SpeechRecognizer:
                     self.audio_queue.put((full_audio, listen_ms))
 
             self.buffer.clear()
-            emit_event(EventType.VAD_END, {})
+            self.events.emit(EventType.VAD_END, {})
 
         return vad_state

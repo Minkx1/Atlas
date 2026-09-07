@@ -16,7 +16,7 @@ import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
 from ..core.config import DATA_DIR, cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 
 VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
@@ -25,6 +25,7 @@ HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
 class TextToSpeech:
     def __init__(
         self,
+        events: EventManager | None = None,
         model_path=cfg.tts.model_path,
         volume=cfg.tts.volume,
         length_scale=cfg.tts.length_scale,
@@ -32,6 +33,8 @@ class TextToSpeech:
         noise_w_scale=cfg.tts.noise_w_scale,
         normalize_audio=cfg.tts.normalize_audio,
     ) -> None:
+        self.events = events or EventManager()
+
         self.path = DATA_DIR / model_path
         if not self.path.exists():
             self._download_model()
@@ -64,7 +67,7 @@ class TextToSpeech:
             "TTS",
             "SUCCESS",
         )
-        emit_event(EventType.TTS_LOADED, {})
+        self.events.emit(EventType.TTS_LOADED, {})
 
     def start(self):
         if not hasattr(self, "voice"):
@@ -165,7 +168,7 @@ class TextToSpeech:
         self._set_busy(False)
 
     def _set_busy(self, value: bool) -> None:
-        emit_event(EventType.TTS_BUSY if value else EventType.TTS_FREE, {})
+        self.events.emit(EventType.TTS_BUSY if value else EventType.TTS_FREE, {})
         with self._busy_lock:
             self._busy = value
 

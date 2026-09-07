@@ -9,13 +9,18 @@ import threading
 import numpy as np
 
 from ..core.config import DATA_DIR, PLUGINS_DIR, cfg
-from ..core.events import EventType, emit_event, log
+from ..core.events import EventManager, EventType, log
 from .plugins import Plugin, PluginManifest
 from .sentence_transformer import ONNXSentenceTransformer
 
 
 class CommandOperator:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+    ) -> None:
+        self.events = events or EventManager()
+
         self.history: list[str] = []
         self.commands: dict[str, dict[str, list[dict[str, str]] | list[str]]] = {}
         self.plugins: dict[str, Plugin] = {}
@@ -83,7 +88,7 @@ class CommandOperator:
                 log(f"Unable to parse {toml_path}: {e}", "OP", "ERROR")
                 continue
 
-            self.plugins[manifest.id] = Plugin(d, manifest)
+            self.plugins[manifest.id] = Plugin(d, manifest, self.events)
             self.triggers[manifest.id] = manifest.triggers
             log(f"Loaded plugin: {manifest.id}", "OP", "INFO")
 
@@ -204,4 +209,4 @@ class CommandOperator:
             ).start()
             return None
 
-        emit_event(EventType.OP_INTENT, {"intent": intent})
+        self.events.emit(EventType.OP_INTENT, {"intent": intent})

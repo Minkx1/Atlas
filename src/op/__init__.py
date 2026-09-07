@@ -2,10 +2,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .cmd_operator import CommandOperator
-    from .global_operator import Operator
     from .llama import Llama
+    from .module import OpModule
 
-__all__ = ["CommandOperator", "Llama", "Operator"]
+__all__ = ["CommandOperator", "Llama", "OpModule"]
 
 
 def __getattr__(name: str):
@@ -17,8 +17,8 @@ def __getattr__(name: str):
         from .llama import Llama
 
         return Llama
-    if name == "Operator":
-        from .global_operator import Operator
+    if name == "OpModule":
+        from .module import OpModule
 
-        return Operator
+        return OpModule
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

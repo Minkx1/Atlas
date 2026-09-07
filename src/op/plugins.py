@@ -11,7 +11,7 @@ from pathlib import Path
 
 import tomllib
 
-from ..core.events import CommandType, EventType, command, emit_event, log
+from ..core.events import CommandType, EventManager, EventType, command, log
 
 
 @dataclass
@@ -42,7 +42,11 @@ class PluginManifest:
 
 
 class Plugin:
-    def __init__(self, root: Path, manifest: PluginManifest):
+    def __init__(
+        self, root: Path, manifest: PluginManifest, events: EventManager | None = None
+    ):
+        self.events = events or EventManager()
+
         self.root = root
         self.manifest = manifest
 
@@ -136,7 +140,9 @@ class Plugin:
             case "say":
                 # mimics originally-designed event to call `tts.speak(...)`
                 command(CommandType.TTS_SPEAK, {"text": msg.get("text", "")})
-                emit_event(EventType.UI_ASSISTANT_SAY, {"text": msg.get("text", "")})
+                self.events.emit(
+                    EventType.UI_ASSISTANT_SAY, {"text": msg.get("text", "")}
+                )
             case "event":
                 self._forward_event(msg)
             case "done":
@@ -151,7 +157,7 @@ class Plugin:
     def _forward_event(self, msg: dict):
         name = msg.get("name")
         try:
-            emit_event(EventType(name), msg.get("content") or {})
+            self.events.emit(EventType(name), msg.get("content") or {})
         except ValueError:
             log(
                 f"Plugin '{self.manifest.id}' emitted uknown event: {name}",
