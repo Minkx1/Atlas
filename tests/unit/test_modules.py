@@ -4,6 +4,13 @@ from atlas.core.events import EventManager, EventType
 from atlas.core.module import Module, on_event
 
 
+def require_importable(module_name: str) -> None:
+    try:
+        __import__(module_name)
+    except Exception as exc:
+        pytest.skip(f"{module_name} is not usable: {exc}")
+
+
 class ProbeModule(Module):
     def __init__(self, events: EventManager):
         self.received = []
@@ -24,7 +31,7 @@ def test_on_event_registers_method_on_the_supplied_manager(event_manager):
 
 
 def test_op_module_passes_manager_to_child_components(monkeypatch, event_manager):
-    pytest.importorskip("onnxruntime")
+    require_importable("onnxruntime")
     from atlas.op import module as op_module
     from atlas.op.module import OpModule
 
@@ -46,7 +53,7 @@ def test_op_module_passes_manager_to_child_components(monkeypatch, event_manager
 
 
 def test_stt_module_passes_manager_to_child_components(monkeypatch, event_manager):
-    pytest.importorskip("sounddevice")
+    require_importable("sounddevice")
     from atlas.stt import module as stt_module
     from atlas.stt.module import SttModule
 
