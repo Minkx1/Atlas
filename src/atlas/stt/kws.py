@@ -9,8 +9,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..core.config import CONFIG_DIR, DATA_DIR, cfg
-from ..core.events import EventManager, EventType, log
+from atlas.core.config import CONFIG_DIR, DATA_DIR, cfg
+from atlas.core.events import EventManager, EventType, log
 
 
 class KeyWordSpotter:

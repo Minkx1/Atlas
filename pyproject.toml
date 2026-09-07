@@ -37,8 +37,7 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
 
 [tool.ruff]
 line-length = 88
@@ -62,4 +61,3 @@ version_provider = "pep621"
 tag_format = "v$version"
 major_version_zero = true
 update_changelog_on_bump = true
-version_files = ["src/_version.py:__version__"]

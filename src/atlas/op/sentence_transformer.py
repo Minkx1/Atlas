@@ -10,8 +10,8 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from ..core.config import DATA_DIR
-from ..core.events import log
+from atlas.core.config import DATA_DIR
+from atlas.core.events import log
 
 
 class ONNXSentenceTransformer:

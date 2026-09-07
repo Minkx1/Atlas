@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from src.stt.speech_recognition import VAD
+from atlas.stt.speech_recognition import VAD
 
 
 def test_sentence_chunker_keeps_punctuation_and_flushes_tail():
     pytest.importorskip("onnxruntime")
-    from src.op.module import OpModule
+    from atlas.op.module import OpModule
 
     tokens = ["First", " sentence. ", "Second", "!", " tail"]
 

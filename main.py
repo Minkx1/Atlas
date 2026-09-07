@@ -7,7 +7,7 @@ from contextlib import suppress
 
 
 def main() -> None:
-    from src import Atlas
+    from atlas import Atlas
 
     atlas = Atlas()
     atlas.start()

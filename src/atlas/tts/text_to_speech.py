@@ -15,8 +15,8 @@ import sounddevice as sd
 import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
-from ..core.config import DATA_DIR, cfg
-from ..core.events import EventManager, EventType, log
+from atlas.core.config import DATA_DIR, cfg
+from atlas.core.events import EventManager, EventType, log
 
 VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"

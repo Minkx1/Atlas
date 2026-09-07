@@ -13,8 +13,8 @@ import scipy.signal
 import sounddevice as sd
 import soundfile as sf
 
-from ..core.config import DATA_DIR, cfg
-from ..core.events import EventManager, EventType, log
+from atlas.core.config import DATA_DIR, cfg
+from atlas.core.events import EventManager, EventType, log
 
 
 class SoundManager:

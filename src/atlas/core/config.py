@@ -27,7 +27,7 @@ def get_base_dir() -> Path:
             return exe_dir.parent
         return exe_dir
     return (
-        Path(__file__).resolve().parent.parent.parent
+        Path(__file__).resolve().parents[3]
     )  # '/src/core/config.py'.parent.parent.parent is '/'
 
 

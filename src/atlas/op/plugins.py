@@ -11,7 +11,7 @@ from pathlib import Path
 
 import tomllib
 
-from ..core.events import CommandType, EventManager, EventType, command, log
+from atlas.core.events import CommandType, EventManager, EventType, command, log
 
 
 @dataclass

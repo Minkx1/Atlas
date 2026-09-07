@@ -8,8 +8,9 @@ import queue
 import re
 import threading
 
-from ..core.events import CommandType, EventManager, EventType
-from ..core.module import Module, on_event
+from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.module import Module, on_event
+
 from .cmd_operator import CommandOperator
 from .llama import Llama
 

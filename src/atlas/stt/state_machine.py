@@ -6,8 +6,8 @@
 import time
 from enum import StrEnum
 
-from ..core.config import cfg
-from ..core.events import EventManager, EventType
+from atlas.core.config import cfg
+from atlas.core.events import EventManager, EventType
 
 
 class State(StrEnum):

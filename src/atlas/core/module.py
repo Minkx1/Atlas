@@ -4,7 +4,7 @@
 #
 
 
-from ..core.events import CommandType, EventManager, EventType
+from atlas.core.events import CommandType, EventManager, EventType
 
 
 class Module:

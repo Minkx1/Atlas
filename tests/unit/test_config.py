@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.core import config
+from atlas.core import config
 
 
 def test_load_config_reads_nested_values(tmp_path: Path):

@@ -1,7 +1,7 @@
 import pytest
 
-from src.core.events import EventManager, EventType
-from src.core.module import Module, on_event
+from atlas.core.events import EventManager, EventType
+from atlas.core.module import Module, on_event
 
 
 class ProbeModule(Module):
@@ -25,8 +25,8 @@ def test_on_event_registers_method_on_the_supplied_manager(event_manager):
 
 def test_op_module_passes_manager_to_child_components(monkeypatch, event_manager):
     pytest.importorskip("onnxruntime")
-    from src.op import module as op_module
-    from src.op.module import OpModule
+    from atlas.op import module as op_module
+    from atlas.op.module import OpModule
 
     class FakeCommandOperator:
         def __init__(self, events):
@@ -47,8 +47,8 @@ def test_op_module_passes_manager_to_child_components(monkeypatch, event_manager
 
 def test_stt_module_passes_manager_to_child_components(monkeypatch, event_manager):
     pytest.importorskip("sounddevice")
-    from src.stt import module as stt_module
-    from src.stt.module import SttModule
+    from atlas.stt import module as stt_module
+    from atlas.stt.module import SttModule
 
     class FakeKws:
         def __init__(self, events):

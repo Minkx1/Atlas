@@ -4,8 +4,9 @@
 
 from pathlib import Path
 
-from ..core.events import CommandType, EventManager, EventType
-from ..core.module import Module, on_event
+from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.module import Module, on_event
+
 from .sound_manager import SoundManager
 from .text_to_speech import TextToSpeech
 

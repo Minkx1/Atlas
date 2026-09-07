@@ -8,8 +8,8 @@ from contextlib import suppress
 
 import llama_cpp
 
-from ..core.config import DATA_DIR, cfg
-from ..core.events import EventManager, EventType, log
+from atlas.core.config import DATA_DIR, cfg
+from atlas.core.events import EventManager, EventType, log
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)

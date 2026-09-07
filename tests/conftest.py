@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.events import EventManager
+from atlas.core.events import EventManager
 
 
 @pytest.fixture(autouse=True)

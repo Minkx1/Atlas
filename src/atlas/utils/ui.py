@@ -9,8 +9,8 @@ from textual.events import Resize
 from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
-from ..core.config import cfg
-from ..core.events import Event, EventManager, EventType, log
+from atlas.core.config import cfg
+from atlas.core.events import Event, EventManager, EventType, log
 
 
 class AudioWaveform(Static):

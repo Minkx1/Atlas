@@ -4,8 +4,9 @@
 
 from typing import TYPE_CHECKING
 
-from ..core.events import CommandType, EventManager, EventType, emit_event, log
-from ..core.module import Module, on_event
+from atlas.core.events import CommandType, EventManager, EventType, emit_event, log
+from atlas.core.module import Module, on_event
+
 from .kws import KeyWordSpotter
 from .listener import Listener
 from .speech_recognition import SpeechRecognizer

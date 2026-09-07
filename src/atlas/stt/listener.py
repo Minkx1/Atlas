@@ -11,8 +11,8 @@ import numpy as np
 import sounddevice as sd
 from scipy.signal import resample_poly
 
-from ..core.config import cfg
-from ..core.events import EventManager, EventType, log
+from atlas.core.config import cfg
+from atlas.core.events import EventManager, EventType, log
 
 
 class Listener:

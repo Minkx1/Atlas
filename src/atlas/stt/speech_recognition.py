@@ -13,8 +13,8 @@ from typing import Literal
 
 import numpy as np
 
-from ..core.config import DATA_DIR, cfg
-from ..core.events import EventManager, EventType, log
+from atlas.core.config import DATA_DIR, cfg
+from atlas.core.events import EventManager, EventType, log
 
 # disables HF symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"

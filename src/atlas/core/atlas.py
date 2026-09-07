@@ -5,15 +5,11 @@
 
 import sys
 
-# from ..op import CommandOperator, Llama, Operator
-from ..op import OpModule
+from atlas.op import OpModule
+from atlas.stt import SttModule
+from atlas.tts import TtsModule
+from atlas.utils import UI, KeyBindManager
 
-# from ..stt import KeyWordSpotter, Listener, SpeechRecognizer, State, StateMachine
-from ..stt import SttModule
-
-# from ..tts import SoundManager, TextToSpeech
-from ..tts import TtsModule
-from ..utils import UI, KeyBindManager
 from .config import cfg
 from .events import (
     CommandType,

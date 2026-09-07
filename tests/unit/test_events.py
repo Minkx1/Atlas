@@ -1,9 +1,8 @@
 import threading
 
-from src.core.events import (
+from atlas.core.events import (
     CommandType,
     Event,
-    EventManager,
     EventType,
     command,
     emit_event,
