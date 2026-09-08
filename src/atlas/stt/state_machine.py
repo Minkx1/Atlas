@@ -7,7 +7,7 @@ import time
 from enum import StrEnum
 
 from atlas.core.config import cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 
 class State(StrEnum):
@@ -43,12 +43,12 @@ class StateMachine:
             if new_state == State.AWAKE:
                 self.update_deadline()
 
-            self.events.emit(EventType.STT_CHANGED_STATE, {"state": new_state.value})
+            self.events.emit("stt.changed_state", {"state": new_state.value})
 
             payload = {"state": new_state.value}
             if detail:
                 payload["detail"] = detail
-            self.events.emit(EventType.UI_STATE_CHANGE, payload)
+            self.events.emit("ui.state_change", payload)
 
     def update(self) -> None:
         if self.state == State.WAITING:

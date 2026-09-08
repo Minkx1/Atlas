@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from atlas.core.config import CONFIG_DIR, DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -70,9 +70,7 @@ class KeyWordSpotter:
             )
 
             self.stream = self.kws.create_stream()
-
             log.info("KWS model loaded")
-            self.events.emit(EventType.KWS_LOADED, {})
         except Exception:
             log.exception("Error loading KWS model")
             raise

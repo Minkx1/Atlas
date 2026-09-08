@@ -5,7 +5,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 from atlas.core.module import Module, on_event
 
 from .kws import KeyWordSpotter
@@ -35,7 +35,7 @@ class SttModule(Module):
     def _processor(self, chunk: np.ndarray) -> None:
         kw = self.kws.process_chunk(chunk)
         if kw:
-            self.events.emit(EventType.KWS_KEYWORD_DETECTED, {"keyword": kw})
+            self.events.emit("stt.kws.keyword_detected", {"keyword": kw})
         self.state.update()
 
         allow_rec = self.state.allow_speech_recognition()
@@ -64,40 +64,40 @@ class SttModule(Module):
 
     # Events
 
-    @on_event(EventType.TTS_BUSY, EventType.OP_START)
+    @on_event("tts.busy", "op.start")
     def waiting_state(self, **kwargs) -> None:
         """Waiting when the TTS is speaking"""
         self.state.set_state(SMState.WAITING)
 
-    @on_event(CommandType.SET_STATE)
+    @on_event("stt.command_set_state")
     def set_state(self, state: str = "", detail: str | None = None, **kwargs) -> None:
         self.state.set_state(SMState(state), detail)
 
-    @on_event(EventType.STT_CHANGED_STATE)
+    @on_event("stt.changed_state")
     def reset_kws(self, state: str = "") -> None:
         if state == "SLEEPING":
             self.kws.reset()
 
-    @on_event(EventType.VAD_START)
+    @on_event("stt.vad.start")
     def on_vad_start(self, **kwargs) -> None:
         self.state.set_state(SMState.RECORDING)
 
-    @on_event(EventType.VAD_END)
+    @on_event("stt.vad.end")
     def on_vad_end(self, **kwargs) -> None:
         self.state.set_state(SMState.AWAKE)
 
-    @on_event(EventType.TTS_FREE)
+    @on_event("tts.free")
     def awaken(self, **kwargs) -> None:
         self.state.set_state(SMState.AWAKE)
         self.state.update_deadline()
 
-    @on_event(EventType.KWS_KEYWORD_DETECTED)
+    @on_event("stt.kws.keyword_detected")
     def handle_kw_detected(self, keyword: str = "", **kwargs):
         if self.state.state == SMState.WAITING:
-            self.events.emit(EventType.OP_INTERRUPT, {})
+            self.events.emit("op.interrupt", {})
             self.state.set_state(SMState.AWAKE, f"Interrupted: {keyword}")
         else:
             # app.operator.submit("!EVENT_KEYWORD_DETECTED")
             log.info("Keyword detected directly: %s", keyword)
-            self.events.emit(EventType.OP_INTENT, {"intent": "greet"})
+            self.events.emit("op.intent", {"intent": "greet"})
             self.state.set_state(SMState.AWAKE, f"Keyword: {keyword}")

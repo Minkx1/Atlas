@@ -10,7 +10,7 @@ import threading
 import numpy as np
 
 from atlas.core.config import DATA_DIR, PLUGINS_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 from .plugins import Plugin, PluginManifest
 from .sentence_transformer import ONNXSentenceTransformer
@@ -218,5 +218,5 @@ class CommandOperator:
             ).start()
             return None
 
-        self.events.emit(EventType.OP_INTENT, {"intent": intent})
+        self.events.emit("op.intent", {"intent": intent})
         log.info(f"Intent: {intent}")

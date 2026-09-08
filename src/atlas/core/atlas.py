@@ -12,7 +12,7 @@ from atlas.tts import TtsModule
 from atlas.utils import UI, KeyBindManager
 
 from .config import DATA_DIR, cfg
-from .events import CommandType, EventManager, EventType
+from .events import EventManager
 from .logging_config import configure_logging
 
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class Atlas:
         self.keybinds.register_keybind(
             cfg.kws.awake_keybind,
             lambda: self.events.emit(
-                EventType.KWS_KEYWORD_DETECTED, {"keyword": "{HotKey}"}
+                "stt.kws.keyword_detected", {"keyword": "{HotKey}"}
             ),
         )
 
@@ -79,9 +79,9 @@ class Atlas:
             if intent == "farewell":
                 self.shutdown()
             if intent == "sleep":
-                self.events.emit_command(CommandType.SET_STATE, {"state": "SLEEPING"})
+                self.events.emit("stt.command_set_state", {"state": "SLEEPING"})
 
-        self.events.subscribe(EventType.OP_INTENT, handle_intent)
+        self.events.subscribe("op.intent", handle_intent)
 
     def _close(self):
         try:
@@ -100,7 +100,7 @@ class Atlas:
                 log.debug("TTS closed")
 
             self.shutdown()
-            self.events.flush_and_stop()
+            self.events.close()
             log.info("Shutdown complete")
         except Exception:
             log.exception("Error during shutdown")
@@ -127,7 +127,7 @@ class Atlas:
         self.tts_module.start()
         self.op_module.start()
 
-        self.events.emit(EventType.UI_BANNER, {})
+        self.events.emit("ui.banner", {})
 
         self.ui.run()  # this blocks main thread
 

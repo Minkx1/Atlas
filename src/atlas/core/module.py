@@ -4,7 +4,7 @@
 #
 
 
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 
 
 class Module:
@@ -27,7 +27,7 @@ class Module:
     def close(self) -> None: ...
 
 
-def on_event(*event_types: EventType | CommandType):
+def on_event(*event_types: str):
     """Mark method for event subscription"""
 
     def wrapper(func):

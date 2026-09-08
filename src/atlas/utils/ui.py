@@ -11,7 +11,7 @@ from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
 from atlas.core.config import cfg
-from atlas.core.events import Event, EventManager, EventType
+from atlas.core.events import Event, EventManager
 
 log = logging.getLogger(__name__)
 
@@ -278,12 +278,12 @@ class UI(App):
         self.set_interval(1.0, self.update_clock)
         self.update_clock()
 
-        self.events.subscribe(EventType.STT_CHANGED_STATE, self.event_stt_changed_state)
-        self.events.subscribe(EventType.STT_AUDIOWAVE, self.on_audio_wave)
-        self.events.subscribe(EventType.STT_TRANSCRIBED, self.event_on_received_command)
+        self.events.subscribe("stt.changed_state", self.event_stt_changed_state)
+        self.events.subscribe("stt.audiowave", self.on_audio_wave)
+        self.events.subscribe("stt.transcribed", self.event_on_received_command)
 
-        self.events.subscribe(EventType.UI_LLM_CHUNK, self.event_on_llm_chunk)
-        self.events.subscribe(EventType.UI_ASSISTANT_SAY, self.event_on_assistant_say)
+        self.events.subscribe("ui.llm_chunk", self.event_on_llm_chunk)
+        self.events.subscribe("ui.say", self.event_on_assistant_say)
 
     def safe_call(self, fn, *args, **kwargs):
         if getattr(self, "is_running", False):
@@ -404,7 +404,7 @@ class UI(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.input.value = ""
-        self.events.emit(EventType.STT_TRANSCRIBED, {"text": event.value})
+        self.events.emit("stt.transcribed", {"text": event.value})
 
 
 if __name__ == "__main__":

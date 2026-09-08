@@ -15,7 +15,7 @@ from typing import Literal
 import numpy as np
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -85,7 +85,6 @@ class VAD:
             self.reset_state()
 
             log.info("VAD model loaded")
-            self.events.emit(EventType.VAD_LOADED, {})
         except Exception:
             log.exception("Error loading VAD model")
             raise
@@ -188,7 +187,6 @@ class Whisper:
                 download_root=str(self.model_dir),
             )
             log.info("Whisper model loaded")
-            self.events.emit(EventType.WHISPER_LOADED, {})
         except Exception:
             log.exception("Error loading Whisper model")
             raise
@@ -257,14 +255,7 @@ class SpeechRecognizer:
             text = text.strip()
 
             if text:
-                self.events.emit(
-                    EventType.UI_TRANSCRIPTION,
-                    {
-                        "text": text,
-                    },
-                )
-
-                self.events.emit(EventType.STT_TRANSCRIBED, {"text": text})
+                self.events.emit("stt.transcribed", {"text": text})
                 log.info(f"Recognized: {text}")
 
             self.audio_queue.task_done()
@@ -284,7 +275,7 @@ class SpeechRecognizer:
         if vad_state == "start":
             self._recording = True
             self.buffer = list(self.preroll)
-            self.events.emit(EventType.VAD_START, {})
+            self.events.emit("stt.vad.start", {})
 
         elif vad_state == "speaking" and self._recording:
             self.buffer.append(chunk)
@@ -300,6 +291,6 @@ class SpeechRecognizer:
                     self.audio_queue.put((full_audio, listen_ms))
 
             self.buffer.clear()
-            self.events.emit(EventType.VAD_END, {})
+            self.events.emit("stt.vad.end", {})
 
         return vad_state

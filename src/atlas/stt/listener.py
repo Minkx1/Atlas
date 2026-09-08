@@ -13,7 +13,7 @@ import sounddevice as sd
 from scipy.signal import resample_poly
 
 from atlas.core.config import cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class Listener:
                             audio_mono = audio[:, 0] if audio.ndim > 1 else audio
 
                             rms = float(np.sqrt(np.mean(audio_mono**2)))
-                            self.events.emit(EventType.STT_AUDIOWAVE, {"rms": rms})
+                            self.events.emit("stt.audiowave", {"rms": rms})
 
                     except Exception:
                         log.exception("Error processing audio chunk")
@@ -112,7 +112,6 @@ class Listener:
 
     def start(self):
         self._running = True
-        self.events.emit(EventType.STT_START, {})
         self.audio_input_thread.start()
 
     def close(self):
@@ -120,5 +119,3 @@ class Listener:
 
         if self.audio_input_thread is not None and self.audio_input_thread.is_alive():
             self.audio_input_thread.join(timeout=2.0)
-
-        self.events.emit(EventType.STT_FINISH, {})

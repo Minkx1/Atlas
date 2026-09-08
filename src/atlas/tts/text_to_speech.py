@@ -17,7 +17,7 @@ import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +68,6 @@ class TextToSpeech:
         # self._generate_basic_sounds()
         self._healthy = True
         log.info("TTS model loaded")
-        self.events.emit(EventType.TTS_LOADED, {})
 
     def start(self):
         if not hasattr(self, "voice"):
@@ -157,7 +156,7 @@ class TextToSpeech:
         self._set_busy(False)
 
     def _set_busy(self, value: bool) -> None:
-        self.events.emit(EventType.TTS_BUSY if value else EventType.TTS_FREE, {})
+        self.events.emit("tts.busy" if value else "tts.free", {})
         with self._busy_lock:
             self._busy = value
 

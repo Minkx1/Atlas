@@ -15,7 +15,7 @@ import sounddevice as sd
 import soundfile as sf
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class SoundManager:
             sd.play(padded_audio, samplerate)
             sd.wait()
 
-            self.events.emit(EventType.TTS_FREE, {})
+            self.events.emit("tts.free", {})
         except Exception:
             self._healthy = False
             log.exception("Error playing audio %s", path.name)
@@ -88,14 +88,14 @@ class SoundManager:
 
             formatted_text = str(text).format(username=cfg.username, name=cfg.name)
             if formatted_text:
-                self.events.emit(EventType.UI_ASSISTANT_SAY, {"text": formatted_text})
+                self.events.emit("ui.say", {"text": formatted_text})
             if not path:
                 return
             payload = Path(path)
         elif isinstance(payload, str):
             payload = Path(payload)
 
-        self.events.emit(EventType.TTS_BUSY, {})
+        self.events.emit("tts.busy", {})
         self.play_audio(payload)
 
     def interrupt(self) -> None:
@@ -184,7 +184,7 @@ class SoundManager:
 
                 log.info("Generating sound: %s", path_str)
                 self.events.emit(
-                    EventType.SOUNDS_GENERATE_SOUND,
+                    "tts.sounds.generate_sound",
                     {"text": formatted_text.strip(), "path": full_path},
                 )
 
