@@ -16,7 +16,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Minkx1/Atlas/releases)
 
-**A.T.L.A.S** _(**A**dvanced **T**ransformable **L**ocal **A**I **S**ystem)_ — is a fast, private and fully offline personal AI Voice Assistant.
+**A.T.L.A.S.** — is a fast, private and fully offline personal AI voice assistant, that can be tuned and transformed into whatever you want.
 
 ## About
 
