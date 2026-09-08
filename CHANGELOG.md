@@ -1,3 +1,9 @@
+## v0.6.7 (2026-09-08)
+
+### Refactor
+
+- add core/schema for payloads and event type identifiers
+
 ## v0.6.6 (2026-09-07)
 
 ### Refactor
