@@ -25,7 +25,7 @@ def test_on_event_registers_method_on_the_supplied_manager(event_manager):
     probe = ProbeModule(event_manager)
 
     event_manager.emit("ui.banner", {"value": 42})
-    event_manager.queue.join()
+    event_manager._queue.join()
 
     assert probe.received == [42]
 

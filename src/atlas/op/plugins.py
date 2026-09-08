@@ -12,7 +12,7 @@ from pathlib import Path
 
 import tomllib
 
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -153,7 +153,7 @@ class Plugin:
         match msg.get("type"):
             case "say":
                 # mimics originally-designed event to call `tts.speak(...)`
-                self.events.emit_command("tts.speak", {"text": msg.get("text", "")})
+                self.events.emit("tts.speak", {"text": msg.get("text", "")})
                 self.events.emit("ui.say", {"text": msg.get("text", "")})
             case "event":
                 self._forward_event(msg)
@@ -169,6 +169,6 @@ class Plugin:
     def _forward_event(self, msg: dict):
         name = msg.get("name")
         try:
-            self.events.emit(EventType(name), msg.get("content") or {})
+            self.events.emit(str(name), msg.get("content") or {})
         except ValueError:
             log.warning("Plugin '%s' emitted unknown event: %s", self.manifest.id, name)

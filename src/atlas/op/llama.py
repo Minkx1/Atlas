@@ -10,7 +10,7 @@ from contextlib import suppress
 import llama_cpp
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,6 @@ class Llama:
                 n_gpu_layers=0,
                 verbose=False,
             )
-            self.events.emit(EventType.LLM_LOADED, {})
         except Exception:
             log.exception("Error loading LLM model")
             self.no_model = True
