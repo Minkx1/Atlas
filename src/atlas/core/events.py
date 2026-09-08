@@ -92,11 +92,17 @@ class EventManager:
             self._queue.put(None)
 
             if self._dispatcher is not None:
-                self._dispatcher.join(timeout=timeout)
+                if threading.current_thread() is not self._dispatcher:
+                    self._dispatcher.join(timeout=timeout)
                 self._dispatcher = None
 
             if self._executor is not None:
-                self._executor.shutdown(wait=True, cancel_futures=False)
+                current_thread = threading.current_thread()
+                is_worker_thread = any(
+                    t == current_thread for t in self._executor._threads
+                )
+
+                self._executor.shutdown(wait=not is_worker_thread, cancel_futures=True)
                 self._executor = None
 
     # API

@@ -5,6 +5,7 @@
 
 import logging
 import sys
+import threading
 
 from atlas.op import OpModule
 from atlas.stt import SttModule
@@ -63,12 +64,14 @@ class Atlas(Module):
             log.exception("Error loading models")
             raise
 
-    @on_event("core.terminate")
+    @on_event("core.terminate", mode="immediate")
+    def _handle_terminate_event(self, **kwargs):
+        log.info("Received terminate event, starting shutdown thread")
+        threading.Thread(target=self.close, name="ATLAS_SHUTDOWN", daemon=True).start()
+
     def close(self, **kwargs):
         try:
             log.info("Shutting down assistant")
-            self.events.close()
-
             self.keybinds.close()
 
             if getattr(self, "stt_module", None):
@@ -81,6 +84,7 @@ class Atlas(Module):
                 self.tts_module.close()
                 log.debug("TTS closed")
 
+            self.events.close()
             self._shutdown()
 
             log.info("Shutdown complete")
@@ -103,6 +107,8 @@ class Atlas(Module):
 
     def _main(self):
         self.load_models()
+
+        self.events.start()
 
         self.keybinds.start()
         self.stt_module.start()
