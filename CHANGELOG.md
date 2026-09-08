@@ -1,3 +1,9 @@
+## v0.6.8 (2026-09-08)
+
+### Refactor
+
+- fixed error policy and imporved logging
+
 ## v0.6.7 (2026-09-08)
 
 ### Refactor
