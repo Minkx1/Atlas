@@ -21,3 +21,6 @@ bin/
 .coverage
 coverage.xml
 htmlcov/
+
+.trash/
+artifacts/
