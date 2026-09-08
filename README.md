@@ -1,11 +1,11 @@
 # Atlas
 
 <p align="center">
-  <img src="docs/assets/atlas.svg" alt="Atlas Logo" width="200">
+  <img src="docs/assets/banner.svg" alt="A.T.L.A.S. Banner" width="100%">
 </p>
 
 <p align="center">
-  <em>A fast, AI-powered, fully offline voice assistant.</em>
+  <em><b>A</b>dvanced <b>T</b>ransformable <b>L</b>ocal <b>A</b>I <b>S</b>ystem</em>
 </p>
 
 ---
@@ -16,7 +16,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/Minkx1/Atlas/releases)
 
-**Atlas** is a fast, private and 100% offline personal AI Voice Assistant.
+**A.T.L.A.S** _(**A**dvanced **T**ransformable **L**ocal **A**I **S**ystem)_ — is a fast, private and fully offline personal AI Voice Assistant.
 
 ## About
 
