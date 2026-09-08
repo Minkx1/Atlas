@@ -20,6 +20,10 @@ username = "sir"
 # Set to false if you do not want the assistant to create log files.
 log = true
 
+# Minimum log level written to the console and log file.
+# Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL.
+log_level = "INFO"
+
 
 [op]
 

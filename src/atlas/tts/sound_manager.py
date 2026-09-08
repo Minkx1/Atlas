@@ -4,6 +4,7 @@
 #
 
 import json
+import logging
 import math
 import random
 from pathlib import Path
@@ -14,7 +15,9 @@ import sounddevice as sd
 import soundfile as sf
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 
 class SoundManager:
@@ -23,15 +26,20 @@ class SoundManager:
 
         self.commands = cfg.op.load_commands() or {}
         self.silence_duration = cfg.tts.silence_duration
+        self._healthy = False
 
     def load(self) -> None:
         self.commands = cfg.op.load_commands()
         self._generate_basic_sounds()
+        self._healthy = True
 
     def play_audio(self, path: Path) -> None:
         """Plays audio from path"""
+        if not self._healthy:
+            log.warning("Ignoring sound request because TTS audio is unavailable")
+            return
         try:
-            log(f"Playing audio: {path.name}", "TTS", "DEBUG")
+            log.debug("Playing audio: %s", path.name)
             audio, samplerate = sf.read(path)
 
             target_sr = 48000
@@ -43,19 +51,6 @@ class SoundManager:
                 axis = 0 if audio.ndim > 1 else -1
                 audio = scipy.signal.resample_poly(audio, up, down, axis=axis)
                 samplerate = target_sr
-
-            log(
-                f"Audio: {path.name}, shape={audio.shape}"
-                f" dtype={audio.dtype}, sr={samplerate}",
-                "TTS",
-                "INFO",
-            )
-
-            log(
-                f"Output device: {sd.default.device}",
-                "TTS",
-                "INFO",
-            )
 
             sd.check_output_settings(
                 samplerate=samplerate,
@@ -78,15 +73,15 @@ class SoundManager:
             sd.wait()
 
             self.events.emit(EventType.TTS_FREE, {})
-        except Exception as e:
-            log(
-                f"Error playing audio {path.name}: {type(e).__name__}: {e}",
-                "TTS",
-                "ERROR",
-            )
+        except Exception:
+            self._healthy = False
+            log.exception("Error playing audio %s", path.name)
 
     def play_sound(self, payload: Path | dict[str, str | Path | None]) -> None:
         """Plays sound from payload."""
+        if not self._healthy:
+            log.warning("Ignoring sound request because TTS audio is unavailable")
+            return
         if isinstance(payload, dict):
             path = payload.get("path") or payload.get("sound")
             text = payload.get("text")
@@ -142,12 +137,8 @@ class SoundManager:
                         name=cfg.name, username=cfg.username
                     )
                     formatted_sounds.append({"path": path_str, "text": formatted_text})
-                except KeyError as e:
-                    log(
-                        f"Missing config key {e} for string '{text_template}'",
-                        "TTS",
-                        "ERROR",
-                    )
+                except KeyError:
+                    log.exception("Missing config key for string '%s'", text_template)
                     continue
 
             if formatted_sounds:
@@ -156,7 +147,7 @@ class SoundManager:
         return state
 
     def _generate_basic_sounds(self):
-        log("Checking sounds...", "TTS", "INFO")
+        log.info("Checking sounds")
 
         sounds_dir = DATA_DIR / "sounds"
         sounds_dir.mkdir(parents=True, exist_ok=True)
@@ -169,12 +160,12 @@ class SoundManager:
                 with open(manifest_file, encoding="utf-8") as f:
                     old_state = json.load(f)
             except json.JSONDecodeError:
-                log("Manifest file is corrupted. Regenerating all.", "TTS", "WARN")
+                log.warning("Manifest file is corrupted; regenerating all")
 
         re_generate_all = old_state.get("settings") != current_state["settings"]
 
         if re_generate_all:
-            log("TTS settings changed. All sounds will be regenerated.", "TTS", "INFO")
+            log.info("TTS settings changed; all sounds will be regenerated")
 
         for intent, sounds_list in current_state["sounds"].items():
             old_intent_sounds = old_state.get("sounds", {}).get(intent, [])
@@ -191,7 +182,7 @@ class SoundManager:
                 ):
                     continue
 
-                log(f"Generating sound: {path_str}", "TTS", "INFO")
+                log.info("Generating sound: %s", path_str)
                 self.events.emit(
                     EventType.SOUNDS_GENERATE_SOUND,
                     {"text": formatted_text.strip(), "path": full_path},
@@ -201,18 +192,19 @@ class SoundManager:
         with open(manifest_file, "w", encoding="utf-8") as f:
             json.dump(current_state, f, indent=4)
 
-        log("Sounds check complete.", "TTS", "INFO")
+        log.info("Sounds check complete")
 
     def play_category(self, category: str):
         """Plays random sound from category."""
+        if not self._healthy:
+            log.warning(
+                "Ignoring sound category '%s' because TTS is unavailable", category
+            )
+            return None
         conf = self.commands.get(category, {})
         sounds = conf.get("sounds", [])
 
-        log(
-            f"Fetching sound for '{category}'.",
-            "OP",
-            "DEBUG",
-        )
+        log.debug("Fetching sound for '%s'", category)
 
         if isinstance(sounds, list) and sounds:
             sound = random.choice(sounds)
@@ -226,35 +218,25 @@ class SoundManager:
             elif isinstance(sound, str):
                 path_str = sound
             else:
-                log(
-                    f"Invalid sound type in config for '{category}': {type(sound)}",
-                    "OP",
-                    "WARN",
+                log.warning(
+                    "Invalid sound type in config for '%s': %s", category, type(sound)
                 )
 
             if text_str:
                 try:
                     text_str = text_str.format(username=cfg.username, name=cfg.name)
-                except KeyError as e:
-                    log(
-                        f"Formatting text failed for '{text_str}': Missing key {e}",
-                        "OP",
-                        "DEBUG",
-                    )
+                except KeyError:
+                    log.exception("Formatting text failed for '%s'", text_str)
 
             if path_str:
                 path = Path(path_str)
                 if not path.is_absolute():
                     path = DATA_DIR / "sounds" / path
 
-                log(
-                    f"Playing sound payload: {path_str} | text: {text_str}",
-                    "OP",
-                    "DEBUG",
-                )
+                log.debug("Playing sound payload: %s | text: %s", path_str, text_str)
                 payload = {"path": str(path), "text": text_str if text_str else None}
                 self.play_sound(payload)
                 return payload
 
-        log(f"No sounds available for category: {category}", "OP", "WARN")
+        log.warning("No sounds available for category: %s", category)
         return None

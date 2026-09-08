@@ -3,6 +3,7 @@
 # Listens InputStream and processes audio data
 #
 
+import logging
 import time
 from collections.abc import Callable
 from threading import Thread
@@ -12,7 +13,9 @@ import sounddevice as sd
 from scipy.signal import resample_poly
 
 from atlas.core.config import cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 
 class Listener:
@@ -48,20 +51,15 @@ class Listener:
                 dtype=cfg.audio.dtype,
             )
 
-            log(
-                f"Input device supports requested sample rate: {target_sr} Hz",
-                "LISTENER",
-                "INFO",
-            )
+            log.info("Input device supports requested sample rate: %s Hz", target_sr)
 
             return target_sr
 
         except sd.PortAudioError:
-            log(
-                f"Input device does not support {target_sr} Hz. "
-                f"Using native rate {native_sr} Hz and resampling to {target_sr} Hz.",
-                "LISTENER",
-                "WARN",
+            log.warning(
+                "Input device does not support %s Hz; using native rate %s Hz",
+                target_sr,
+                native_sr,
             )
 
             return native_sr
@@ -77,11 +75,7 @@ class Listener:
                 blocksize=cfg.audio.blocksize,
                 dtype=cfg.audio.dtype,
             ) as stream:
-                log(
-                    f"Audio stream opened: {input_sr} Hz → {target_sr} Hz",
-                    "LISTENER",
-                    "SUCCESS",
-                )
+                log.info("Audio stream opened: %s Hz -> %s Hz", input_sr, target_sr)
 
                 while self._running:
                     indata, _ = stream.read(cfg.audio.blocksize)
@@ -108,16 +102,12 @@ class Listener:
                             rms = float(np.sqrt(np.mean(audio_mono**2)))
                             self.events.emit(EventType.STT_AUDIOWAVE, {"rms": rms})
 
-                    except Exception as e:
-                        log(
-                            f"Error processing audio chunk: {e}",
-                            "LISTENER",
-                            "ERROR",
-                        )
+                    except Exception:
+                        log.exception("Error processing audio chunk")
                         raise
 
-        except Exception as e:
-            log(f"Microphone input error: {e}", "LISTENER", "ERROR")
+        except Exception:
+            log.exception("Microphone input error; STT input stopped")
             raise
 
     def start(self):

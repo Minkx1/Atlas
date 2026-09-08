@@ -3,6 +3,7 @@
 # Main Atlas entry point and orchestrator for the application
 #
 
+import logging
 import sys
 
 from atlas.op import OpModule
@@ -10,33 +11,19 @@ from atlas.stt import SttModule
 from atlas.tts import TtsModule
 from atlas.utils import UI, KeyBindManager
 
-from .config import cfg
-from .events import (
-    CommandType,
-    EventLogger,
-    EventManager,
-    EventType,
-    log,
-)
+from .config import DATA_DIR, cfg
+from .events import CommandType, EventManager, EventType
+from .logging_config import configure_logging
+
+log = logging.getLogger(__name__)
 
 
 class Atlas:
     def __init__(self) -> None:
+        configure_logging(DATA_DIR / "logs", enabled=cfg.log, level=cfg.log_level)
         # Events and Logger
         self.events = EventManager()
         self.alive = True
-        self.logger = None
-
-        if cfg.log:
-            self.logger = EventLogger()
-            import time
-
-            timestamp = time.strftime("%H:%M:%S", time.localtime(time.time()))
-            self.logger._write_file(
-                f" ===== New Atlas Session: [{timestamp}] | SUCCESS ===== \n",
-                time.time(),
-            )
-
         # Utils
 
         self.keybinds = KeyBindManager()
@@ -64,7 +51,7 @@ class Atlas:
 
     def load_models(self):
         try:
-            log("Starting model loading...", "ATLAS", "INFO")
+            log.info("Starting model loading")
             # self.kws.load()
             # self.sr.load()
             self.stt_module.load()
@@ -77,13 +64,9 @@ class Atlas:
             # self.cmd.load()
             # self.llama.load()
 
-            log("All models loaded successfully.", "ATLAS", "SUCCESS")
-        except Exception as e:
-            log(
-                f"Error loading models: {type(e).__name__}: {e}",
-                "ATLAS",
-                "ERROR",
-            )
+            log.info("All models loaded successfully")
+        except Exception:
+            log.exception("Error loading models")
             raise
 
     def _setup_subscriptions(self):
@@ -102,25 +85,25 @@ class Atlas:
 
     def _close(self):
         try:
-            log("Shutting down assistant...", "ATLAS", "INFO")
+            log.info("Shutting down assistant")
 
             self.keybinds.close()
 
             if getattr(self, "stt_module", None):
                 self.stt_module.close()
-                log("STT closed.", "ATLAS", "DEBUG")
+                log.debug("STT closed")
             if getattr(self, "op_module", None):
                 self.op_module.close()
-                log("Operator closed.", "ATLAS", "DEBUG")
+                log.debug("Operator closed")
             if getattr(self, "tts_module", None):
                 self.tts_module.close()
-                log("TTS closed.", "ATLAS", "DEBUG")
+                log.debug("TTS closed")
 
             self.shutdown()
             self.events.flush_and_stop()
-            log("Shutdown complete.", "ATLAS", "INFO")
-        except Exception as e:
-            log(f"Error during shutdown: {type(e).__name__}: {e}", "ATLAS", "ERROR")
+            log.info("Shutdown complete")
+        except Exception:
+            log.exception("Error during shutdown")
         finally:
             import sys
 

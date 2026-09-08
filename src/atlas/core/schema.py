@@ -52,12 +52,6 @@ class SoundPlaybackPayload(TypedDict):
     text: NotRequired[str | None]
 
 
-class LogPayload(TypedDict):
-    message: str
-    source: str
-    level: str
-
-
 # Identifiers
 
 
@@ -96,8 +90,6 @@ class EventType(StrEnum):
     UI_LLM_RESPONSE = "UI_LLM_RESPONSE"
     UI_LLM_RESPONSE_DONE = "UI_LLM_RESPONSE_DONE"
     UI_ASSISTANT_SAY = "UI_ASSISTANT_SAY"
-
-    DEBUG_LOG = "DEBUG_LOG"
 
     LLM_RESPONSE = "LLM_RESPONSE"
     LLM_LOADED = "LLM_LOADED"

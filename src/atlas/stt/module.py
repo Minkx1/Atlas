@@ -2,9 +2,10 @@
 # stt / module.py
 #
 
+import logging
 from typing import TYPE_CHECKING
 
-from atlas.core.events import CommandType, EventManager, EventType, log
+from atlas.core.events import CommandType, EventManager, EventType
 from atlas.core.module import Module, on_event
 
 from .kws import KeyWordSpotter
@@ -12,6 +13,8 @@ from .listener import Listener
 from .speech_recognition import SpeechRecognizer
 from .state_machine import State as SMState
 from .state_machine import StateMachine
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -95,6 +98,6 @@ class SttModule(Module):
             self.state.set_state(SMState.AWAKE, f"Interrupted: {keyword}")
         else:
             # app.operator.submit("!EVENT_KEYWORD_DETECTED")
-            log(f"Keyword detected directly: {keyword}.", level="INFO")
+            log.info("Keyword detected directly: %s", keyword)
             self.events.emit(EventType.OP_INTENT, {"intent": "greet"})
             self.state.set_state(SMState.AWAKE, f"Keyword: {keyword}")

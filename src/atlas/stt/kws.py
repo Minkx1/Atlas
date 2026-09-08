@@ -4,13 +4,16 @@
 # returns keyword if one was spotted
 #
 
+import logging
 import os
 from pathlib import Path
 
 import numpy as np
 
 from atlas.core.config import CONFIG_DIR, DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 
 class KeyWordSpotter:
@@ -47,18 +50,14 @@ class KeyWordSpotter:
         self.keywords_file: str = str(keywords_file)
 
         if not os.path.exists(self.tokens):
-            log(
-                f"No Sherpa model in: {path}. Donwloading...",
-                source="KWS",
-                level="WARN",
-            )
+            log.warning("No Sherpa model in %s; downloading", path)
             self._download_sherpa_onnx_model(path)
 
     def load(self):
         import sherpa_onnx
 
         try:
-            log("Loading Sherpa-ONNX KWS model...", "KWS", "INFO")
+            log.info("Loading Sherpa-ONNX KWS model")
             self.kws = sherpa_onnx.KeywordSpotter(
                 tokens=self.tokens,
                 encoder=self.encoder,
@@ -72,14 +71,10 @@ class KeyWordSpotter:
 
             self.stream = self.kws.create_stream()
 
-            log("KWS model loaded.", "KWS", "SUCCESS")
+            log.info("KWS model loaded")
             self.events.emit(EventType.KWS_LOADED, {})
-        except Exception as e:
-            log(
-                f"Error loading KWS model: {type(e).__name__}: {e}",
-                "KWS",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error loading KWS model")
             raise
 
     @staticmethod

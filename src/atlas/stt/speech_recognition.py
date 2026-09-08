@@ -4,6 +4,7 @@
 # recognize spoken text as fast as possible
 #
 
+import logging
 import os
 import queue
 from collections import deque
@@ -14,7 +15,9 @@ from typing import Literal
 import numpy as np
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 # disables HF symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
@@ -63,10 +66,10 @@ class VAD:
         import onnxruntime as ort
 
         try:
-            log("Loading Silero VAD ONNX model...", "VAD", "INFO")
+            log.info("Loading Silero VAD ONNX model")
 
             if not self.model_path.exists():
-                log("No VAD model found. Downloading...", "VAD", "WARN")
+                log.warning("No VAD model found; downloading")
                 self._download_model()
 
             self.session = ort.InferenceSession(
@@ -81,14 +84,10 @@ class VAD:
 
             self.reset_state()
 
-            log("VAD model loaded.", "VAD", "SUCCESS")
+            log.info("VAD model loaded")
             self.events.emit(EventType.VAD_LOADED, {})
-        except Exception as e:
-            log(
-                f"Error loading VAD model: {type(e).__name__}: {e}",
-                "VAD",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error loading VAD model")
             raise
 
     def reset_state(self):
@@ -173,15 +172,13 @@ class Whisper:
         try:
             w = cfg.stt
             if not self.model_dir.exists():
-                log(
-                    f"Faster-Whisper model not found: {self.model_dir}. Downloading...",
-                    "STT",
-                    "INFO",
+                log.info(
+                    "Faster-Whisper model not found at %s; downloading", self.model_dir
                 )
             else:
-                log(f"Using Whisper model from {self.model_dir}", "STT", "DEBUG")
+                log.debug("Using Whisper model from %s", self.model_dir)
 
-            log(f"Loading Whisper model: {w.model_size}...", "STT", "INFO")
+            log.info("Loading Whisper model: %s", w.model_size)
             self.model = WhisperModel(
                 w.model_size,
                 device=w.device,
@@ -190,14 +187,10 @@ class Whisper:
                 num_workers=1,
                 download_root=str(self.model_dir),
             )
-            log("Whisper model loaded.", "STT", "SUCCESS")
+            log.info("Whisper model loaded")
             self.events.emit(EventType.WHISPER_LOADED, {})
-        except Exception as e:
-            log(
-                f"Error loading Whisper model: {type(e).__name__}: {e}",
-                "STT",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error loading Whisper model")
             raise
 
     def transcribe(self, audio_array: np.ndarray) -> str:
@@ -272,6 +265,7 @@ class SpeechRecognizer:
                 )
 
                 self.events.emit(EventType.STT_TRANSCRIBED, {"text": text})
+                log.info(f"Recognized: {text}")
 
             self.audio_queue.task_done()
 

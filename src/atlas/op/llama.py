@@ -3,13 +3,16 @@
 # Wrapper for Llama-cpp-python
 #
 
+import logging
 import os
 from contextlib import suppress
 
 import llama_cpp
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -51,13 +54,9 @@ class Llama:
 
     def load(self):
         try:
-            log(f"Loading LLM model: {self.model_path.name}...", "LLM", "INFO")
+            log.info("Loading LLM model: %s", self.model_path.name)
             if not self.model_path.exists():
-                log(
-                    "LLM .gguf model path is not valid. Running without LLM...",
-                    "OP",
-                    "WARN",
-                )
+                log.warning("LLM model path is invalid; running without LLM")
                 self.no_model = True
                 return
 
@@ -69,12 +68,8 @@ class Llama:
                 verbose=False,
             )
             self.events.emit(EventType.LLM_LOADED, {})
-        except Exception as e:
-            log(
-                f"Error loading LLM model: {type(e).__name__}: {e}",
-                "LLM",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error loading LLM model")
             self.no_model = True
             raise
 
@@ -83,7 +78,7 @@ class Llama:
 
     def get_response(self, message: str) -> _LLM_Response:
         try:
-            log(f"LLM: Getting response for: {message}...", "LLM", "DEBUG")
+            log.debug("Getting LLM response for: %s", message)
             self.history.append({"role": "user", "content": message})
             response = self.llama.create_chat_completion(  # type: ignore
                 messages=self.history,  # type: ignore
@@ -101,17 +96,13 @@ class Llama:
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 completion_tokens=usage.get("completion_tokens", 0),
             )
-        except Exception as e:
-            log(
-                f"Error getting LLM response: {type(e).__name__}: {e}",
-                "LLM",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error getting LLM response")
             raise
 
     def stream_response(self, message: str):
         try:
-            log(f"LLM: Streaming response for: {message}...", "LLM", "DEBUG")
+            log.debug("Streaming LLM response for: %s", message)
             self.history.append({"role": "user", "content": message})
 
             output = self.llama.create_chat_completion(  # type: ignore
@@ -128,36 +119,24 @@ class Llama:
                     delta = chunk["choices"][0]["delta"]  # type: ignore
                     if "content" in delta:
                         yield delta["content"]  # type: ignore
-                except Exception as e:
-                    log(
-                        f"Error processing stream chunk: {type(e).__name__}: {e}",
-                        "LLM",
-                        "ERROR",
-                    )
+                except Exception:
+                    log.exception("Error processing LLM stream chunk")
                     raise
-        except Exception as e:
-            log(
-                f"Error streaming LLM response: {type(e).__name__}: {e}",
-                "LLM",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error streaming LLM response")
             raise
 
     def close(self):
         if hasattr(self, "llama") and self.llama is not None:
             try:
-                log("Closing LLM model...", "LLM", "DEBUG")
+                log.debug("Closing LLM model")
                 self.llama.close()
-            except Exception as e:
-                log(
-                    f"Error closing LLM: {type(e).__name__}: {e}",
-                    "LLM",
-                    "ERROR",
-                )
+            except Exception:
+                log.exception("Error closing LLM")
                 raise
             finally:
                 self.llama = None
-                log("LLM model closed.", "LLM", "DEBUG")
+                log.debug("LLM model closed")
 
     def __del__(self):
         self.close()

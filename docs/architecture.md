@@ -167,7 +167,30 @@ This boundary protects the main process from plugin-specific dependencies and ma
 
 ## Observability
 
-`EventLogger` subscribes to `DEBUG_LOG` and writes daily files under `data/logs/`. The useful diagnostic categories are model loading, state transitions, command matching, plugin execution, output, and exceptions.
+Atlas uses Python's standard `logging` package for diagnostics. Each module uses a
+module logger (`log = logging.getLogger(__name__)`), while `EventManager` remains
+responsible only for application events and commands. Logs go to the console and,
+when `[app].log = true`, to a rotating file under `data/logs/`. The Textual UI
+receives log records through a logging handler, not through the event bus.
+
+### Error and configuration policy
+
+- **Atlas-fatal:** failure to load required STT, TTS, operator or configured model
+    resources during startup. The exception is logged with a traceback and startup
+    stops; Atlas must not present a partially initialized assistant as healthy.
+- **Subsystem-isolating:** runtime failure in TTS playback/synthesis, microphone
+    input, or a plugin process. The failing subsystem is marked unavailable or the
+    plugin invocation ends, while unrelated subsystems remain alive.
+- **Recoverable:** expected fallbacks such as an unsupported native audio sample
+    rate, a missing optional LLM model, or a corrupt generated-sound manifest. The
+    fallback is logged at `WARNING` and the chosen fallback is explicit.
+- **Diagnostic-only:** rejected intents, empty plugin triggers, malformed plugin
+    messages, and normal lifecycle details. These are logged without changing
+    application state.
+
+TTS and plugins must never silently degrade: TTS failures include a traceback and
+disable only TTS runtime work; plugin launch errors, broken pipes, invalid protocol
+messages, timeouts and non-zero exits are logged with the plugin id and outcome.
 
 ## Current boundaries and next steps
 

@@ -3,6 +3,7 @@
 # Own ONNX-runtime wrapper for SentenceTransformer models using `tokenizers`
 #
 
+import logging
 from pathlib import Path
 from urllib.error import URLError
 
@@ -11,7 +12,8 @@ import onnxruntime as ort
 from tokenizers import Tokenizer
 
 from atlas.core.config import DATA_DIR
-from atlas.core.events import log
+
+log = logging.getLogger(__name__)
 
 
 class ONNXSentenceTransformer:
@@ -41,7 +43,7 @@ class ONNXSentenceTransformer:
 
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        log(f"Downloading {dest.name}...", "OP", "INFO")
+        log.info("Downloading %s...", dest.name)
 
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with (

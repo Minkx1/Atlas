@@ -149,6 +149,7 @@ class AppConfig:
     name: str = "Atlas"
     username: str = "Sir"
     log: bool = False
+    log_level: str = "INFO"
 
     audio: AudioConfig = field(default_factory=AudioConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -184,6 +185,7 @@ def load_config(config_path: str = "config/config.toml") -> AppConfig:
         name=app.get("name", "Atlas"),
         username=app.get("username", "Sir"),
         log=app.get("log", False),
+        log_level=app.get("log_level", "INFO"),
         audio=AudioConfig(**data.get("audio", {})),
         llm=LLMConfig(**data.get("llm", {})),
         op=OPConfig(**data.get("op", {})),

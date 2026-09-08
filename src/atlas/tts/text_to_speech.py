@@ -3,6 +3,7 @@
 # Uses PiperTTS model to dynamically speak text
 #
 
+import logging
 import math
 import queue
 import threading
@@ -16,7 +17,9 @@ import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
 from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
@@ -53,6 +56,7 @@ class TextToSpeech:
         )
         self._busy = False
         self._busy_lock = threading.Lock()
+        self._healthy = False
 
         self.silence_duration = cfg.tts.silence_duration
         self.use_cuda = cfg.tts.use_cuda
@@ -62,11 +66,8 @@ class TextToSpeech:
             self.path, use_cuda=self.use_cuda, download_dir=self.path.parent
         )
         # self._generate_basic_sounds()
-        log(
-            "TTS model loaded.",
-            "TTS",
-            "SUCCESS",
-        )
+        self._healthy = True
+        log.info("TTS model loaded")
         self.events.emit(EventType.TTS_LOADED, {})
 
     def start(self):
@@ -92,11 +93,7 @@ class TextToSpeech:
         model_dir = model_path.parent
         model_dir.mkdir(parents=True, exist_ok=True)
 
-        log(
-            f"Downloading PiperTTS model '{model_key}' via HuggingFace index...",
-            "TTS",
-            "INFO",
-        )
+        log.info("Downloading PiperTTS model '%s' via HuggingFace index", model_key)
 
         try:
             req = urllib.request.Request(
@@ -118,7 +115,7 @@ class TextToSpeech:
                 download_url = HF_BASE_URL + rel_path
 
                 if not target_path.exists():
-                    log(f"Downloading {file_name}...", "TTS", "INFO")
+                    log.info("Downloading %s...", file_name)
                     file_req = urllib.request.Request(
                         download_url, headers={"User-Agent": "Mozilla/5.0"}
                     )
@@ -128,18 +125,10 @@ class TextToSpeech:
                     ):
                         shutil.copyfileobj(response, out_file)
 
-            log(
-                f"PiperTTS model '{model_key}' downloaded successfully.",
-                "TTS",
-                "SUCCESS",
-            )
+            log.info("PiperTTS model '%s' downloaded successfully", model_key)
 
-        except Exception as e:
-            log(
-                f"Failed to download Piper '{model_key}': {type(e).__name__}: {e}",
-                "TTS",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Failed to download Piper '%s'", model_key)
             raise
 
     def _tts_worker(self):
@@ -160,7 +149,7 @@ class TextToSpeech:
 
     def interrupt(self) -> None:
         """Stops current playback and clears the TTS queue."""
-        log("TTS Interrupted!", "TTS", "INFO")
+        log.info("TTS interrupted")
         with self.queue.mutex:
             self.queue.queue.clear()
 
@@ -174,9 +163,12 @@ class TextToSpeech:
 
     def _text_to_speech(self, text: str) -> None:
         """Generates and plays audio from text(str)."""
+        if not self._healthy:
+            log.warning("Ignoring TTS request because the subsystem is unavailable")
+            return
         if text.strip():
             try:
-                log(f"Synthesizing TTS: {text}...", "TTS", "DEBUG")
+                log.debug("Synthesizing TTS text")
                 audio_chunks = list(self.voice.synthesize(text, self.syn_config))
                 audio_array = np.concatenate(
                     [chunk.audio_float_array for chunk in audio_chunks]
@@ -199,13 +191,10 @@ class TextToSpeech:
 
                 sd.play(padded_audio, samplerate=samplerate)
                 sd.wait()
-                log("TTS playback completed.", "TTS", "DEBUG")
-            except Exception as e:
-                log(
-                    f"Error during TTS synthesis: {type(e).__name__}: {e}",
-                    "TTS",
-                    "ERROR",
-                )
+                log.debug("TTS playback completed")
+            except Exception:
+                self._healthy = False
+                log.exception("TTS synthesis or playback failed; subsystem disabled")
 
     def _text_to_file(self, text: str, path: Path) -> None:
         """Generates audio from `text` and writes it to the `output_path`."""
@@ -223,24 +212,16 @@ class TextToSpeech:
                 return  # .wav file was already generated
 
             if path.suffix.lower() in {".flac", ".ogg"}:
-                log(
-                    f"Compressing to {path.suffix.lower()}: {path.name}",
-                    "TTS",
-                    "DEBUG",
-                )
+                log.debug("Compressing to %s: %s", path.suffix.lower(), path.name)
 
                 sf.write(path, *sf.read(wav_file))
 
                 wav_file.unlink()
             else:
-                log(f"Unsupported output format: {path.suffix}", "TTS", "ERROR")
+                log.error("Unsupported output format: %s", path.suffix)
 
-        except Exception as e:
-            log(
-                f"Error generating audio {path.name}: {type(e).__name__}: {e}",
-                "TTS",
-                "ERROR",
-            )
+        except Exception:
+            log.exception("Error generating audio %s", path.name)
 
     def speak(self, text: str) -> None:
         self.queue.put(text)

@@ -1,4 +1,5 @@
 # ui.py
+import logging
 import time
 from datetime import datetime
 
@@ -10,7 +11,21 @@ from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
 from atlas.core.config import cfg
-from atlas.core.events import Event, EventManager, EventType, log
+from atlas.core.events import Event, EventManager, EventType
+
+log = logging.getLogger(__name__)
+
+
+class UILogHandler(logging.Handler):
+    def __init__(self, ui: "UI") -> None:
+        super().__init__()
+        self.ui = ui
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.ui.safe_call(self.ui.write_log_record, record)
+        except Exception:
+            self.handleError(record)
 
 
 class AudioWaveform(Static):
@@ -253,6 +268,8 @@ class UI(App):
         self.audiowave = self.query_one("#audio-waveform", AudioWaveform)
         self.status_text = self.query_one("#status-text", Static)
         self.event_log = self.query_one("#event-log", RichLog)
+        self._log_handler = UILogHandler(self)
+        logging.getLogger().addHandler(self._log_handler)
 
         self._current_assistant_label: Label | None = None
         self._current_assistant_text = ""
@@ -265,7 +282,6 @@ class UI(App):
         self.events.subscribe(EventType.STT_AUDIOWAVE, self.on_audio_wave)
         self.events.subscribe(EventType.STT_TRANSCRIBED, self.event_on_received_command)
 
-        self.events.subscribe(EventType.DEBUG_LOG, self.event_on_debug_log)
         self.events.subscribe(EventType.UI_LLM_CHUNK, self.event_on_llm_chunk)
         self.events.subscribe(EventType.UI_ASSISTANT_SAY, self.event_on_assistant_say)
 
@@ -273,8 +289,8 @@ class UI(App):
         if getattr(self, "is_running", False):
             try:
                 self.call_from_thread(fn, *args, **kwargs)
-            except Exception as e:
-                log(f"UI thread safe call error: {e}.", "UI", "ERROR")
+            except Exception:
+                log.exception("UI thread safe call error")
                 raise
 
     def event_stt_changed_state(self, event: Event):
@@ -305,29 +321,29 @@ class UI(App):
         wave_data = event.payload.get("rms", 0.0)
         self.safe_call(self.audiowave.push_volume, wave_data)
 
-    def event_on_debug_log(self, event: Event):
-        """This method is called from EVENT_DISPATCHER thread"""
-        level = event.payload.get("level", "INFO").upper()
-        source = event.payload.get("source", "SYS")
-        message = event.payload.get("message", "")
+    def write_log_record(self, record: logging.LogRecord) -> None:
+        """Render a standard logging record on the Textual thread."""
+        timestamp = time.strftime("%H:%M:%S", time.localtime(record.created))
+        level = record.levelname
+        source = record.name.rsplit(".", 1)[-1].upper()
+        message = record.getMessage()
 
-        timestamp = time.strftime("%H:%M:%S", time.localtime(event.timestamp))
-
-        # Colors settings
         color_map = {
             "INFO": "green",
             "DEBUG": "dim #a0a0a0",
             "WARNING": "yellow",
             "ERROR": "bold red",
-            "SUCCESS": "bold cyan",
+            "CRITICAL": "bold red",
         }
         color = color_map.get(level, "white")
 
         formatted_msg = f"[[#00d7ff]{timestamp}[/#00d7ff]] [[bold]{source}[/bold]]"
-        f"[{color}][{level}][/{color}]: {message}"
+        formatted_msg += f"[{color}][{level}][/{color}]: {message}"
 
-        # transport writing to Textual main thread
-        self.safe_call(self.event_log.write, formatted_msg)
+        self.event_log.write(formatted_msg)
+
+    def on_unmount(self) -> None:
+        logging.getLogger().removeHandler(self._log_handler)
 
     def event_on_llm_chunk(self, event: Event):
         def f():

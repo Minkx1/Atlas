@@ -3,16 +3,19 @@
 # Loads and manipulaties commands and plugins
 #
 
+import logging
 import re
 import threading
 
 import numpy as np
 
 from atlas.core.config import DATA_DIR, PLUGINS_DIR, cfg
-from atlas.core.events import EventManager, EventType, log
+from atlas.core.events import EventManager, EventType
 
 from .plugins import Plugin, PluginManifest
 from .sentence_transformer import ONNXSentenceTransformer
+
+log = logging.getLogger(__name__)
 
 
 class CommandOperator:
@@ -43,17 +46,13 @@ class CommandOperator:
         self._load_plugins()
         self._precompute_embeddings()
 
-        log("Embeddings and commands loaded.", "OP", "INFO")
+        log.info("Embeddings and commands loaded")
 
     def _load_commands(self) -> None:
         """Loads all triggers and intents from commands config."""
         self.commands = cfg.op.load_commands() or {}  # type: ignore
 
-        log(
-            f"Loaded intents: {list(self.commands.keys())}",
-            "OP",
-            "DEBUG",
-        )
+        log.debug("Loaded intents: %s", list(self.commands.keys()))
 
         def _format_triggers(triggers: list[str]) -> list[str]:
             res = []
@@ -67,10 +66,8 @@ class CommandOperator:
                 if "triggers" in data:
                     self.triggers[intent] = _format_triggers(data["triggers"])  # type: ignore
             else:
-                log(
-                    f"Data for intent '{intent}' is not a dict. Type: {type(data)}",
-                    "OP",
-                    "WARN",
+                log.warning(
+                    "Data for intent '%s' is not a dict: %s", intent, type(data)
                 )
 
     def _load_plugins(self) -> None:
@@ -85,24 +82,24 @@ class CommandOperator:
                 continue
             try:
                 manifest = PluginManifest.from_toml(toml_path)
-            except Exception as e:
-                log(f"Unable to parse {toml_path}: {e}", "OP", "ERROR")
+            except Exception:
+                log.exception("Unable to parse %s", toml_path)
                 continue
 
             self.plugins[manifest.id] = Plugin(d, manifest, self.events)
             self.triggers[manifest.id] = manifest.triggers
-            log(f"Loaded plugin: {manifest.id}", "OP", "INFO")
+            log.info("Loaded plugin: %s", manifest.id)
 
     def _precompute_embeddings(self) -> None:
         """Precomputes embeddings for triggers."""
-        log("Precomputing trigger embeddings...", "OP", "DEBUG")
+        log.debug("Precomputing trigger embeddings")
         for intent, triggers in self.triggers.items():
             if not triggers:
-                log(f"Intent '{intent}' has empty triggers. Skipping.", "OP", "WARN")
+                log.warning("Intent '%s' has empty triggers; skipping", intent)
                 continue
             vectors = self._get_embedd_vec(triggers)
             self.trigger_embeddings[intent] = vectors
-        log("Embeddings precomputed.", "OP", "DEBUG")
+        log.debug("Embeddings precomputed")
 
     def _get_embedd_vec(self, phrase: str | list[str]) -> np.ndarray:
         return self.model.encode(
@@ -160,15 +157,17 @@ class CommandOperator:
         second_best_score = sorted_intents[1][1] if len(sorted_intents) > 1 else 0.0
         second_best_intent = sorted_intents[1][0] if len(sorted_intents) > 1 else "None"
 
-        log(
-            f"Intent check '{cmd_clean}': Best: {best_intent} ({best_score:.3f}), "
-            f"2nd: {second_best_intent} ({second_best_score:.3f})",
-            "OP",
-            "DEBUG",
+        log.debug(
+            "Intent check '%s': best %s (%.3f), second %s (%.3f)",
+            cmd_clean,
+            best_intent,
+            best_score,
+            second_best_intent,
+            second_best_score,
         )
 
         if best_intent == "llm_query":
-            log("Intent is 'llm_query', passing to LLM.", "OP", "DEBUG")
+            log.debug("Intent is 'llm_query'; passing to LLM")
             return None
 
         if best_score >= self.intent_threshold:
@@ -176,38 +175,48 @@ class CommandOperator:
             is_confident = margin >= self.margin
 
             if is_confident:
-                log(
-                    f"Found confident intent: {best_intent} (Score: {best_score:.3f}, "
-                    f"Margin: {margin:.3f})",
-                    "OP",
-                    "DEBUG",
+                log.debug(
+                    "Found confident intent: %s (score %.3f, margin %.3f)",
+                    best_intent,
+                    best_score,
+                    margin,
                 )
                 return best_intent
             else:
-                log(
-                    f"Rejected intent '{best_intent}': Margin too low"
-                    f"({margin:.3f} < {self.margin})",
-                    "OP",
-                    "DEBUG",
+                log.debug(
+                    "Rejected intent '%s': margin too low (%.3f < %.3f)",
+                    best_intent,
+                    margin,
+                    self.margin,
                 )
         else:
-            log(
-                f"Rejected intent '{best_intent}': Score too low"
-                f"({best_score:.3f} < {self.intent_threshold})",
-                "OP",
-                "DEBUG",
+            log.debug(
+                "Rejected intent '%s': score too low (%.3f < %.3f)",
+                best_intent,
+                best_score,
+                self.intent_threshold,
             )
 
         return None
 
     def exec_command(self, intent: str) -> dict[str, str | None] | None:
-        log(f"Executing intent: {intent}", "OP", "DEBUG")
+        log.debug("Executing intent: %s", intent)
         if intent in self.plugins:
             origin = self.history[-1] if self.history else ""
+
+            def run_plugin() -> None:
+                try:
+                    self.plugins[intent].run(origin)
+                except Exception:
+                    log.exception("Plugin '%s' failed unexpectedly", intent)
+
             # running plugin process in separate thread
             threading.Thread(
-                target=self.plugins[intent].run, args=(origin,), daemon=True
+                target=run_plugin,
+                name=f"PLUGIN_{intent}",
+                daemon=True,
             ).start()
             return None
 
         self.events.emit(EventType.OP_INTENT, {"intent": intent})
+        log.info(f"Intent: {intent}")

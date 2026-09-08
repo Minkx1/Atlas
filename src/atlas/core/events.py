@@ -3,16 +3,14 @@
 # Contains core event system
 #
 
+import logging
 import queue
 import threading
 import time
 from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Literal, overload
-
-from rich.console import Console
 
 from .schema import (
     AudioWavePayload,
@@ -22,12 +20,13 @@ from .schema import (
     IntentPayload,
     KeywordPayload,
     LLMChunkPayload,
-    LogPayload,
     SetStatePayload,
     SoundGenerationPayload,
     SoundPlaybackPayload,
     TextPayload,
 )
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -102,12 +101,8 @@ class EventManager:
     def _run_callback(self, callback: Callback, event: Event):
         try:
             callback(event)
-        except Exception as exc:
-            log(
-                f"Error in callback for {event.name}: {exc}",
-                source="EVENTS",
-                level="ERROR",
-            )
+        except Exception:
+            log.exception("Error in callback for event %s", event.name)
 
     def _dispatch_loop(self):
         while True:
@@ -240,11 +235,6 @@ class EventManager:
         ],
         payload: EmptyPayload | None = None,
     ) -> None: ...
-    @overload
-    def emit(
-        self, event: Literal[EventType.DEBUG_LOG], payload: LogPayload
-    ) -> None: ...
-
     def emit(
         self, event: EventType | None, payload: Mapping[str, Any] | None = None
     ) -> None:
@@ -277,63 +267,3 @@ class EventManager:
         self, cmd: CommandType, payload: Mapping[str, Any] | None = None
     ) -> None:
         self.queue.put(Event(cmd.value, dict(payload or {}), kind="command"))
-
-
-def emit_event(event: EventType | None, payload: Payload | None = None):
-    EventManager().emit(event, payload)
-
-
-# def command(cmd: CommandType, payload: Payload | None = None) -> None:
-#     """Dispatch an operation request while preserving its command identity."""
-#     EventManager().emit_command(cmd, payload)
-
-
-def log(message: str, source: str = "SYS", level: str = "DEBUG"):
-    emit_event(
-        EventType.DEBUG_LOG,
-        LogPayload(message=str(message), source=source, level=level.upper()),  # type: ignore
-    )
-
-
-class EventLogger:
-    def __init__(self):
-        from .config import DATA_DIR
-
-        self.logs_dir = DATA_DIR / "logs"
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
-        self.console = Console()
-
-        # Subscribe only to DEBUG_LOG events (explicit, not wildcard)
-        EventManager().subscribe(EventType.DEBUG_LOG, self._log_event)
-
-    def _get_log_filepath(self, timestamp: float) -> Path:
-        date_str = time.strftime("%Y-%m-%d", time.localtime(timestamp))
-        return self.logs_dir / f"{date_str}.log"
-
-    def _write_file(self, msg: str, timestamp: float):
-        log_file = self._get_log_filepath(timestamp)
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(msg + "\n")
-            f.flush()
-
-    def _log_event(self, event: Event):
-        message_text = self._format_message(event)
-        # self.console.print(message_text)
-
-        self._write_file(message_text, event.timestamp)
-
-    def _format_message(self, event: Event) -> str:
-        timestamp = time.strftime("%H:%M:%S", time.localtime(event.timestamp))
-
-        if event.name == EventType.DEBUG_LOG.value:
-            level = str(event.payload.get("level", "INFO")).upper()
-            source = str(event.payload.get("source", "SYSTEM"))
-            message = str(event.payload.get("message", ""))
-            return f"[{timestamp}] [{source}]  [{level}]: {message}"
-
-        content_str = (
-            str(event.payload)[:150] + "..."
-            if len(str(event.payload)) > 150
-            else str(event.payload)
-        )
-        return f"[{timestamp}] {event.name}: {content_str}"

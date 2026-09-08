@@ -4,6 +4,7 @@
 #
 
 import json
+import logging
 import subprocess
 import threading
 from dataclasses import dataclass, field
@@ -11,7 +12,9 @@ from pathlib import Path
 
 import tomllib
 
-from atlas.core.events import CommandType, EventManager, EventType, log
+from atlas.core.events import CommandType, EventManager, EventType
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,16 +71,13 @@ class Plugin:
             try:
                 msg = json.loads(raw)
                 if msg.get("type") == "log":
-                    log(
-                        msg.get("message", ""),
-                        msg.get("source", self.manifest.id),
-                        msg.get("level", "INFO"),
-                    )
+                    level = getattr(log, msg.get("level", "INFO").lower(), log.info)
+                    level("%s", msg.get("message", ""))
                     continue
             except json.JSONDecodeError:
-                log(raw, self.manifest.id, "DEBUG")
+                log.debug("[%s] %s", self.manifest.id, raw)
 
-    def run(self, origin: str) -> None:
+    def run(self, origin: str) -> bool:
         # creating process
         try:
             proc = subprocess.Popen(
@@ -89,20 +89,18 @@ class Plugin:
                 text=True,
                 bufsize=1,
             )
-        except OSError as e:
-            log(
-                f"Unable to run plugin '{self.manifest.id}': {e}",
-                "PLUGIN",
-                "ERROR",
-            )
-            return
+        except OSError:
+            log.exception("Unable to run plugin '%s'", self.manifest.id)
+            return False
 
         # giving context
         try:
             proc.stdin.write(json.dumps({"origin": origin}) + "\n")  # type: ignore
             proc.stdin.close()  # type: ignore
         except (BrokenPipeError, OSError):
-            pass
+            log.warning(
+                "Plugin '%s' closed stdin before receiving origin", self.manifest.id
+            )
 
         threading.Thread(
             target=self._pump_stderr, args=(proc.stderr,), daemon=True
@@ -112,15 +110,31 @@ class Plugin:
         if self.manifest.timeout > 0:
             timer = threading.Timer(self.manifest.timeout, proc.kill)
             timer.start()
+        timed_out = False
         try:
             for line in proc.stdout:  # type: ignore
                 self._handle_line(line)
         finally:
             if timer:
+                timed_out = proc.poll() is None and timer.is_alive() is False
                 timer.cancel()
             if proc.poll() is None:
                 proc.kill()
             proc.wait(timeout=1)
+
+        if timed_out:
+            log.error(
+                "Plugin '%s' exceeded timeout of %.1fs",
+                self.manifest.id,
+                self.manifest.timeout,
+            )
+        elif proc.returncode:
+            log.error(
+                "Plugin '%s' exited with status %s",
+                self.manifest.id,
+                proc.returncode,
+            )
+        return not timed_out and proc.returncode == 0
 
     def _handle_line(self, line: str):
         line = line.strip()
@@ -129,10 +143,10 @@ class Plugin:
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
-            log(
-                f"Plugin '{self.manifest.id}' submited invalid line: {line!r}",
-                "PLUGIN",
-                "WARN",
+            log.warning(
+                "Plugin '%s' submitted invalid JSON line: %r",
+                self.manifest.id,
+                line,
             )
             return
 
@@ -150,10 +164,10 @@ class Plugin:
             case "done":
                 pass
             case other:
-                log(
-                    f"Unknown message type '{self.manifest.id}': {other}",
-                    "PLUGIN",
-                    "WARN",
+                log.warning(
+                    "Unknown message type from plugin '%s': %s",
+                    self.manifest.id,
+                    other,
                 )
 
     def _forward_event(self, msg: dict):
@@ -161,8 +175,4 @@ class Plugin:
         try:
             self.events.emit(EventType(name), msg.get("content") or {})
         except ValueError:
-            log(
-                f"Plugin '{self.manifest.id}' emitted uknown event: {name}",
-                "PLUGIN",
-                "WARN",
-            )
+            log.warning("Plugin '%s' emitted unknown event: %s", self.manifest.id, name)
