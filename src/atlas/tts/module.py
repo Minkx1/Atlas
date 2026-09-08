@@ -21,9 +21,6 @@ class TtsModule(Module):
         self.piper = TextToSpeech(self.events)
         self.sound = SoundManager(self.events)
 
-    def play_category(self, category: str):
-        return self.sound.play_category(category)
-
     # Module methods
 
     def load(self) -> None:
@@ -37,6 +34,10 @@ class TtsModule(Module):
         self.piper.close()
 
     # Events
+
+    @on_event("tts.sounds.play_category")
+    def play_category(self, category: str, **kwargs):
+        return self.sound.play_category(category)
 
     @on_event("tts.sounds.generate_sound")
     def generate_sound(self, text: str = "", path: Path = Path(), **kwargs):

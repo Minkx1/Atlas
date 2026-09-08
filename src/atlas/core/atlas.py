@@ -14,17 +14,21 @@ from atlas.utils import UI, KeyBindManager
 from .config import DATA_DIR, cfg
 from .events import EventManager
 from .logging_config import configure_logging
+from .module import Module, on_event
 
 log = logging.getLogger(__name__)
 
 
-class Atlas:
+class Atlas(Module):
     def __init__(self) -> None:
+        # logs and events
         configure_logging(DATA_DIR / "logs", enabled=cfg.log, level=cfg.log_level)
-        # Events and Logger
         self.events = EventManager()
+        self._register_events(self.events)
+
+        # utils
+
         self.alive = True
-        # Utils
 
         self.keybinds = KeyBindManager()
         self.keybinds.register_keybind(
@@ -42,9 +46,7 @@ class Atlas:
         self.tts_module = TtsModule(self.events)
         self.op_module = OpModule(self.events)
 
-        self._setup_subscriptions()
-
-    def shutdown(self):
+    def _shutdown(self):
         self.alive = False
         if hasattr(self, "ui") and getattr(self.ui, "is_running", False):
             self.ui.call_from_thread(self.ui.exit)
@@ -52,40 +54,20 @@ class Atlas:
     def load_models(self):
         try:
             log.info("Starting model loading")
-            # self.kws.load()
-            # self.sr.load()
             self.stt_module.load()
-
             self.tts_module.load()
-            # self.tts.load()
-            # self.sound_manager.load()
-
             self.op_module.load()
-            # self.cmd.load()
-            # self.llama.load()
 
             log.info("All models loaded successfully")
         except Exception:
             log.exception("Error loading models")
             raise
 
-    def _setup_subscriptions(self):
-        """Subscribe all nececessary callbacks for events."""
-
-        def handle_intent(event):
-            intent: str = event.payload["intent"]
-            self.tts_module.play_category(intent)
-
-            if intent == "farewell":
-                self.shutdown()
-            if intent == "sleep":
-                self.events.emit("stt.command_set_state", {"state": "SLEEPING"})
-
-        self.events.subscribe("op.intent", handle_intent)
-
-    def _close(self):
+    @on_event("core.terminate")
+    def close(self, **kwargs):
         try:
             log.info("Shutting down assistant")
+            self.events.close()
 
             self.keybinds.close()
 
@@ -99,8 +81,8 @@ class Atlas:
                 self.tts_module.close()
                 log.debug("TTS closed")
 
-            self.shutdown()
-            self.events.close()
+            self._shutdown()
+
             log.info("Shutdown complete")
         except Exception:
             log.exception("Error during shutdown")
@@ -127,8 +109,6 @@ class Atlas:
         self.tts_module.start()
         self.op_module.start()
 
-        self.events.emit("ui.banner", {})
-
         self.ui.run()  # this blocks main thread
 
         # from threading import Event
@@ -136,11 +116,11 @@ class Atlas:
         #     Event().wait(1.0)
 
     def start(self):
-        """Starts Atlas Assistant."""
+        """Starts Atlas."""
         try:
             self._main()
         except Exception as e:
             print(f"[!] FATAL ERROR: {e}")
             sys.exit(1)
         finally:
-            self._close()
+            self.close()

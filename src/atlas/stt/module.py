@@ -74,7 +74,7 @@ class SttModule(Module):
         self.state.set_state(SMState(state), detail)
 
     @on_event("stt.changed_state")
-    def reset_kws(self, state: str = "") -> None:
+    def reset_kws(self, state: str = "", **kwargs) -> None:
         if state == "SLEEPING":
             self.kws.reset()
 

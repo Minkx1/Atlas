@@ -121,6 +121,15 @@ class OpModule(Module):
 
     # Events
 
+    @on_event("op.intent")
+    def handle_intent(self, intent: str, **kwargs):
+        self.events.emit("tts.sounds.play_category", {"category": intent})
+
+        if intent == "farewell":
+            self.events.emit("core.terminate")
+        if intent == "sleep":
+            self.events.emit("stt.command_set_state", {"state": "SLEEPING"})
+
     @on_event("op.submit", "stt.transcribed")
     def submit(self, text: str = "", **kwargs):
         self.command_queue.put(text)
