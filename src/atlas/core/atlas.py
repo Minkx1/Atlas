@@ -16,8 +16,6 @@ from .events import (
     EventLogger,
     EventManager,
     EventType,
-    command,
-    emit_event,
     log,
 )
 
@@ -44,7 +42,9 @@ class Atlas:
         self.keybinds = KeyBindManager()
         self.keybinds.register_keybind(
             cfg.kws.awake_keybind,
-            lambda: emit_event(EventType.KWS_KEYWORD_DETECTED, {"keyword": "{HotKey}"}),
+            lambda: self.events.emit(
+                EventType.KWS_KEYWORD_DETECTED, {"keyword": "{HotKey}"}
+            ),
         )
 
         self.ui = UI(app=self, events=self.events)
@@ -96,7 +96,7 @@ class Atlas:
             if intent == "farewell":
                 self.shutdown()
             if intent == "sleep":
-                command(CommandType.SET_STATE, {"state": "SLEEPING"})
+                self.events.emit_command(CommandType.SET_STATE, {"state": "SLEEPING"})
 
         self.events.subscribe(EventType.OP_INTENT, handle_intent)
 
@@ -144,7 +144,7 @@ class Atlas:
         self.tts_module.start()
         self.op_module.start()
 
-        emit_event(EventType.UI_BANNER, {})
+        self.events.emit(EventType.UI_BANNER, {})
 
         self.ui.run()  # this blocks main thread
 

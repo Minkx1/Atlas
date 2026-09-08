@@ -4,7 +4,7 @@
 
 from typing import TYPE_CHECKING
 
-from atlas.core.events import CommandType, EventManager, EventType, emit_event, log
+from atlas.core.events import CommandType, EventManager, EventType, log
 from atlas.core.module import Module, on_event
 
 from .kws import KeyWordSpotter
@@ -91,10 +91,10 @@ class SttModule(Module):
     @on_event(EventType.KWS_KEYWORD_DETECTED)
     def handle_kw_detected(self, keyword: str = "", **kwargs):
         if self.state.state == SMState.WAITING:
-            emit_event(EventType.OP_INTERRUPT, {})
+            self.events.emit(EventType.OP_INTERRUPT, {})
             self.state.set_state(SMState.AWAKE, f"Interrupted: {keyword}")
         else:
             # app.operator.submit("!EVENT_KEYWORD_DETECTED")
             log(f"Keyword detected directly: {keyword}.", level="INFO")
-            emit_event(EventType.OP_INTENT, {"intent": "greet"})
+            self.events.emit(EventType.OP_INTENT, {"intent": "greet"})
             self.state.set_state(SMState.AWAKE, f"Keyword: {keyword}")

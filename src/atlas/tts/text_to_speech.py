@@ -247,4 +247,4 @@ class TextToSpeech:
 
     def close(self):
         self.queue.put(None)
-        self.worker_thread.join()
+        self.worker_thread.join(timeout=2.0)

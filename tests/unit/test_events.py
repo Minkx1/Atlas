@@ -1,12 +1,6 @@
 import threading
 
-from atlas.core.events import (
-    CommandType,
-    Event,
-    EventType,
-    command,
-    emit_event,
-)
+from atlas.core.events import CommandType, Event, EventType
 
 
 def test_event_and_command_payloads_are_dictionaries(event_manager):
@@ -15,8 +9,8 @@ def test_event_and_command_payloads_are_dictionaries(event_manager):
     manager.subscribe(EventType.UI_BANNER, received.append)
     manager.subscribe(CommandType.TTS_SPEAK, received.append)
 
-    emit_event(EventType.UI_BANNER)
-    command(CommandType.TTS_SPEAK, {"text": "hello"})
+    manager.emit(EventType.UI_BANNER)
+    manager.emit_command(CommandType.TTS_SPEAK, {"text": "hello"})
     manager.queue.join()
 
     assert received[0].payload == {}
@@ -33,7 +27,7 @@ def test_async_callback_does_not_block_dispatcher_and_is_flushed(event_manager):
 
     manager = event_manager
     manager.subscribe(EventType.UI_BANNER, callback, asynchronous=True)
-    emit_event(EventType.UI_BANNER, {})
+    manager.emit(EventType.UI_BANNER, {})
     manager.queue.join()
 
     assert finished.is_set()

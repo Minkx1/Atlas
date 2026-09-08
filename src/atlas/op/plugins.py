@@ -11,7 +11,7 @@ from pathlib import Path
 
 import tomllib
 
-from atlas.core.events import CommandType, EventManager, EventType, command, log
+from atlas.core.events import CommandType, EventManager, EventType, log
 
 
 @dataclass
@@ -139,7 +139,9 @@ class Plugin:
         match msg.get("type"):
             case "say":
                 # mimics originally-designed event to call `tts.speak(...)`
-                command(CommandType.TTS_SPEAK, {"text": msg.get("text", "")})
+                self.events.emit_command(
+                    CommandType.TTS_SPEAK, {"text": msg.get("text", "")}
+                )
                 self.events.emit(
                     EventType.UI_ASSISTANT_SAY, {"text": msg.get("text", "")}
                 )

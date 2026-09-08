@@ -6,14 +6,28 @@
 import queue
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from enum import StrEnum
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, overload
 
 from rich.console import Console
+
+from .schema import (
+    AudioWavePayload,
+    CommandType,
+    EmptyPayload,
+    EventType,
+    IntentPayload,
+    KeywordPayload,
+    LLMChunkPayload,
+    LogPayload,
+    SetStatePayload,
+    SoundGenerationPayload,
+    SoundPlaybackPayload,
+    TextPayload,
+)
 
 
 @dataclass
@@ -29,65 +43,7 @@ class Event:
         return self.payload
 
 
-class LogPayload(TypedDict):
-    message: str
-    source: str
-    level: str
-
-
-class EventType(StrEnum):
-    # TextToSpeach
-    TTS_LOADED = "TTS_LOADED"
-    SOUNDS_GENERATE_SOUND = "SOUNDS_GENERATE_SOUND"
-    TTS_BUSY = "TTS_BUSY"
-    TTS_FREE = "TTS_FREE"
-
-    KWS_LOADED = "KWS_LOADED"
-    KWS_KEYWORD_DETECTED = "KWS_KEYWORD_DETECTED"
-
-    VAD_LOADED = "VAD_LOADED"
-    VAD_START = "VAD_START"
-    VAD_END = "VAD_END"
-
-    WHISPER_LOADED = "WHISPER_LOADED"
-    STT_MUTE = "STT_MUTE"
-    STT_UNMUTE = "STT_UNMUTE"
-    STT_AUDIOWAVE = "STT_AUDIOWAVE"
-    STT_CHANGED_STATE = "STT_CHANGED_STATE"
-    STT_TRANSCRIBED = "STT_TRANSCRIBED"
-    STT_START = "STT_START"
-    STT_FINISH = "STT_FINISH"
-
-    OP_INTERRUPT = "OP_INTERRUPT"
-    OP_INTENT = "OP_INTENT"
-    OP_START = "OP_LLM_START"
-    OP_LLM_CHUNK = "OP_LLM_CHUNK"
-    OP_FINISH = "OP_LLM_FINISH"
-
-    UI_BANNER = "UI_BANNER"
-    UI_STATE_CHANGE = "UI_STATE_CHANGE"
-    UI_TRANSCRIPTION = "UI_TRANSCRIPTION"
-    UI_LLM_CHUNK = "UI_LLM_CHUNK"
-    UI_LLM_RESPONSE = "UI_LLM_RESPONSE"
-    UI_LLM_RESPONSE_DONE = "UI_LLM_RESPONSE_DONE"
-    UI_ASSISTANT_SAY = "UI_ASSISTANT_SAY"
-
-    DEBUG_LOG = "DEBUG_LOG"
-
-    LLM_RESPONSE = "LLM_RESPONSE"
-    LLM_LOADED = "LLM_LOADED"
-
-    WILDCARD = "*"
-
-
-class CommandType(StrEnum):
-    TTS_SPEAK = "TTS_SPEAK"
-    TTS_PLAY_SOUND = "TTS_PLAY_SOUND"
-    OP_SUBMIT = "OP_SUBMIT"
-    SET_STATE = "SET_STATE"
-
-
-Payload = dict[str, Any]
+Payload = Mapping[str, Any]
 Callback = Callable[[Event], Any]
 
 
@@ -115,15 +71,6 @@ class EventManager:
             target=self._dispatch_loop, name="EVENT_DISPATCHER", daemon=True
         )
         self._dispatcher.start()
-
-    def emit(self, event: EventType | None, payload: Payload | None = None):
-        if event is None:
-            self.queue.put(None)
-            return
-        self.queue.put(Event(event.value, payload or {}))
-
-    def emit_command(self, cmd: CommandType, payload: Payload | None = None):
-        self.queue.put(Event(cmd.value, payload or {}, kind="command"))
 
     def subscribe(
         self,
@@ -185,22 +132,6 @@ class EventManager:
 
             self.queue.task_done()
 
-    def wait_for(self, event: EventType, timeout: float | None = None) -> Event | None:
-        """Blocks thread until event is emitted."""
-        wait_event = threading.Event()
-        received_event = None
-
-        def _unblock(e: Event):
-            nonlocal received_event
-            received_event = e
-            wait_event.set()
-
-        self.subscribe(event, _unblock)
-        wait_event.wait(timeout)
-        self.unsubscribe(event, _unblock)
-
-        return received_event
-
     def flush_and_stop(self, timeout: float = 2.0):
         def _wait():
             self.queue.join()
@@ -222,18 +153,139 @@ class EventManager:
         self._dispatcher.join(timeout=2.0)
         self._async_executor.shutdown(wait=True, cancel_futures=False)
 
+    # Emit overloads
+    @overload
+    def emit(
+        self, event: Literal[EventType.OP_INTENT], payload: IntentPayload
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: Literal[
+            EventType.OP_LLM_CHUNK,
+            EventType.UI_LLM_RESPONSE_DONE,
+            EventType.LLM_RESPONSE,
+        ],
+        payload: TextPayload,
+    ) -> None: ...
+    @overload
+    def emit(
+        self, event: Literal[EventType.UI_LLM_CHUNK], payload: LLMChunkPayload
+    ) -> None: ...
+    @overload
+    def emit(
+        self, event: Literal[EventType.KWS_KEYWORD_DETECTED], payload: KeywordPayload
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: Literal[
+            EventType.UI_TRANSCRIPTION,
+            EventType.STT_TRANSCRIBED,
+            EventType.UI_LLM_RESPONSE,
+            EventType.UI_ASSISTANT_SAY,
+        ],
+        payload: TextPayload,
+    ) -> None: ...
+    @overload
+    def emit(
+        self, event: Literal[EventType.STT_AUDIOWAVE], payload: AudioWavePayload
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: Literal[EventType.STT_CHANGED_STATE, EventType.UI_STATE_CHANGE],
+        payload: SetStatePayload,
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: Literal[EventType.SOUNDS_GENERATE_SOUND],
+        payload: SoundGenerationPayload,
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: Literal[
+            EventType.TTS_LOADED,
+            EventType.KWS_LOADED,
+            EventType.VAD_LOADED,
+            EventType.WHISPER_LOADED,
+            EventType.STT_MUTE,
+            EventType.STT_UNMUTE,
+            EventType.STT_START,
+            EventType.STT_FINISH,
+            EventType.OP_INTERRUPT,
+            EventType.LLM_LOADED,
+            EventType.UI_BANNER,
+        ],
+        payload: EmptyPayload | None = None,
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: EventType | None,
+        payload: Payload | None = None,
+    ) -> None: ...
+    @overload
+    def emit(
+        self,
+        event: Literal[
+            EventType.OP_START,
+            EventType.OP_FINISH,
+            EventType.VAD_START,
+            EventType.VAD_END,
+            EventType.TTS_BUSY,
+            EventType.TTS_FREE,
+        ],
+        payload: EmptyPayload | None = None,
+    ) -> None: ...
+    @overload
+    def emit(
+        self, event: Literal[EventType.DEBUG_LOG], payload: LogPayload
+    ) -> None: ...
+
+    def emit(
+        self, event: EventType | None, payload: Mapping[str, Any] | None = None
+    ) -> None:
+        if event is None:
+            self.queue.put(None)
+            return
+        self.queue.put(Event(event.value, dict(payload or {})))
+
+    # command overloads
+    @overload
+    def emit_command(
+        self,
+        cmd: Literal[CommandType.TTS_SPEAK, CommandType.OP_SUBMIT],
+        payload: TextPayload,
+    ) -> None: ...
+    @overload
+    def emit_command(
+        self, cmd: Literal[CommandType.SET_STATE], payload: SetStatePayload
+    ) -> None: ...
+    @overload
+    def emit_command(
+        self, cmd: Literal[CommandType.TTS_PLAY_SOUND], payload: SoundPlaybackPayload
+    ) -> None: ...
+    @overload
+    def emit_command(
+        self, cmd: CommandType, payload: Payload | None = None
+    ) -> None: ...
+
+    def emit_command(
+        self, cmd: CommandType, payload: Mapping[str, Any] | None = None
+    ) -> None:
+        self.queue.put(Event(cmd.value, dict(payload or {}), kind="command"))
+
 
 def emit_event(event: EventType | None, payload: Payload | None = None):
     EventManager().emit(event, payload)
 
 
-def command(cmd: CommandType, payload: Payload | None = None) -> None:
-    """Dispatch an operation request while preserving its command identity."""
-    EventManager().emit_command(cmd, payload)
-
-
-def wait_for(event: EventType, timeout: float | None = None) -> Event | None:
-    return EventManager().wait_for(event, timeout)
+# def command(cmd: CommandType, payload: Payload | None = None) -> None:
+#     """Dispatch an operation request while preserving its command identity."""
+#     EventManager().emit_command(cmd, payload)
 
 
 def log(message: str, source: str = "SYS", level: str = "DEBUG"):
