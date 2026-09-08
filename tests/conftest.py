@@ -7,7 +7,7 @@ from atlas.core.events import EventManager
 def clean_event_manager():
     manager = EventManager()
     yield
-    manager.flush_and_stop()
+    manager.close()
 
 
 @pytest.fixture

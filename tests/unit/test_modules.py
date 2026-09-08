@@ -1,6 +1,6 @@
 import pytest
 
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 from atlas.core.module import Module, on_event
 
 
@@ -16,7 +16,7 @@ class ProbeModule(Module):
         self.received = []
         self._register_events(events)
 
-    @on_event(EventType.UI_BANNER)
+    @on_event("ui.banner")
     def receive(self, value: int = 0, **kwargs):
         self.received.append(value)
 
@@ -24,7 +24,7 @@ class ProbeModule(Module):
 def test_on_event_registers_method_on_the_supplied_manager(event_manager):
     probe = ProbeModule(event_manager)
 
-    event_manager.emit(EventType.UI_BANNER, {"value": 42})
+    event_manager.emit("ui.banner", {"value": 42})
     event_manager.queue.join()
 
     assert probe.received == [42]

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 from atlas.op.plugins import Plugin, PluginManifest
 
 
@@ -39,14 +39,11 @@ def test_plugin_say_message_emits_tts_command_and_ui_event(
     plugin = Plugin(tmp_path, PluginManifest(id="demo"), event_manager)
     received = []
     manager = event_manager
-    manager.subscribe(CommandType.TTS_SPEAK, received.append)
-    manager.subscribe(EventType.UI_ASSISTANT_SAY, received.append)
+    manager.subscribe("tts.speak", received.append)
+    manager.subscribe("ui.say", received.append)
 
     plugin._handle_line('{"type": "say", "text": "hello"}')
-    manager.queue.join()
+    manager._queue.join()
 
-    assert [event.name for event in received] == [
-        CommandType.TTS_SPEAK.value,
-        EventType.UI_ASSISTANT_SAY.value,
-    ]
+    assert [event.name for event in received] == ["tts.speak", "ui.say"]
     assert all(event.payload == {"text": "hello"} for event in received)
