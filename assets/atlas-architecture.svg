@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" role="img" aria-labelledby="title desc">
+  <title id="title">Atlas local voice pipeline</title>
+  <desc id="desc">A microphone flows through recognition and routing into local output.</desc>
+  <defs>
+    <linearGradient id="field" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#176b87" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#e0a33a" stop-opacity=".2"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#17212b" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect width="760" height="430" rx="24" fill="url(#field)"/>
+  <path d="M78 215h604" stroke="#176b87" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 10" opacity=".55"/>
+  <g filter="url(#shadow)" font-family="sans-serif" text-anchor="middle">
+    <g transform="translate(42 155)">
+      <rect width="120" height="120" rx="18" fill="#fff"/>
+      <circle cx="60" cy="48" r="18" fill="#e0a33a"/>
+      <path d="M48 48a12 12 0 0 0 24 0v-4a12 12 0 0 0-24 0zM42 49a18 18 0 0 0 36 0M60 67v15M48 84h24" fill="none" stroke="#17212b" stroke-width="5" stroke-linecap="round"/>
+      <text x="60" y="105" fill="#17212b" font-size="13" font-weight="700">VOICE</text>
+    </g>
+    <g transform="translate(220 125)">
+      <rect width="160" height="180" rx="18" fill="#fff"/>
+      <circle cx="80" cy="55" r="30" fill="#176b87" opacity=".16"/>
+      <path d="M62 57h36M67 47h26M70 67h20" stroke="#176b87" stroke-width="5" stroke-linecap="round"/>
+      <text x="80" y="115" fill="#17212b" font-size="14" font-weight="700">RECOGNIZE</text>
+      <text x="80" y="139" fill="#5c6974" font-size="12">KWS · VAD · STT</text>
+      <text x="80" y="160" fill="#5c6974" font-size="12">local audio</text>
+    </g>
+    <g transform="translate(440 125)">
+      <rect width="160" height="180" rx="18" fill="#fff"/>
+      <path d="M48 62h64M48 82h42M48 102h54" stroke="#e0a33a" stroke-width="7" stroke-linecap="round"/>
+      <text x="80" y="135" fill="#17212b" font-size="14" font-weight="700">DECIDE</text>
+      <text x="80" y="159" fill="#5c6974" font-size="12">commands · plugins · LLM</text>
+    </g>
+    <g transform="translate(638 155)">
+      <rect width="80" height="120" rx="18" fill="#fff"/>
+      <path d="M28 55h24M28 70h24M28 85h17" stroke="#176b87" stroke-width="5" stroke-linecap="round"/>
+      <text x="40" y="105" fill="#17212b" font-size="12" font-weight="700">OUTPUT</text>
+    </g>
+  </g>
+  <text x="380" y="385" fill="#176b87" font-family="sans-serif" font-size="15" font-weight="700" text-anchor="middle" letter-spacing="2">PRIVATE BY DESIGN · BUILT TO EXTEND</text>
+</svg>
