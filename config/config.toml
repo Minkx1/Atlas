@@ -22,7 +22,7 @@ log = true
 
 # Minimum log level written to the console and log file.
 # Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL.
-log_level = "INFO"
+log_level = "DEBUG"
 
 
 [op]

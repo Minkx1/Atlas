@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 class Atlas(Module):
     name = "core"
 
-    def __init__(self, log: bool = True, level: str = "INFO") -> None:
+    def __init__(self, log: bool = True, level: str = "DEBUG") -> None:
         self.alive: bool = True
 
         # logs and events
