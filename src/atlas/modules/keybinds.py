@@ -2,7 +2,14 @@
 # keybins.py
 #
 
+import logging
 from collections.abc import Callable
+
+from atlas.core.config import cfg
+from atlas.core.events import EventManager
+from atlas.core.module import Module
+
+log = logging.getLogger(__name__)
 
 
 class KeyBindManager:
@@ -33,10 +40,33 @@ class KeyBindManager:
             try:
                 cb()
             except Exception as e:
-                print(f"Error handling '{keybind}': {e}", "KeyBind", "ERROR")
+                log.exception(f"Error handling '{keybind}'" + ": %s", e)
 
     def register_keybind(self, keybind: str, callback: Callable) -> None:
         """Registers callback for the keybind."""
         if keybind not in self.keybinds:
             self.keybinds[keybind] = []
         self.keybinds[keybind].append(callback)
+
+
+class KeybindsModule(Module):
+    name = "keybinds"
+
+    def __init__(self, events: EventManager | None, **kwargs) -> None:
+        super().__init__(events, **kwargs)
+
+        self.keybinds = KeyBindManager()
+
+    def start(self) -> None:
+        self.keybinds.start()
+
+    def load(self) -> None:
+        self.keybinds.register_keybind(
+            cfg.kws.awake_keybind,
+            lambda: self.events.emit(
+                "stt.kws.keyword_detected", {"keyword": "{HotKey}"}
+            ),
+        )
+
+    def close(self) -> None:
+        self.keybinds.close()

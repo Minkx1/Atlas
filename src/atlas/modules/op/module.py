@@ -19,8 +19,7 @@ class OpModule(Module):
     name = "op"
 
     def __init__(self, events: EventManager | None = None) -> None:
-        self.events = events or EventManager()
-        self._register_events(self.events)
+        super().__init__(events)
 
         self._running = False
         self.cmd = CommandOperator(self.events)

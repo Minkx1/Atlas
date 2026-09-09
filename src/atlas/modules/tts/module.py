@@ -15,8 +15,7 @@ class TtsModule(Module):
     name = "tts"
 
     def __init__(self, events: EventManager | None = None) -> None:
-        self.events = events or EventManager()
-        self._register_events(self.events)
+        super().__init__(events)
 
         self.piper = TextToSpeech(self.events)
         self.sound = SoundManager(self.events)

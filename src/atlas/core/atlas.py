@@ -7,45 +7,34 @@ import logging
 import sys
 import threading
 
-from atlas.op import OpModule
-from atlas.stt import SttModule
-from atlas.tts import TtsModule
-from atlas.utils import UI, KeyBindManager
+import atlas.modules
+from atlas.core.module import Module, discover_modules, on_event
+from atlas.utils import UI
 
 from .config import DATA_DIR, cfg
 from .events import EventManager
 from .logging_config import configure_logging
-from .module import Module, on_event
 
 log = logging.getLogger(__name__)
 
 
 class Atlas(Module):
-    def __init__(self) -> None:
+    name = "core"
+
+    def __init__(self, log: bool = True, level: str = "INFO") -> None:
+        self.alive: bool = True
+
         # logs and events
         configure_logging(DATA_DIR / "logs", enabled=cfg.log, level=cfg.log_level)
         self.events = EventManager()
         self._register_events(self.events)
 
-        # utils
-
-        self.alive = True
-
-        self.keybinds = KeyBindManager()
-        self.keybinds.register_keybind(
-            cfg.kws.awake_keybind,
-            lambda: self.events.emit(
-                "stt.kws.keyword_detected", {"keyword": "{HotKey}"}
-            ),
-        )
-
         self.ui = UI(app=self, events=self.events)
 
         # Modules
-
-        self.stt_module = SttModule(self.events)
-        self.tts_module = TtsModule(self.events)
-        self.op_module = OpModule(self.events)
+        self.modules: dict[str, Module] = {}
+        for name, cls in discover_modules(atlas.modules).items():
+            self.modules[name] = cls(self.events)
 
     def _shutdown(self):
         self.alive = False
@@ -55,9 +44,9 @@ class Atlas(Module):
     def load_models(self):
         try:
             log.info("Starting model loading")
-            self.stt_module.load()
-            self.tts_module.load()
-            self.op_module.load()
+
+            for module in self.modules.values():
+                module.load()
 
             log.info("All models loaded successfully")
         except Exception:
@@ -72,17 +61,8 @@ class Atlas(Module):
     def close(self, **kwargs):
         try:
             log.info("Shutting down assistant")
-            self.keybinds.close()
-
-            if getattr(self, "stt_module", None):
-                self.stt_module.close()
-                log.debug("STT closed")
-            if getattr(self, "op_module", None):
-                self.op_module.close()
-                log.debug("Operator closed")
-            if getattr(self, "tts_module", None):
-                self.tts_module.close()
-                log.debug("TTS closed")
+            for module in self.modules.values():
+                module.close()
 
             self.events.close()
             self._shutdown()
@@ -107,26 +87,17 @@ class Atlas(Module):
 
     def _main(self):
         self.load_models()
-
         self.events.start()
-
-        self.keybinds.start()
-        self.stt_module.start()
-        self.tts_module.start()
-        self.op_module.start()
-
-        self.ui.run()  # this blocks main thread
-
-        # from threading import Event
-        # while self.alive:
-        #     Event().wait(1.0)
+        for module in self.modules.values():
+            module.start()
+        self.ui.run()
 
     def start(self):
         """Starts Atlas."""
         try:
             self._main()
         except Exception as e:
-            print(f"[!] FATAL ERROR: {e}")
+            log.error("[!] FATAL ERROR: %s", e, exc_info=True)
             sys.exit(1)
         finally:
             self.close()

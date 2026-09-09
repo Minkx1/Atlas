@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from atlas.core.events import EventManager
-from atlas.op.plugins import Plugin, PluginManifest
+from atlas.modules.op.plugins import Plugin, PluginManifest
 
 
 def test_plugin_manifest_reads_toml(tmp_path: Path):
