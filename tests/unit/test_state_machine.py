@@ -4,7 +4,7 @@ from atlas.modules.stt.state_machine import State, StateMachine
 def test_state_machine_starts_sleeping_when_configured(monkeypatch, event_manager):
     from atlas.modules.stt import state_machine
 
-    monkeypatch.setattr(state_machine.cfg.stt, "start_state", "SLEEPING")
+    monkeypatch.setitem(state_machine.cfg, "start_state", "SLEEPING")
 
     assert StateMachine(event_manager).state is State.SLEEPING
 
@@ -12,7 +12,7 @@ def test_state_machine_starts_sleeping_when_configured(monkeypatch, event_manage
 def test_awake_state_emits_state_events(monkeypatch, event_manager):
     from atlas.modules.stt import state_machine
 
-    monkeypatch.setattr(state_machine.cfg.stt, "start_state", "SLEEPING")
+    monkeypatch.setitem(state_machine.cfg, "start_state", "SLEEPING")
     machine = StateMachine(event_manager)
     received = []
     manager = event_manager

@@ -3,19 +3,24 @@
 # Loads and manipulaties commands and plugins
 #
 
+import json
 import logging
 import re
 import threading
+from pathlib import Path
 
 import numpy as np
 
-from atlas.core.config import DATA_DIR, PLUGINS_DIR, cfg
 from atlas.core.events import EventManager
+from atlas.utils.config import CONFIG_DIR, DATA_DIR, PLUGINS_DIR, Config
 
 from .plugins import Plugin, PluginManifest
 from .sentence_transformer import ONNXSentenceTransformer
 
 log = logging.getLogger(__name__)
+
+CONFIG_EXAMPLE = Path(__file__).parent / "op_example.toml"
+cfg = Config.load_config("op.toml", CONFIG_EXAMPLE.read_text())["op"]
 
 
 class CommandOperator:
@@ -48,16 +53,42 @@ class CommandOperator:
 
         log.info("Embeddings and commands loaded")
 
+    @staticmethod
+    def load_commands() -> dict[str, dict[str, str | list[str] | None]]:
+        path = CONFIG_DIR / "commands.json"
+        if not path.exists():
+            Config.write_from_eample(
+                path, Path(__file__).parent / "commands_example.json"
+            )
+
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        if not isinstance(payload, dict):
+            return {}
+
+        commands: dict[str, dict[str, str | list[str] | None]] = {}
+        for intent, values in payload.items():
+            if not isinstance(values, dict):
+                continue
+
+            commands[str(intent)] = {
+                "sounds": values.get("sounds", []),
+                "triggers": values.get("triggers", []),
+            }
+
+        return commands
+
     def _load_commands(self) -> None:
         """Loads all triggers and intents from commands config."""
-        self.commands = cfg.op.load_commands() or {}  # type: ignore
+        self.commands = self.load_commands() or {}  # type: ignore
 
         log.debug("Loaded intents: %s", list(self.commands.keys()))
 
         def _format_triggers(triggers: list[str]) -> list[str]:
             res = []
             for trig in triggers:
-                new = trig.format(username=cfg.username, name=cfg.name)
+                new = trig.format(username=cfg["username"], name=cfg["name"])
                 res.append(new)
             return res
 

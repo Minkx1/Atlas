@@ -14,10 +14,13 @@ from typing import Literal
 
 import numpy as np
 
-from atlas.core.config import DATA_DIR, cfg
 from atlas.core.events import EventManager
+from atlas.utils.config import DATA_DIR, Config
 
 log = logging.getLogger(__name__)
+
+CONFIG_EXAMPLE = Path(__file__).parent / "stt_example.toml"
+cfg = Config.load_config("stt.toml", CONFIG_EXAMPLE.read_text())
 
 # disables HF symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
@@ -28,7 +31,7 @@ class VAD:
         self.events = events or EventManager()
 
         self.is_speaking = False
-        self.model_path: Path = DATA_DIR / cfg.vad.model_path
+        self.model_path: Path = DATA_DIR / cfg["vad"]["model_path"]
 
         self.triggered = False
         self.temp_end = 0
@@ -76,10 +79,10 @@ class VAD:
                 str(self.model_path), providers=["CPUExecutionProvider"]
             )
 
-            self.sample_rate = cfg.audio.sample_rate
-            self.threshold = cfg.vad.threshold
+            self.sample_rate = cfg["audio"]["sample_rate"]
+            self.threshold = cfg["vad"]["threshold"]
             self.min_silence_samples = (
-                self.sample_rate * cfg.vad.min_silence_duration_ms
+                self.sample_rate * cfg["vad"]["min_silence_duration_ms"]
             ) / 1000
 
             self.reset_state()
@@ -162,14 +165,12 @@ class Whisper:
         # should make downloading Whisper models from HF faster
         os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
-        w = cfg.stt
-        self.model_dir: Path = DATA_DIR / w.download_root
+        self.model_dir: Path = DATA_DIR / cfg["stt"]["download_root"]
 
     def load(self):
         from faster_whisper import WhisperModel
 
         try:
-            w = cfg.stt
             if not self.model_dir.exists():
                 log.info(
                     "Faster-Whisper model not found at %s; downloading", self.model_dir
@@ -177,12 +178,12 @@ class Whisper:
             else:
                 log.debug("Using Whisper model from %s", self.model_dir)
 
-            log.info("Loading Whisper model: %s", w.model_size)
+            log.info("Loading Whisper model: %s", cfg["stt"]["model_size"])
             self.model = WhisperModel(
-                w.model_size,
-                device=w.device,
+                cfg["stt"]["model_size"],
+                device=cfg["stt"]["device"],
                 compute_type="int8",
-                cpu_threads=w.cpu_threads,
+                cpu_threads=cfg["stt"]["cpu_threads"],
                 num_workers=1,
                 download_root=str(self.model_dir),
             )
@@ -196,12 +197,11 @@ class Whisper:
         if not hasattr(self, "model"):
             raise RuntimeError("Whisper was used before whisper.load()")
 
-        w = cfg.stt
         segments, _ = self.model.transcribe(
             audio=audio_array,
-            beam_size=w.beam_size,
-            language=w.language,
-            initial_prompt=w.initial_prompt,
+            beam_size=cfg["stt"]["beam_size"],
+            language=cfg["stt"]["language"],
+            initial_prompt=cfg["stt"]["initial_prompt"],
             condition_on_previous_text=False,
         )
         text = " ".join([segment.text for segment in segments]).strip()
@@ -215,13 +215,13 @@ class SpeechRecognizer:
         self.vad = VAD(self.events)
         self.whisper = Whisper(self.events)
 
-        self.preroll = deque(maxlen=cfg.vad.preroll_blocks)
+        self.preroll = deque(maxlen=cfg["vad"]["preroll_blocks"])
         self.buffer: list[np.ndarray] = []
         self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
         self._recording = False
-        self.sample_rate = cfg.audio.sample_rate
-        self.min_command_ms = cfg.stt.min_command_ms
+        self.sample_rate = cfg["audio"]["sample_rate"]
+        self.min_command_ms = cfg["stt"]["min_command_ms"]
 
         self.stt_worker_thread = Thread(
             target=self._stt_worker, name="STT_WORKER_THREAD", daemon=True

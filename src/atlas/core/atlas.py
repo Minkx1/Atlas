@@ -7,13 +7,14 @@ import logging
 import sys
 import threading
 
+# modules
 import atlas.modules
+from atlas.core.events import EventManager
 from atlas.core.module import Module, discover_modules, on_event
-from atlas.utils import UI
 
-from .config import DATA_DIR, cfg
-from .events import EventManager
-from .logging_config import configure_logging
+# utils
+from atlas.ui import UI
+from atlas.utils.config import DATA_DIR
 
 log = logging.getLogger(__name__)
 
@@ -21,11 +22,13 @@ log = logging.getLogger(__name__)
 class Atlas(Module):
     name = "core"
 
-    def __init__(self, log: bool = True, level: str = "DEBUG") -> None:
+    def __init__(self) -> None:
         self.alive: bool = True
 
         # logs and events
-        configure_logging(DATA_DIR / "logs", enabled=cfg.log, level=cfg.log_level)
+        from atlas.utils.logging_config import configure_logging
+
+        configure_logging(DATA_DIR / "logs", enabled=True, level="DEBUG")
         self.events = EventManager()
         self._register_events(self.events)
 

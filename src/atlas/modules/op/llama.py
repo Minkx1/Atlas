@@ -9,10 +9,15 @@ from contextlib import suppress
 
 import llama_cpp
 
-from atlas.core.config import DATA_DIR, cfg
 from atlas.core.events import EventManager
+from atlas.utils.config import DATA_DIR, Config, Path
 
 log = logging.getLogger(__name__)
+
+
+CONFIG_EXAMPLE = Path(__file__).parent / "llama_example.toml"
+cfg = Config.load_config("llama.toml", CONFIG_EXAMPLE.read_text())["llama"]
+
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -38,11 +43,11 @@ class Llama:
     def __init__(self, events: EventManager | None = None) -> None:
         self.events = events or EventManager()
 
-        self.model_path = DATA_DIR / cfg.llm.model_path
-        self.initial_prompt = cfg.llm.initial_prompt
-        self.context_tokens = cfg.llm.context_tokens
-        self.max_tokens = cfg.llm.max_msg_tokens
-        self.temperature = cfg.llm.temperature
+        self.model_path = DATA_DIR / cfg["model_path"]
+        self.initial_prompt = cfg["initial_prompt"]
+        self.context_tokens = cfg["context_tokens"]
+        self.max_tokens = cfg["max_msg_tokens"]
+        self.temperature = cfg["temperature"]
 
         self.repeat_penalty = 1.15
         self.stop = ["\nUser:", "User:", "<|im_end|>"]
@@ -139,20 +144,3 @@ class Llama:
 
     def __del__(self):
         self.close()
-
-
-if __name__ == "__main__":
-    llm = Llama()
-    print("Loading model...")
-    llm.load()
-    print("Loading complete!")
-    while True:
-        try:
-            for tok in llm.stream_response(input("> ")):
-                print(tok, sep="", end="", flush=True)
-            print()
-        except KeyboardInterrupt:
-            print("\nQuiting...")
-            break
-
-    llm.close()

@@ -16,10 +16,13 @@ import sounddevice as sd
 import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
-from atlas.core.config import DATA_DIR, cfg
 from atlas.core.events import EventManager
+from atlas.utils.config import DATA_DIR, Config
 
 log = logging.getLogger(__name__)
+
+CONFIG_EXAMPLE = Path(__file__).parent / "tts_exapmle.toml"
+cfg = Config.load_config("tts.toml", CONFIG_EXAMPLE.read_text())["tts"]
 
 VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
@@ -29,12 +32,12 @@ class TextToSpeech:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_path=cfg.tts.model_path,
-        volume=cfg.tts.volume,
-        length_scale=cfg.tts.length_scale,
-        noise_scale=cfg.tts.noise_scale,
-        noise_w_scale=cfg.tts.noise_w_scale,
-        normalize_audio=cfg.tts.normalize_audio,
+        model_path=cfg["model_path"],
+        volume=cfg["volume"],
+        length_scale=cfg["length_scale"],
+        noise_scale=cfg["noise_scale"],
+        noise_w_scale=cfg["noise_w_scale"],
+        normalize_audio=cfg["normalize_audio"],
     ) -> None:
         self.events = events or EventManager()
 
@@ -58,8 +61,8 @@ class TextToSpeech:
         self._busy_lock = threading.Lock()
         self._healthy = False
 
-        self.silence_duration = cfg.tts.silence_duration
-        self.use_cuda = cfg.tts.use_cuda
+        self.silence_duration = cfg["silence_duration"]
+        self.use_cuda = cfg["use_cuda"]
 
     def load(self):
         self.voice = PiperVoice.load(

@@ -10,10 +10,13 @@ from pathlib import Path
 
 import numpy as np
 
-from atlas.core.config import CONFIG_DIR, DATA_DIR, cfg
 from atlas.core.events import EventManager
+from atlas.utils.config import CONFIG_DIR, DATA_DIR, Config
 
 log = logging.getLogger(__name__)
+
+CONFIG_EXAMPLE = Path(__file__).parent / "stt_example.toml"
+cfg = Config.load_config("stt.toml", CONFIG_EXAMPLE.read_text())
 
 
 class KeyWordSpotter:
@@ -32,10 +35,10 @@ class KeyWordSpotter:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_dir: str = cfg.kws.model_dir,
-        keywords_file: Path = CONFIG_DIR / cfg.kws.keywords_file,
-        num_threads: int = cfg.kws.num_threads,
-        keywords_threshold: float = cfg.kws.score_threshold,
+        model_dir: str = cfg["kws"]["model_dir"],
+        keywords_file: Path = CONFIG_DIR / cfg["kws"]["keywords_file"],
+        num_threads: int = cfg["kws"]["num_threads"],
+        keywords_threshold: float = cfg["kws"]["score_threshold"],
     ):
         self.events = events or EventManager()
 
@@ -134,7 +137,7 @@ class KeyWordSpotter:
             raise RuntimeError("KWS was used before kws.load()")
 
         chunk_np = chunk_np.squeeze(1) if chunk_np.ndim > 1 else chunk_np
-        self.stream.accept_waveform(cfg.audio.sample_rate, chunk_np)
+        self.stream.accept_waveform(cfg["audio"]["sample_rate"], chunk_np)
         while self.kws.is_ready(self.stream):
             self.kws.decode_stream(self.stream)
             result = self.kws.get_result(self.stream)

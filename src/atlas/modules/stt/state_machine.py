@@ -6,8 +6,11 @@
 import time
 from enum import StrEnum
 
-from atlas.core.config import cfg
 from atlas.core.events import EventManager
+from atlas.utils.config import Config, Path
+
+CONFIG_EXAMPLE = Path(__file__).parent / "stt_example.toml"
+cfg = Config.load_config("stt.toml", CONFIG_EXAMPLE.read_text())["stt"]
 
 
 class State(StrEnum):
@@ -23,7 +26,7 @@ class StateMachine:
 
         self.state = State.SLEEPING
 
-        if cfg.stt.start_state == "AWAKE":
+        if cfg["start_state"] == "AWAKE":
             self.state = State.AWAKE
         else:
             self.state = State.SLEEPING
@@ -32,7 +35,7 @@ class StateMachine:
 
     def update_deadline(self) -> None:
         """Updates deadline to prevent going to sleep during talking or processing."""
-        self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
+        self.awake_deadline = time.monotonic() + cfg["awake_timeout"]
 
     def is_deadline_expired(self) -> bool:
         return time.monotonic() > self.awake_deadline
@@ -56,7 +59,7 @@ class StateMachine:
         elif self.state == State.AWAKE and self.is_deadline_expired():
             self.set_state(
                 State.SLEEPING,
-                detail=f"Timeout ({int(cfg.stt.awake_timeout)}s)",
+                detail=f"Timeout ({int(cfg['awake_timeout'])}s)",
             )
         elif self.state == State.RECORDING:
             self.update_deadline()

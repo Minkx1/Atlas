@@ -10,7 +10,6 @@ from textual.events import Resize
 from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
-from atlas.core.config import cfg
 from atlas.core.events import Event, EventManager
 
 log = logging.getLogger(__name__)
@@ -36,10 +35,7 @@ class AudioWaveform(Static):
         self.wave_history: list[int] = [0] * 10
         self._current_level: int = 0
 
-        if cfg.stt.start_state in {"SLEEPING", "WAITING"}:
-            self.is_listening = False
-        else:
-            self.is_listening = True
+        self.is_listening = False
 
     def on_mount(self) -> None:
         self.set_interval(0.07, self.update_waveform)

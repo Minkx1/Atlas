@@ -1,0 +1,45 @@
+[tts]
+
+name = "Atlas"
+username = "Sir"
+
+# Path to the Piper TTS model.
+# This model is responsible for converting generated text into speech.
+model_path = "models/piper/en_US-ryan-medium.onnx"
+
+# Enable CUDA acceleration for TTS.
+# false = use CPU.
+# true = use a compatible NVIDIA GPU/CUDA backend, if supported.
+use_cuda = false
+
+# Output volume multiplier.
+# 1.0 = normal volume.
+# Values below 1.0 make the voice quieter.
+# Values above 1.0 make it louder.
+volume = 1.0
+
+# Controls the speaking speed.
+# 1.0 = default speed.
+# Values below 1.0 make speech faster.
+# Values above 1.0 make speech slower.
+length_scale = 0.85
+
+# Controls variation in the generated audio.
+# Higher values can make the voice sound more varied,
+# while lower values make it more consistent.
+noise_scale = 1.0
+
+# Controls variation in phoneme duration/prosody.
+# Higher values can produce more variation in how words are spoken.
+noise_w_scale = 1.0
+
+# Whether Piper's generated audio should be normalized.
+# false = use the raw audio produced by the voice model.
+# true = normalize the output level before playback.
+normalize_audio = false
+
+# Silence inserted before TTS playback starts, in seconds.
+# A small delay can help prevent the beginning of speech from being cut off.
+# If you notice that the beginning or end of speech is cut off,
+# try increasing this value slightly.
+silence_duration = 0.5

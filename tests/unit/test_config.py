@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from atlas.core import config
+from atlas.core import _config
 
 
 def test_load_config_reads_nested_values(tmp_path: Path):
@@ -22,7 +22,7 @@ start_state = "SLEEPING"
         encoding="utf-8",
     )
 
-    loaded = config.load_config(str(config_path))
+    loaded = _config.load_config(str(config_path))
 
     assert loaded.name == "Test Atlas"
     assert loaded.username == "tester"
@@ -38,8 +38,8 @@ def test_load_commands_filters_invalid_entries(monkeypatch, tmp_path: Path):
         '{"greet": {"triggers": ["hello"], "sounds": []}, "invalid": "ignored"}',
         encoding="utf-8",
     )
-    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(_config, "CONFIG_DIR", tmp_path)
 
-    commands = config.OPConfig(commands="commands.json").load_commands()
+    commands = _config.OPConfig(commands="commands.json").load_commands()
 
     assert commands == {"greet": {"triggers": ["hello"], "sounds": []}}

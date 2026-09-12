@@ -1,5 +1,7 @@
+"""!!! DEPRECATED !!!"""
+
 #
-# core / config.py
+# core / _config.py
 # Contains core configuration and settings for the application
 #
 
