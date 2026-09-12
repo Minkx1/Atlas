@@ -168,26 +168,36 @@ class Whisper:
         self.model_dir: Path = DATA_DIR / cfg["stt"]["download_root"]
 
     def load(self):
-        from faster_whisper import WhisperModel
+        from faster_whisper import WhisperModel, download_model
 
         try:
-            if not self.model_dir.exists():
-                log.info(
-                    "Faster-Whisper model not found at %s; downloading", self.model_dir
+            model_size = cfg["stt"]["model_size"]
+            try:
+                model_path = download_model(
+                    model_size, cache_dir=str(self.model_dir), local_files_only=True
                 )
-            else:
-                log.debug("Using Whisper model from %s", self.model_dir)
+                log.debug("Using cached Whisper model from %s", model_path)
 
-            log.info("Loading Whisper model: %s", cfg["stt"]["model_size"])
+            except Exception:
+                log.info(
+                    "Faster-Whisper model '%s' not found locally; downloading...",
+                    model_size,
+                )
+                model_path = download_model(
+                    model_size, cache_dir=str(self.model_dir), local_files_only=False
+                )
+                log.info("Download complete.")
+
             self.model = WhisperModel(
-                cfg["stt"]["model_size"],
+                model_path,
                 device=cfg["stt"]["device"],
                 compute_type="int8",
                 cpu_threads=cfg["stt"]["cpu_threads"],
                 num_workers=1,
-                download_root=str(self.model_dir),
+                local_files_only=True,
             )
             log.info("Whisper model loaded")
+
         except Exception:
             log.exception("Error loading Whisper model")
             raise
@@ -197,15 +207,32 @@ class Whisper:
         if not hasattr(self, "model"):
             raise RuntimeError("Whisper was used before whisper.load()")
 
-        segments, _ = self.model.transcribe(
-            audio=audio_array,
-            beam_size=cfg["stt"]["beam_size"],
-            language=cfg["stt"]["language"],
-            initial_prompt=cfg["stt"]["initial_prompt"],
-            condition_on_previous_text=False,
-        )
-        text = " ".join([segment.text for segment in segments]).strip()
-        return text
+        try:
+            log.debug("Initializing Whisper generator...")
+            segments, _ = self.model.transcribe(
+                audio=audio_array,
+                beam_size=cfg["stt"]["beam_size"],
+                language=cfg["stt"]["language"],
+                initial_prompt=cfg["stt"]["initial_prompt"],
+                condition_on_previous_text=False,
+                log_progress=False,
+            )
+
+            text_parts = []
+            log.debug("Starting to iterate over segments...")
+
+            for segment in segments:
+                log.debug(f"Decoded segment: {segment.text}")
+                text_parts.append(segment.text)
+
+            text = " ".join(text_parts).strip()
+            return text
+
+        except Exception as e:
+            log.exception(
+                f"CRITICAL: Whisper crashed during transcription! Error: {e!r}"
+            )
+            return ""
 
 
 class SpeechRecognizer:

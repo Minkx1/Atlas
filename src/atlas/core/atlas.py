@@ -6,6 +6,7 @@
 import logging
 import sys
 import threading
+import time
 
 # modules
 import atlas.modules
@@ -22,7 +23,7 @@ log = logging.getLogger(__name__)
 class Atlas(Module):
     name = "core"
 
-    def __init__(self) -> None:
+    def __init__(self, *, ui: bool = True) -> None:
         self.alive: bool = True
 
         # logs and events
@@ -32,7 +33,7 @@ class Atlas(Module):
         self.events = EventManager()
         self._register_events(self.events)
 
-        self.ui = UI(app=self, events=self.events)
+        self.ui = UI(app=self, events=self.events) if ui else None
 
         # Modules
         self.modules: dict[str, Module] = {}
@@ -41,7 +42,7 @@ class Atlas(Module):
 
     def _shutdown(self):
         self.alive = False
-        if hasattr(self, "ui") and getattr(self.ui, "is_running", False):
+        if self.ui and self.ui.is_running:
             self.ui.call_from_thread(self.ui.exit)
 
     def load_models(self):
@@ -89,11 +90,18 @@ class Atlas(Module):
             sys.stdout.flush()
 
     def _main(self):
+        log.info("=#= STARTING ATLAS =#=")
+
         self.load_models()
         self.events.start()
         for module in self.modules.values():
             module.start()
-        self.ui.run()
+
+        if self.ui:
+            self.ui.run()
+        else:
+            while self.alive:
+                time.sleep(0.1)
 
     def start(self):
         """Starts Atlas."""

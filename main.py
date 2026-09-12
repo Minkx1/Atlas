@@ -9,7 +9,7 @@ from contextlib import suppress
 def main() -> None:
     from atlas import Atlas
 
-    atlas = Atlas()
+    atlas = Atlas(ui=False)
     atlas.start()
 
 
