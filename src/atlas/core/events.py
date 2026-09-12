@@ -154,14 +154,29 @@ class EventManager:
                     self._subs.get(WILDCARD, ())
                 )
 
-            # async_count = 0
+            async_count = 0
             for sub in subs:
                 if sub.mode == "immediate":
                     self._run_immediate(sub.callback, event)
                 else:
                     assert self._executor is not None
-                    self._executor.submit(self._run_safe, sub.callback, event)
+                    async_count += 1
+                    self._executor.submit(
+                        self._run_callback_and_done, sub.callback, event
+                    )
 
+            # If no async callbacks, mark done now;
+            # otherwise mark done in callback wrapper
+            if async_count == 0:
+                self._queue.task_done()
+
+    def _run_callback_and_done(
+        self, callback: Callable[[Event], None], event: Event
+    ) -> None:
+        """Run callback and mark queue task as done after async callback completes."""
+        try:
+            self._run_safe(callback, event)
+        finally:
             self._queue.task_done()
 
     def _run_immediate(self, callback: Callable[[Event], None], event: Event) -> None:
