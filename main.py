@@ -1,4 +1,7 @@
+#
 # main.py
+# Entrypoint for Atlas
+#
 
 import multiprocessing
 import os
@@ -6,11 +9,11 @@ import warnings
 from contextlib import suppress
 
 
-def main() -> None:
+def main(no_ui: bool = True) -> None:
     from atlas import Atlas
 
-    atlas = Atlas(ui=False)
-    atlas.start()
+    atlas = Atlas(ignored_modules=["ui"] if no_ui else [])
+    atlas.run()
 
 
 if __name__ == "__main__":
@@ -27,4 +30,4 @@ if __name__ == "__main__":
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    main()
+    main(no_ui=True)

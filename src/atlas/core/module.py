@@ -62,8 +62,8 @@ def discover_modules(package: ModuleType) -> dict[str, type[Module]]:
     discover_modules(atlas.modules)
 
     Exptected structure:
-        atlas/modules/<name>/module.py
-        atlas/modules/<module>.py (wip)
+        atlas/modules/{name}/module.py
+        atlas/modules/{module}.py (wip)
     """
     found: dict[str, type[Module]] = {}
 

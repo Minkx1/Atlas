@@ -27,6 +27,11 @@ class Event:
     payload: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
 
+    @property
+    def content(self) -> dict:
+        # for backwards compatability purposes
+        return self.payload
+
 
 class _Subscription:
     __slots__ = ("callback", "mode")

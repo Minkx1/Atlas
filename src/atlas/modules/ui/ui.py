@@ -10,7 +10,7 @@ from textual.events import Resize
 from textual.reactive import reactive
 from textual.widgets import Input, Label, RichLog, Static
 
-from atlas.core.events import Event, EventManager
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -225,10 +225,13 @@ class UI(App):
     TITLE = "Atlas"
     CSS = tcss
 
-    def __init__(self, events: EventManager | None = None, app=None, **kwargs):
+    def __init__(self, events: EventManager | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.atlas = app
+
         self.events = events or EventManager()
+
+        self._current_assistant_label: Label | None = None
+        self._current_assistant_text = ""
 
     def compose(self) -> ComposeResult:
         with Container(id="main-app"):
@@ -239,12 +242,12 @@ class UI(App):
             with Container(id="central-panel") as center:
                 center.border_title = "STATUS"
                 logo = r"""[#00d7ff]
-    ___    __  __
+    ___    __  __          
    /   |  / / / /___ ______
   / /| | / __/ / __ `/ ___/
- / ___ |/ /_/ / /_/ (__  )
-/_/  |_|\__/_/\__,_/____/
-[/#00d7ff]"""
+ / ___ |/ /_/ / /_/ (__  ) 
+/_/  |_|\__/_/\__,_/____/  
+[/#00d7ff]"""  # noqa: W291
                 yield Static(logo, id="image-box")
                 yield Static("[dim #a0a0a0]SLEEPING[/dim #a0a0a0]", id="status-text")
                 yield AudioWaveform(id="audio-waveform")
@@ -264,62 +267,163 @@ class UI(App):
         self.audiowave = self.query_one("#audio-waveform", AudioWaveform)
         self.status_text = self.query_one("#status-text", Static)
         self.event_log = self.query_one("#event-log", RichLog)
+
         self._log_handler = UILogHandler(self)
         logging.getLogger().addHandler(self._log_handler)
 
-        self._current_assistant_label: Label | None = None
-        self._current_assistant_text = ""
-
         self.event_log.write("[dim #a0a0a0]Loading modules...[/dim #a0a0a0]")
+
         self.set_interval(1.0, self.update_clock)
         self.update_clock()
 
-        self.events.subscribe("stt.changed_state", self.event_stt_changed_state)
-        self.events.subscribe("stt.audiowave", self.on_audio_wave)
-        self.events.subscribe("stt.transcribed", self.event_on_received_command)
+    def update_state(self, state: str) -> None:
+        """Update the displayed assistant state."""
 
-        self.events.subscribe("ui.llm_chunk", self.event_on_llm_chunk)
-        self.events.subscribe("ui.say", self.event_on_assistant_say)
+        def update() -> None:
+            if self.audiowave:
+                if state in {"SLEEPING", "WAITING"}:
+                    self.audiowave.is_listening = False
+                else:
+                    self.audiowave.is_listening = True
 
-    def safe_call(self, fn, *args, **kwargs):
-        if getattr(self, "is_running", False):
-            try:
-                self.call_from_thread(fn, *args, **kwargs)
-            except Exception:
-                log.exception("UI thread safe call error")
-                raise
+            states = {
+                "SLEEPING": "[dim #a0a0a0]SLEEPING[/dim #a0a0a0]",
+                "AWAKE": "[bold #00d7ff]AWAKE[/bold #00d7ff]",
+                "RECORDING": "[bold #00ff5f]RECORDING[/bold #00ff5f]",
+                "WAITING": "[bold #ffaf00]WAITING...[/bold #ffaf00]",
+            }
 
-    def event_stt_changed_state(self, event: Event):
-        def _():
-            state_str = event.payload.get("state", "")
+            self.status_text.update(
+                states.get(
+                    state,
+                    f"[#00d7ff]{state}[/#00d7ff]",
+                )
+            )
 
-            if state_str in {"SLEEPING", "WAITING"}:
-                self.audiowave.is_listening = False
-            else:
-                self.audiowave.is_listening = True
+        self.safe_call(update)
 
-            if state_str == "SLEEPING":
-                formatted_state = "[dim #a0a0a0]SLEEPING[/dim #a0a0a0]"
-            elif state_str == "AWAKE":
-                formatted_state = "[bold #00d7ff]AWAKE[/bold #00d7ff]"
-            elif state_str == "RECORDING":
-                formatted_state = "[bold #00ff5f]RECORDING[/bold #00ff5f]"
-            elif state_str == "WAITING":
-                formatted_state = "[bold #ffaf00]WAITING...[/bold #ffaf00]"
-            else:
-                formatted_state = f"[#00d7ff]{state_str}[/#00d7ff]"
+    def update_waveform(self, volume: float) -> None:
+        """Update the audio waveform."""
 
-            self.status_text.update(formatted_state)
+        self.safe_call(
+            self.audiowave.push_volume,
+            volume,
+        )
 
-        self.safe_call(_)
+    def add_user_message(self, text: str) -> None:
+        """Add a user message to the dialog."""
 
-    def on_audio_wave(self, event: Event):
-        wave_data = event.payload.get("rms", 0.0)
-        self.safe_call(self.audiowave.push_volume, wave_data)
+        def update() -> None:
+            label = Label(
+                f"> [#00d7ff]{text}[/#00d7ff]",
+                classes="chat-message",
+            )
+
+            self.dialog.mount(label)
+            label.scroll_visible()
+
+        self.safe_call(update)
+
+    def add_assistant_message(self, text: str) -> None:
+        """Add an assistant message to the dialog."""
+
+        def update() -> None:
+            label = Label(
+                f": {text}",
+                classes="chat-message",
+            )
+
+            self.dialog.mount(label)
+            label.scroll_visible()
+
+        self.safe_call(update)
+
+    def add_llm_chunk(
+        self,
+        text: str,
+        is_first: bool,
+    ) -> None:
+        """Add a streamed LLM response chunk."""
+
+        def update() -> None:
+            if is_first:
+                self._current_assistant_text = f": {text}"
+                self._current_assistant_label = Label(
+                    self._current_assistant_text,
+                    classes="chat-message",
+                )
+
+                self.dialog.mount(self._current_assistant_label)
+                self._current_assistant_label.scroll_visible()
+                return
+
+            self._current_assistant_text += text
+
+            if self._current_assistant_label:
+                self._current_assistant_label.update(self._current_assistant_text)
+                self.dialog.scroll_end(animate=False)
+
+        self.safe_call(update)
+
+    # ------------------------------------------------------------------
+    # Textual events
+    # ------------------------------------------------------------------
+
+    def action_quit(self) -> None:
+        """Emit Atlas termination event instead of exiting directly."""
+        self.events.emit("core.terminate", {})
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Submit text entered into the UI."""
+        text = event.value.strip()
+        event.input.value = ""
+
+        if not text:
+            return
+
+        self.events.emit("ui.input_submitted", {"text": text})
+
+    def on_resize(self, event: Resize) -> None:
+        """Display a warning when the terminal is too small."""
+
+        req_w, req_h = 80, 24
+
+        if event.size.width < req_w or event.size.height < req_h:
+            self.add_class("small-size")
+
+            warning = self.query_one("#size-warning", Static)
+            warning.update(
+                f"\n\n\n\n"
+                f"[bold red]Terminal size too small:[/bold red]\n"
+                f"Width = {event.size.width} "
+                f"Height = {event.size.height}\n\n"
+                f"[bold #00d7ff]Needed for current config:[/bold #00d7ff]\n"
+                f"Width = {req_w} Height = {req_h}"
+            )
+        else:
+            self.remove_class("small-size")
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def safe_call(self, fn, *args, **kwargs) -> None:
+        """Execute a UI update on the Textual thread."""
+        if not self.is_running:
+            return
+
+        try:
+            self.call_from_thread(fn, *args, **kwargs)
+        except Exception:
+            log.exception("UI thread safe call error")
 
     def write_log_record(self, record: logging.LogRecord) -> None:
-        """Render a standard logging record on the Textual thread."""
-        timestamp = time.strftime("%H:%M:%S", time.localtime(record.created))
+        """Render a logging record in the event log."""
+
+        timestamp = time.strftime(
+            "%H:%M:%S",
+            time.localtime(record.created),
+        )
         level = record.levelname
         source = record.name.rsplit(".", 1)[-1].upper()
         message = record.getMessage()
@@ -331,76 +435,29 @@ class UI(App):
             "ERROR": "bold red",
             "CRITICAL": "bold red",
         }
+
         color = color_map.get(level, "white")
 
-        formatted_msg = f"[[#00d7ff]{timestamp}[/#00d7ff]] [[bold]{source}[/bold]]"
-        formatted_msg += f"[{color}][{level}][/{color}]: {message}"
+        formatted = (
+            f"[[#00d7ff]{timestamp}[/#00d7ff]] "
+            f"[[bold]{source}[/bold]] "
+            f"[{color}][{level}][/{color}]: {message}"
+        )
 
-        self.event_log.write(formatted_msg)
-
-    def on_unmount(self) -> None:
-        logging.getLogger().removeHandler(self._log_handler)
-
-    def event_on_llm_chunk(self, event: Event):
-        def f():
-            chunk_text = event.payload["text"]
-            is_first = event.payload["is_first"]
-
-            if is_first:
-                self._current_assistant_text = rf": {chunk_text}"
-                self._current_assistant_label = Label(
-                    self._current_assistant_text, classes="chat-message"
-                )
-                self.dialog.mount(self._current_assistant_label)
-                self._current_assistant_label.scroll_visible()
-            else:
-                self._current_assistant_text += chunk_text
-                if self._current_assistant_label:
-                    self._current_assistant_label.update(self._current_assistant_text)
-                    self.dialog.scroll_end(animate=False)
-
-        self.safe_call(f)
-
-    def event_on_assistant_say(self, event: Event):
-        def f():
-            text = rf": {event.payload['text']}"
-            msg_label = Label(text, classes="chat-message")
-            self.dialog.mount(msg_label)
-            msg_label.scroll_visible()
-
-        self.safe_call(f)
-
-    def event_on_received_command(self, event: Event):
-        def f():
-            user_text = rf"> [#00d7ff]{event.payload['text']}[/#00d7ff]"
-
-            msg_label = Label(user_text, classes="chat-message")
-            self.dialog.mount(msg_label)
-            msg_label.scroll_visible()  # auto-scroll
-
-        self.safe_call(f)
-
-    def on_resize(self, event: Resize) -> None:
-        req_w, req_h = 80, 24
-        if event.size.width < req_w or event.size.height < req_h:
-            self.add_class("small-size")
-            warning = self.query_one("#size-warning", Static)
-            warning.update(
-                f"\n\n\n\n\n[bold red]Terminal size too small:[/bold red]\n"
-                f"Width = {event.size.width} Height = {event.size.height}\n\n"
-                f"[bold #00d7ff]Needed for current config:[/bold #00d7ff]\n"
-                f"Width = {req_w} Height = {req_h}"
-            )
-        else:
-            self.remove_class("small-size")
+        self.event_log.write(formatted)
 
     def update_clock(self) -> None:
+        """Update the dialog panel clock."""
+
         now = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
         self.right_panel.border_subtitle = f"[#00d7ff]{now}[/#00d7ff]"
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        event.input.value = ""
-        self.events.emit("stt.transcribed", {"text": event.value})
+    def on_unmount(self) -> None:
+        """Remove the UI logging handler."""
+
+        if self._log_handler:
+            logging.getLogger().removeHandler(self._log_handler)
+            self._log_handler = None
 
 
 if __name__ == "__main__":
