@@ -83,8 +83,11 @@ def discover_modules(package: ModuleType) -> dict[str, type[Module]]:
                 issubclass(obj, Module)
                 and obj is not Module
                 and obj.__module__ == mod.__name__
+                and hasattr(obj, "name")
                 and not inspect.isabstract(obj)
             ):
-                found[obj.name] = obj
-
+                if obj.name not in found:
+                    found[obj.name] = obj
+                else:
+                    log.warning("Module name collision: '%s'", obj.name)
     return found

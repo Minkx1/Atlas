@@ -22,6 +22,7 @@ class Atlas:
 
     def __init__(self, *, ignored_modules: list[str] | None = None) -> None:
         self.alive: bool = True
+        self._closed: bool = False
         self.ignored_modules = ignored_modules or []
 
         self.events = EventManager()
@@ -65,17 +66,24 @@ class Atlas:
 
         Note that this doesn't automatically ends execution.
         See: Atlas.shutdown()
+
+        Idempotent: safe to call multiple times, e.g. once from the
+        `core.terminate` handler's shutdown thread and once from `run()`'s
+        `finally` block.
         """
+        if self._closed:
+            return
+        self._closed = True
+
         try:
-            if self.alive:
-                log.info("Shutting down assistant")
+            log.info("Shutting down assistant")
 
-                for module in self.modules.values():
-                    module.close()
+            for module in self.modules.values():
+                module.close()
 
-                self.events.close()
+            self.events.close()
 
-                log.info("Shutdown complete")
+            log.info("Shutdown complete")
         except Exception:
             log.exception("Error during shutdown")
             raise
