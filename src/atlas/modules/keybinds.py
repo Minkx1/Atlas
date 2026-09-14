@@ -5,7 +5,6 @@
 import logging
 from collections.abc import Callable
 
-# from atlas.core.config import cfg
 from atlas.core.events import EventManager
 from atlas.core.module import Module
 from atlas.utils.config import Config
@@ -14,6 +13,8 @@ log = logging.getLogger(__name__)
 
 
 KEYBINDS_ORIGIN_CFG = """<ctrl>+<alt>+w"""
+
+cfg = Config.load_config("keybinds.cfg", KEYBINDS_ORIGIN_CFG)
 
 
 class KeyBindManager:
@@ -56,18 +57,23 @@ class KeyBindManager:
 class KeybindsModule(Module):
     name = "keybinds"
 
-    def __init__(self, events: EventManager | None, **kwargs) -> None:
+    def __init__(
+        self,
+        events: EventManager | None,
+        keybind: str = cfg["content"],
+        **kwargs,
+    ) -> None:
         super().__init__(events, **kwargs)
 
         self.keybinds = KeyBindManager()
-        self.cfg = Config.load_config("keybinds.cfg", KEYBINDS_ORIGIN_CFG)
+        self.keybind = keybind
 
     def start(self) -> None:
         self.keybinds.start()
 
     def load(self) -> None:
         self.keybinds.register_keybind(
-            self.cfg["content"],
+            self.keybind,
             lambda: self.events.emit(
                 "stt.kws.keyword_detected", {"keyword": "{HotKey}"}
             ),

@@ -39,6 +39,7 @@ class KeyWordSpotter:
         keywords_file: Path = CONFIG_DIR / cfg["kws"]["keywords_file"],
         num_threads: int = cfg["kws"]["num_threads"],
         keywords_threshold: float = cfg["kws"]["score_threshold"],
+        sample_rate: int = cfg["audio"]["sample_rate"],
     ):
         self.events = events or EventManager()
 
@@ -51,6 +52,7 @@ class KeyWordSpotter:
         self.num_threads: int = num_threads
         self.keywords_threshold: float = keywords_threshold
         self.keywords_file: str = str(keywords_file)
+        self.sample_rate: int = sample_rate
 
         if not os.path.exists(self.tokens):
             log.warning("No Sherpa model in %s; downloading", path)
@@ -137,7 +139,7 @@ class KeyWordSpotter:
             raise RuntimeError("KWS was used before kws.load()")
 
         chunk_np = chunk_np.squeeze(1) if chunk_np.ndim > 1 else chunk_np
-        self.stream.accept_waveform(cfg["audio"]["sample_rate"], chunk_np)
+        self.stream.accept_waveform(self.sample_rate, chunk_np)
         while self.kws.is_ready(self.stream):
             self.kws.decode_stream(self.stream)
             result = self.kws.get_result(self.stream)

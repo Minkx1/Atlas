@@ -38,6 +38,8 @@ class TextToSpeech:
         noise_scale=cfg["noise_scale"],
         noise_w_scale=cfg["noise_w_scale"],
         normalize_audio=cfg["normalize_audio"],
+        silence_duration=cfg["silence_duration"],
+        use_cuda=cfg["use_cuda"],
     ) -> None:
         self.events = events or EventManager()
 
@@ -61,8 +63,8 @@ class TextToSpeech:
         self._busy_lock = threading.Lock()
         self._healthy = False
 
-        self.silence_duration = cfg["silence_duration"]
-        self.use_cuda = cfg["use_cuda"]
+        self.silence_duration = silence_duration
+        self.use_cuda = use_cuda
 
     def load(self):
         self.voice = PiperVoice.load(

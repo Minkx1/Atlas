@@ -26,9 +26,18 @@ class Listener:
         self,
         chunk_processor: Callable[[np.ndarray], None],
         events: EventManager | None = None,
+        sample_rate=cfg["sample_rate"],
+        channels=cfg["channels"],
+        dtype=cfg["dtype"],
+        blocksize=cfg["blocksize"],
     ) -> None:
         self.events = events or EventManager()
         self.processor = chunk_processor
+
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.dtype = dtype
+        self.blocksize = blocksize
 
         self.audio_input_thread = Thread(
             target=self._audio_input,
@@ -42,7 +51,7 @@ class Listener:
         self._wave_fps_interval = 0.04
 
     def _get_input_samplerate(self) -> int:
-        target_sr = cfg["sample_rate"]
+        target_sr = self.sample_rate
 
         device = sd.query_devices(kind="input")
         native_sr = int(device["default_samplerate"])
@@ -50,8 +59,8 @@ class Listener:
         try:
             sd.check_input_settings(
                 samplerate=target_sr,
-                channels=cfg["channels"],
-                dtype=cfg["dtype"],
+                channels=self.channels,
+                dtype=self.dtype,
             )
 
             log.info("Input device supports requested sample rate: %s Hz", target_sr)
@@ -70,18 +79,18 @@ class Listener:
     def _audio_input(self):
         try:
             input_sr = self._get_input_samplerate()
-            target_sr = cfg["sample_rate"]
+            target_sr = self.sample_rate
 
             with sd.InputStream(
                 samplerate=input_sr,
-                channels=cfg["channels"],
-                blocksize=cfg["blocksize"],
-                dtype=cfg["dtype"],
+                channels=self.channels,
+                blocksize=self.blocksize,
+                dtype=self.dtype,
             ) as stream:
                 log.info("Audio stream opened: %s Hz -> %s Hz", input_sr, target_sr)
 
                 while self._running:
-                    indata, _ = stream.read(cfg["blocksize"])
+                    indata, _ = stream.read(self.blocksize)
 
                     try:
                         if input_sr != target_sr:

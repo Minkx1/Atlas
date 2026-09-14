@@ -40,14 +40,22 @@ class Llama:
             self.completion_tokens = completion_tokens
             self.total_tokens = prompt_tokens + completion_tokens
 
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        model_path: Path = DATA_DIR / cfg["model_path"],
+        initial_prompt: str = cfg["initial_prompt"],
+        context_tokens: int = cfg["context_tokens"],
+        max_tokens: int = cfg["max_msg_tokens"],
+        temperature: float = cfg["temperature"],
+    ) -> None:
         self.events = events or EventManager()
 
-        self.model_path = DATA_DIR / cfg["model_path"]
-        self.initial_prompt = cfg["initial_prompt"]
-        self.context_tokens = cfg["context_tokens"]
-        self.max_tokens = cfg["max_msg_tokens"]
-        self.temperature = cfg["temperature"]
+        self.model_path = model_path
+        self.initial_prompt = initial_prompt
+        self.context_tokens = context_tokens
+        self.max_tokens = max_tokens
+        self.temperature = temperature
 
         self.repeat_penalty = 1.15
         self.stop = ["\nUser:", "User:", "<|im_end|>"]

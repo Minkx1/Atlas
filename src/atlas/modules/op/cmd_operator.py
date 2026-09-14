@@ -27,8 +27,13 @@ class CommandOperator:
     def __init__(
         self,
         events: EventManager | None = None,
+        username: str = cfg["username"],
+        name: str = cfg["name"],
     ) -> None:
         self.events = events or EventManager()
+
+        self.username = username
+        self.name = name
 
         self.history: list[str] = []
         self.commands: dict[str, dict[str, list[dict[str, str]] | list[str]]] = {}
@@ -88,7 +93,7 @@ class CommandOperator:
         def _format_triggers(triggers: list[str]) -> list[str]:
             res = []
             for trig in triggers:
-                new = trig.format(username=cfg["username"], name=cfg["name"])
+                new = trig.format(username=self.username, name=self.name)
                 res.append(new)
             return res
 

@@ -14,7 +14,6 @@ import scipy.signal
 import sounddevice as sd
 import soundfile as sf
 
-# from atlas.core.config import cfg
 from atlas.core.events import EventManager
 from atlas.utils.config import CONFIG_DIR, DATA_DIR, Config
 
@@ -25,11 +24,34 @@ cfg = Config.load_config("tts.toml", CONFIG_EXAMPLE.read_text())["tts"]
 
 
 class SoundManager:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        name: str = cfg["name"],
+        username: str = cfg["username"],
+        model_path: str = cfg["model_path"],
+        use_cuda: bool = cfg["use_cuda"],
+        volume: float = cfg["volume"],
+        length_scale: float = cfg["length_scale"],
+        noise_scale: float = cfg["noise_scale"],
+        noise_w_scale: float = cfg["noise_w_scale"],
+        normalize_audio: bool = cfg["normalize_audio"],
+        silence_duration: float = cfg["silence_duration"],
+    ) -> None:
         self.events = events or EventManager()
 
+        self.name = name
+        self.username = username
+        self.model_path = model_path
+        self.use_cuda = use_cuda
+        self.volume = volume
+        self.length_scale = length_scale
+        self.noise_scale = noise_scale
+        self.noise_w_scale = noise_w_scale
+        self.normalize_audio = normalize_audio
+        self.silence_duration = silence_duration
+
         self.commands = self.load_commands() or {}
-        self.silence_duration = cfg["silence_duration"]
         self._healthy = False
 
     @staticmethod
@@ -117,7 +139,7 @@ class SoundManager:
             text = payload.get("text")
 
             formatted_text = str(text).format(
-                username=cfg["username"], name=cfg["name"]
+                username=self.username, name=self.name
             )
             if formatted_text:
                 self.events.emit("ui.say", {"text": formatted_text})
@@ -138,15 +160,15 @@ class SoundManager:
         """Returns structured dict of current TTS settings and formatted sounds."""
         state = {
             "settings": {
-                "name": cfg["name"],
-                "username": cfg["username"],
-                "model_path": cfg["model_path"],
-                "use_cuda": cfg["use_cuda"],
-                "volume": cfg["volume"],
-                "length_scale": cfg["length_scale"],
-                "noise_scale": cfg["noise_scale"],
-                "noise_w_scale": cfg["noise_w_scale"],
-                "normalize_audio": cfg["normalize_audio"],
+                "name": self.name,
+                "username": self.username,
+                "model_path": self.model_path,
+                "use_cuda": self.use_cuda,
+                "volume": self.volume,
+                "length_scale": self.length_scale,
+                "noise_scale": self.noise_scale,
+                "noise_w_scale": self.noise_w_scale,
+                "normalize_audio": self.normalize_audio,
             },
             "sounds": {},
         }
@@ -165,7 +187,7 @@ class SoundManager:
                 try:
                     # KeyError occurs if template has {unknown_key}
                     formatted_text = text_template.format(
-                        name=cfg["name"], username=cfg["username"]
+                        name=self.name, username=self.username
                     )
                     formatted_sounds.append({"path": path_str, "text": formatted_text})
                 except KeyError:
@@ -256,7 +278,7 @@ class SoundManager:
             if text_str:
                 try:
                     text_str = text_str.format(
-                        username=cfg["username"], name=cfg["name"]
+                        username=self.username, name=self.name
                     )
                 except KeyError:
                     log.exception("Formatting text failed for '%s'", text_str)

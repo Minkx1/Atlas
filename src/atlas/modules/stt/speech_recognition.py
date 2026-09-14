@@ -27,11 +27,22 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
 
 class VAD:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        model_path: Path = DATA_DIR / cfg["vad"]["model_path"],
+        sample_rate=cfg["audio"]["sample_rate"],
+        threshold=cfg["vad"]["threshold"],
+        min_silence_duration=cfg["vad"]["min_silence_duration_ms"],
+    ) -> None:
         self.events = events or EventManager()
 
+        self.sample_rate = sample_rate
+        self.threshold = threshold
+        self.min_silence_duration = min_silence_duration
+
         self.is_speaking = False
-        self.model_path: Path = DATA_DIR / cfg["vad"]["model_path"]
+        self.model_path = model_path
 
         self.triggered = False
         self.temp_end = 0
@@ -79,10 +90,8 @@ class VAD:
                 str(self.model_path), providers=["CPUExecutionProvider"]
             )
 
-            self.sample_rate = cfg["audio"]["sample_rate"]
-            self.threshold = cfg["vad"]["threshold"]
             self.min_silence_samples = (
-                self.sample_rate * cfg["vad"]["min_silence_duration_ms"]
+                self.sample_rate * self.min_silence_duration
             ) / 1000
 
             self.reset_state()
@@ -159,40 +168,59 @@ class VAD:
 
 
 class Whisper:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        model_dir: Path = DATA_DIR / cfg["stt"]["download_root"],
+        model_size=cfg["stt"]["model_size"],
+        device=cfg["stt"]["device"],
+        cpu_threads=cfg["stt"]["cpu_threads"],
+        beam_size=cfg["stt"]["beam_size"],
+        language=cfg["stt"]["language"],
+        initial_prompt=cfg["stt"]["initial_prompt"],
+    ) -> None:
         self.events = events or EventManager()
 
         # should make downloading Whisper models from HF faster
         os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
-        self.model_dir: Path = DATA_DIR / cfg["stt"]["download_root"]
+        self.model_dir = model_dir
+        self.model_size = model_size
+        self.device = device
+        self.cpu_threads = cpu_threads
+        self.beam_size = beam_size
+        self.language = language
+        self.initial_prompt = initial_prompt
 
     def load(self):
         from faster_whisper import WhisperModel, download_model
 
         try:
-            model_size = cfg["stt"]["model_size"]
             try:
                 model_path = download_model(
-                    model_size, cache_dir=str(self.model_dir), local_files_only=True
+                    self.model_size,
+                    cache_dir=str(self.model_dir),
+                    local_files_only=True,
                 )
                 log.debug("Using cached Whisper model from %s", model_path)
 
             except Exception:
                 log.info(
                     "Faster-Whisper model '%s' not found locally; downloading...",
-                    model_size,
+                    self.model_size,
                 )
                 model_path = download_model(
-                    model_size, cache_dir=str(self.model_dir), local_files_only=False
+                    self.model_size,
+                    cache_dir=str(self.model_dir),
+                    local_files_only=False,
                 )
                 log.info("Download complete.")
 
             self.model = WhisperModel(
                 model_path,
-                device=cfg["stt"]["device"],
+                device=self.device,
                 compute_type="int8",
-                cpu_threads=cfg["stt"]["cpu_threads"],
+                cpu_threads=self.cpu_threads,
                 num_workers=1,
                 local_files_only=True,
             )
@@ -211,9 +239,9 @@ class Whisper:
             log.debug("Initializing Whisper generator...")
             segments, _ = self.model.transcribe(
                 audio=audio_array,
-                beam_size=cfg["stt"]["beam_size"],
-                language=cfg["stt"]["language"],
-                initial_prompt=cfg["stt"]["initial_prompt"],
+                beam_size=self.beam_size,
+                language=self.language,
+                initial_prompt=self.initial_prompt,
                 condition_on_previous_text=False,
                 log_progress=False,
             )
@@ -236,19 +264,25 @@ class Whisper:
 
 
 class SpeechRecognizer:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        sample_rate=cfg["audio"]["sample_rate"],
+        preroll_blocks=cfg["vad"]["preroll_blocks"],
+        min_command_ms=cfg["stt"]["min_command_ms"],
+    ) -> None:
         self.events = events or EventManager()
 
         self.vad = VAD(self.events)
         self.whisper = Whisper(self.events)
 
-        self.preroll = deque(maxlen=cfg["vad"]["preroll_blocks"])
+        self.preroll = deque(maxlen=preroll_blocks)
         self.buffer: list[np.ndarray] = []
         self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
         self._recording = False
-        self.sample_rate = cfg["audio"]["sample_rate"]
-        self.min_command_ms = cfg["stt"]["min_command_ms"]
+        self.sample_rate = sample_rate
+        self.min_command_ms = min_command_ms
 
         self.stt_worker_thread = Thread(
             target=self._stt_worker, name="STT_WORKER_THREAD", daemon=True
