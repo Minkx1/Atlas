@@ -50,16 +50,15 @@ class Atlas:
                 self.modules[name] = cls(self.events)
 
     def load_modules(self):
-        try:
-            log.info("Starting module loading")
+        log.info("Starting module loading")
 
-            for module in self.modules.values():
+        for name, module in self.modules.items():
+            try:
                 module.load()
-
-            log.info("All modules loaded successfully")
-        except Exception as e:
-            log.exception("Error loading modules: %s", e)
-            raise
+            except Exception as e:
+                log.exception("Module " + name + " loaded with error: %s", e)
+                raise
+            log.info("All modules loaded.")
 
     def close(self, **kwargs):
         """Closes all atlas' modules.
@@ -75,36 +74,34 @@ class Atlas:
             return
         self._closed = True
 
-        try:
-            log.info("Shutting down assistant")
+        log.info("Shutting down assistant")
 
-            for module in self.modules.values():
+        for name, module in self.modules.items():
+            try:
                 module.close()
+            except Exception as e:
+                log.exception("Module " + name + " closed with error: %s", e)
+                raise
 
-            self.events.close()
+        self.events.close()
 
-            log.info("Shutdown complete")
-        except Exception:
-            log.exception("Error during shutdown")
-            raise
+        log.info("Shutdown complete")
 
     def start(self) -> None:
         """Loads and starts all mod"""
-        # log.info("=#= STARTING ATLAS =#=")
-        try:
-            log.info("Starting all modules")
+        log.info("Starting all modules")
 
-            self.load_modules()
-            self.events.start()
-            for module in self.modules.values():
+        self.load_modules()
+        self.events.start()
+        for module in self.modules.values():
+            try:
                 module.start()
+            except Exception as e:
+                log.exception("Error starting modules: %s", e)
+                raise
 
             log.info("All modules started successfully.")
-        except Exception as e:
-            log.exception("Error starting modules: %s", e)
-            raise
 
-    # @on_event("core.terminate", mode="immediate")
     def _handle_terminate_event(self, **kwargs):
         log.info("Received terminate event, starting shutdown thread")
         threading.Thread(
@@ -116,7 +113,6 @@ class Atlas:
         self.alive = False
 
     def _main(self):
-        # program' lifecycle
         self.start()
         while self.alive:
             threading.Event().wait(0.1)
@@ -128,7 +124,7 @@ class Atlas:
         except KeyboardInterrupt:
             self.events.emit("core.terminate")
         except Exception as e:
-            log.error("[!] FATAL ERROR: %s", e, exc_info=True)
+            log.critical("[!] ERROR: %s", e, exc_info=True)
             sys.exit(1)
         finally:
             self.close()
