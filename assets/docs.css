@@ -1,0 +1,60 @@
+:root {
+    --atlas-ink: #17212b;
+    --atlas-muted: #5c6974;
+    --atlas-blue: #176b87;
+    --atlas-amber: #e0a33a;
+    --atlas-line: rgba(23, 33, 43, 0.12);
+}
+
+[data-md-color-scheme="slate"] {
+    --atlas-ink: #edf3f5;
+    --atlas-muted: #a8b7bd;
+    --atlas-line: rgba(237, 243, 245, 0.14);
+}
+
+.atlas-hero {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.35fr);
+    gap: 2rem;
+    align-items: center;
+    margin: 1rem 0 3rem;
+    padding: clamp(1.25rem, 4vw, 3.5rem);
+    border: 1px solid var(--atlas-line);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(23, 107, 135, 0.12), rgba(224, 163, 58, 0.12));
+}
+
+.atlas-hero-art {
+    width: 100%;
+    max-height: 280px;
+}
+
+.atlas-hero-copy h2 {
+    margin-top: 0;
+    color: var(--atlas-ink);
+    font-size: clamp(1.8rem, 4vw, 3.1rem);
+    line-height: 1.05;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    margin-top: 1.5rem;
+}
+
+.md-typeset table:not([class]) th {
+    background: rgba(23, 107, 135, 0.1);
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+    border-radius: 8px;
+}
+
+@media screen and (max-width: 700px) {
+    .atlas-hero {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}

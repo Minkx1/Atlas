@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-light" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="bg-grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#021C2E"/>
+      <stop offset="100%" stop-color="#010A10"/>
+    </radialGradient>
+  </defs>
+  <circle cx="250" cy="250" r="250" fill="url(#bg-grad)"/>
+  <circle cx="250" cy="250" r="230" fill="none" stroke="#005588" stroke-width="2" stroke-dasharray="10 15" opacity="0.5"/>
+  <circle cx="250" cy="250" r="200" fill="none" stroke="#00E5FF" stroke-width="12" stroke-dasharray="200 114.15" stroke-dashoffset="100" filter="url(#glow-light)"/>
+  <circle cx="250" cy="250" r="175" fill="none" stroke="#0077AA" stroke-width="3" opacity="0.6"/>
+  <circle cx="250" cy="250" r="145" fill="none" stroke="#002244" stroke-width="24" opacity="0.8"/>
+  <circle cx="250" cy="250" r="145" fill="none" stroke="#00FFFF" stroke-width="24" stroke-dasharray="70 43.88" stroke-dashoffset="35" filter="url(#glow)" opacity="0.9"/>
+  <circle cx="250" cy="250" r="105" fill="none" stroke="#00AADD" stroke-width="3" stroke-dasharray="3 9" opacity="0.65"/>
+  <circle cx="250" cy="250" r="88" fill="none" stroke="#0077AA" stroke-width="2" stroke-dasharray="1 8" opacity="0.55"/>
+  <g fill="#00E5FF" filter="url(#glow-light)" opacity="0.8">
+    <circle cx="250" cy="162" r="2.5"/>
+    <circle cx="338" cy="250" r="2.5"/>
+    <circle cx="250" cy="338" r="2.5"/>
+    <circle cx="162" cy="250" r="2.5"/>
+  </g>
+  <g fill="none" stroke="#00E5FF" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow-light)">
+    <circle cx="250" cy="250" r="72" stroke-width="4" opacity="0.95"/>
+    <ellipse cx="250" cy="250" rx="48" ry="72" stroke-width="2" opacity="0.65"/>
+    <ellipse cx="250" cy="250" rx="23" ry="72" stroke-width="2" opacity="0.45"/>
+    <ellipse cx="250" cy="250" rx="72" ry="45" stroke-width="2" opacity="0.6"/>
+    <ellipse cx="250" cy="250" rx="72" ry="22" stroke-width="2" opacity="0.45"/>
+    <line x1="178" y1="250" x2="322" y2="250" stroke-width="2.5" opacity="0.8"/>
+  </g>
+  <circle cx="250" cy="250" r="3" fill="#00FFFF" filter="url(#glow-light)"/>
+  <g fill="#FFBB00" filter="url(#glow-light)">
+    <circle cx="250" cy="35" r="5"/>
+    <circle cx="250" cy="465" r="5"/>
+    <circle cx="35" cy="250" r="5"/>
+    <circle cx="465" cy="250" r="5"/>
+  </g>
+</svg>
