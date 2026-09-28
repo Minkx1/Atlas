@@ -53,9 +53,18 @@ def _get_base_dir() -> Path:
         if exe_dir.name == "bin":
             return exe_dir.parent
         return exe_dir
-    return (
-        Path(__file__).resolve().parents[3]
-    )  # '/src/utils/config.py'.parent.parent.parent is '/'
+
+    # Not frozen: don't assume a fixed number of parents above this file.
+    # That only holds when `atlas` is physically at <project_root>/src/atlas/
+    # (an unpacked source tree or an editable install) -- a regular
+    # `pip install .` copies the package into site-packages, far away from
+    # the project's actual data/config/plugins directories. Atlas is a
+    # standalone app meant to be run from its own project directory, so walk
+    # up from the current working directory for the project root instead.
+    for candidate in (Path.cwd(), *Path.cwd().parents):
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return Path.cwd()
 
 
 BASE_DIR: Path = _get_base_dir()
