@@ -10,13 +10,11 @@ from contextlib import suppress
 import llama_cpp
 
 from atlas.core.events import EventManager
-from atlas.utils.config import DATA_DIR, Config, Path
+from atlas.utils.config import DATA_DIR
+
+from .config import LlamaConfig, llama_cfg
 
 log = logging.getLogger(__name__)
-
-
-CONFIG_EXAMPLE = Path(__file__).parent / "llama_example.toml"
-cfg = Config.load_config("llama.toml", CONFIG_EXAMPLE.read_text())["llama"]
 
 
 # Llama-cpp traceback fix
@@ -43,19 +41,15 @@ class Llama:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_path: Path = DATA_DIR / cfg["model_path"],
-        initial_prompt: str = cfg["initial_prompt"],
-        context_tokens: int = cfg["context_tokens"],
-        max_tokens: int = cfg["max_msg_tokens"],
-        temperature: float = cfg["temperature"],
+        cfg: LlamaConfig = llama_cfg,
     ) -> None:
         self.events = events or EventManager()
 
-        self.model_path = model_path
-        self.initial_prompt = initial_prompt
-        self.context_tokens = context_tokens
-        self.max_tokens = max_tokens
-        self.temperature = temperature
+        self.model_path = DATA_DIR / cfg.model_path
+        self.initial_prompt = cfg.initial_prompt
+        self.context_tokens = cfg.context_tokens
+        self.max_tokens = cfg.max_msg_tokens
+        self.temperature = cfg.temperature
 
         self.repeat_penalty = 1.15
         self.stop = ["\nUser:", "User:", "<|im_end|>"]

@@ -17,12 +17,11 @@ import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
 from atlas.core.events import EventManager
-from atlas.utils.config import DATA_DIR, Config
+from atlas.utils.config import DATA_DIR
+
+from .config import TtsConfig, tts_cfg
 
 log = logging.getLogger(__name__)
-
-CONFIG_EXAMPLE = Path(__file__).parent / "tts_exapmle.toml"
-cfg = Config.load_config("tts.toml", CONFIG_EXAMPLE.read_text())["tts"]
 
 VOICES_JSON_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
 HF_BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
@@ -32,27 +31,21 @@ class TextToSpeech:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_path=cfg["model_path"],
-        volume=cfg["volume"],
-        length_scale=cfg["length_scale"],
-        noise_scale=cfg["noise_scale"],
-        noise_w_scale=cfg["noise_w_scale"],
-        normalize_audio=cfg["normalize_audio"],
-        silence_duration=cfg["silence_duration"],
-        use_cuda=cfg["use_cuda"],
+        cfg: TtsConfig = tts_cfg,
     ) -> None:
         self.events = events or EventManager()
+        self.cfg = cfg
 
-        self.path = DATA_DIR / model_path
+        self.path = DATA_DIR / cfg.model_path
         if not self.path.exists():
             self._download_model()
 
         self.syn_config = SynthesisConfig(
-            volume=volume,  # half as loud
-            length_scale=length_scale,  # twice as slow
-            noise_scale=noise_scale,  # more audio variation
-            noise_w_scale=noise_w_scale,  # more speaking variation
-            normalize_audio=normalize_audio,  # use raw audio from voice
+            volume=cfg.volume,
+            length_scale=cfg.length_scale,  # twice as slow
+            noise_scale=cfg.noise_scale,  # more audio variation
+            noise_w_scale=cfg.noise_w_scale,  # more speaking variation
+            normalize_audio=cfg.normalize_audio,  # use raw audio from voice
         )
 
         self.queue: queue.Queue[str | None] = queue.Queue()
@@ -63,8 +56,8 @@ class TextToSpeech:
         self._busy_lock = threading.Lock()
         self._healthy = False
 
-        self.silence_duration = silence_duration
-        self.use_cuda = use_cuda
+        self.silence_duration = cfg.silence_duration
+        self.use_cuda = cfg.use_cuda
 
     def load(self):
         self.voice = PiperVoice.load(

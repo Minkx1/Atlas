@@ -1,26 +1,3 @@
-[audio]
-
-# Audio input settings used by the microphone processing pipeline.
-# It is recommended not to change these values unless you know what you are doing.
-
-# Number of audio samples captured per second.
-# 16000 Hz is the standard sample rate used by most speech-recognition models.
-sample_rate = 16000
-
-# Number of audio channels.
-# 1 = mono, 2 = stereo.
-# Speech recognition normally works best with mono audio.
-channels = 1
-
-# Number of audio samples processed in one audio block.
-# Smaller values reduce latency but increase CPU overhead.
-# Larger values reduce CPU overhead but increase latency.
-blocksize = 512
-
-# Internal format of audio samples.
-# float32 is commonly used by the Sounddevice.
-dtype = "float32"
-
 [kws]
 
 # Global hotkey, that awakens Assistant without need to say Atlas

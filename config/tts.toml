@@ -1,8 +1,5 @@
 [tts]
 
-name = "Atlas"
-username = "Sir"
-
 # Path to the Piper TTS model.
 # This model is responsible for converting generated text into speech.
 model_path = "models/piper/en_US-ryan-medium.onnx"

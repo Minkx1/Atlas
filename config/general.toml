@@ -1,0 +1,35 @@
+[identity]
+
+# The name the Assistant will call ITSELF.
+# ! Note, that changing this does not automatically change keyword phrases
+# ! for waking the assistant or the LLM prompt.
+# ! If you want to change them, edit '$DATA/keywords.txt' and the prompts
+# ! in llama.toml / commands.json. See docs on the GitHub repo.
+name = "Atlas"
+
+# The name that the assistant will use to address the USER.
+username = "Sir"
+
+[audio]
+
+# Audio format shared by the whole audio pipeline (microphone capture, wake
+# word, VAD, STT). It is recommended not to change these values unless you
+# know what you are doing.
+
+# Number of audio samples captured per second.
+# 16000 Hz is the standard sample rate used by most speech-recognition models.
+sample_rate = 16000
+
+# Number of audio channels.
+# 1 = mono, 2 = stereo.
+# Speech recognition normally works best with mono audio.
+channels = 1
+
+# Number of audio samples processed in one audio block.
+# Smaller values reduce latency but increase CPU overhead.
+# Larger values reduce CPU overhead but increase latency.
+blocksize = 512
+
+# Internal format of audio samples.
+# float32 is commonly used by the Sounddevice.
+dtype = "float32"

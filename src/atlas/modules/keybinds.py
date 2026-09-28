@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 KEYBINDS_ORIGIN_CFG = """<ctrl>+<alt>+w"""
 
-cfg = Config.load_config("keybinds.cfg", KEYBINDS_ORIGIN_CFG)
+cfg = Config.load_raw("keybinds.cfg", KEYBINDS_ORIGIN_CFG)
 
 
 class KeyBindManager:

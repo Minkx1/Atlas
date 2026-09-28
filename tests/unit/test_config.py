@@ -13,7 +13,7 @@ def isolated_config_dir(tmp_path, monkeypatch):
 def test_load_config_creates_file_from_origin_when_missing(isolated_config_dir):
     origin = '[app]\nname = "Test"\n'
 
-    loaded = Config.load_config("app.toml", origin)
+    loaded = Config.load_raw("app.toml", origin)
 
     created = isolated_config_dir / "app.toml"
     assert created.read_text(encoding="utf-8") == origin
@@ -24,7 +24,7 @@ def test_load_config_does_not_overwrite_existing_file(isolated_config_dir):
     existing = isolated_config_dir / "app.toml"
     existing.write_text('[app]\nname = "Existing"\n', encoding="utf-8")
 
-    loaded = Config.load_config("app.toml", '[app]\nname = "Origin"\n')
+    loaded = Config.load_raw("app.toml", '[app]\nname = "Origin"\n')
 
     assert loaded == {"app": {"name": "Existing"}}
 
@@ -34,7 +34,7 @@ def test_load_config_reads_json(isolated_config_dir):
         '{"greet": {"triggers": ["hello"]}}', encoding="utf-8"
     )
 
-    assert Config.load_config("data.json") == {"greet": {"triggers": ["hello"]}}
+    assert Config.load_raw("data.json") == {"greet": {"triggers": ["hello"]}}
 
 
 @pytest.mark.parametrize("suffix", [".txt", ".cfg"])
@@ -43,7 +43,7 @@ def test_load_config_reads_plain_text_as_content(isolated_config_dir, suffix):
         "<ctrl>+<alt>+w", encoding="utf-8"
     )
 
-    loaded = Config.load_config(f"keybinds{suffix}")
+    loaded = Config.load_raw(f"keybinds{suffix}")
 
     assert loaded == {"content": "<ctrl>+<alt>+w"}
 
@@ -51,11 +51,11 @@ def test_load_config_reads_plain_text_as_content(isolated_config_dir, suffix):
 def test_load_config_unsupported_extension_returns_empty(isolated_config_dir):
     (isolated_config_dir / "unknown.yaml").write_text("a: 1", encoding="utf-8")
 
-    assert Config.load_config("unknown.yaml") == {}
+    assert Config.load_raw("unknown.yaml") == {}
 
 
 def test_load_config_null_id_returns_empty_without_touching_disk(isolated_config_dir):
-    assert Config.load_config() == {}
+    assert Config.load_raw() == {}
     assert list(isolated_config_dir.iterdir()) == []
 
 

@@ -13,12 +13,9 @@ import sounddevice as sd
 from scipy.signal import resample_poly
 
 from atlas.core.events import EventManager
-from atlas.utils.config import Config, Path
+from atlas.utils.config import AudioConfig, general_cfg
 
 log = logging.getLogger(__name__)
-
-CONFIG_EXAMPLE = Path(__file__).parent / "stt_example.toml"
-cfg = Config.load_config("stt.toml", CONFIG_EXAMPLE.read_text())["audio"]
 
 
 class Listener:
@@ -26,18 +23,11 @@ class Listener:
         self,
         chunk_processor: Callable[[np.ndarray], None],
         events: EventManager | None = None,
-        sample_rate=cfg["sample_rate"],
-        channels=cfg["channels"],
-        dtype=cfg["dtype"],
-        blocksize=cfg["blocksize"],
+        cfg: AudioConfig = general_cfg.audio,
     ) -> None:
         self.events = events or EventManager()
         self.processor = chunk_processor
-
-        self.sample_rate = sample_rate
-        self.channels = channels
-        self.dtype = dtype
-        self.blocksize = blocksize
+        self.cfg = cfg
 
         self.audio_input_thread = Thread(
             target=self._audio_input,
@@ -51,7 +41,7 @@ class Listener:
         self._wave_fps_interval = 0.04
 
     def _get_input_samplerate(self) -> int:
-        target_sr = self.sample_rate
+        target_sr = self.cfg.sample_rate
 
         device = sd.query_devices(kind="input")
         native_sr = int(device["default_samplerate"])
@@ -59,8 +49,8 @@ class Listener:
         try:
             sd.check_input_settings(
                 samplerate=target_sr,
-                channels=self.channels,
-                dtype=self.dtype,
+                channels=self.cfg.channels,
+                dtype=self.cfg.dtype,
             )
 
             log.info("Input device supports requested sample rate: %s Hz", target_sr)
@@ -79,18 +69,18 @@ class Listener:
     def _audio_input(self):
         try:
             input_sr = self._get_input_samplerate()
-            target_sr = self.sample_rate
+            target_sr = self.cfg.sample_rate
 
             with sd.InputStream(
                 samplerate=input_sr,
-                channels=self.channels,
-                blocksize=self.blocksize,
-                dtype=self.dtype,
+                channels=self.cfg.channels,
+                blocksize=self.cfg.blocksize,
+                dtype=self.cfg.dtype,
             ) as stream:
                 log.info("Audio stream opened: %s Hz -> %s Hz", input_sr, target_sr)
 
                 while self._running:
-                    indata, _ = stream.read(self.blocksize)
+                    indata, _ = stream.read(self.cfg.blocksize)
 
                     try:
                         if input_sr != target_sr:

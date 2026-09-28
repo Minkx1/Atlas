@@ -8,19 +8,17 @@ import logging
 import os
 import queue
 from collections import deque
-from pathlib import Path
 from threading import Thread
 from typing import Literal
 
 import numpy as np
 
 from atlas.core.events import EventManager
-from atlas.utils.config import DATA_DIR, Config
+from atlas.utils.config import DATA_DIR, AudioConfig, general_cfg
+
+from .config import SttConfig, VadConfig, stt_cfg, vad_cfg
 
 log = logging.getLogger(__name__)
-
-CONFIG_EXAMPLE = Path(__file__).parent / "stt_example.toml"
-cfg = Config.load_config("stt.toml", CONFIG_EXAMPLE.read_text())
 
 # disables HF symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
@@ -30,19 +28,17 @@ class VAD:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_path: Path = DATA_DIR / cfg["vad"]["model_path"],
-        sample_rate=cfg["audio"]["sample_rate"],
-        threshold=cfg["vad"]["threshold"],
-        min_silence_duration=cfg["vad"]["min_silence_duration_ms"],
+        cfg: VadConfig = vad_cfg,
+        audio: AudioConfig = general_cfg.audio,
     ) -> None:
         self.events = events or EventManager()
 
-        self.sample_rate = sample_rate
-        self.threshold = threshold
-        self.min_silence_duration = min_silence_duration
+        self.sample_rate = audio.sample_rate
+        self.threshold = cfg.threshold
+        self.min_silence_duration = cfg.min_silence_duration_ms
 
         self.is_speaking = False
-        self.model_path = model_path
+        self.model_path = DATA_DIR / cfg.model_path
 
         self.triggered = False
         self.temp_end = 0
@@ -171,26 +167,20 @@ class Whisper:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_dir: Path = DATA_DIR / cfg["stt"]["download_root"],
-        model_size=cfg["stt"]["model_size"],
-        device=cfg["stt"]["device"],
-        cpu_threads=cfg["stt"]["cpu_threads"],
-        beam_size=cfg["stt"]["beam_size"],
-        language=cfg["stt"]["language"],
-        initial_prompt=cfg["stt"]["initial_prompt"],
+        cfg: SttConfig = stt_cfg,
     ) -> None:
         self.events = events or EventManager()
 
         # should make downloading Whisper models from HF faster
         os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
-        self.model_dir = model_dir
-        self.model_size = model_size
-        self.device = device
-        self.cpu_threads = cpu_threads
-        self.beam_size = beam_size
-        self.language = language
-        self.initial_prompt = initial_prompt
+        self.model_dir = DATA_DIR / cfg.download_root
+        self.model_size = cfg.model_size
+        self.device = cfg.device
+        self.cpu_threads = cfg.cpu_threads
+        self.beam_size = cfg.beam_size
+        self.language = cfg.language
+        self.initial_prompt = cfg.initial_prompt
 
     def load(self):
         from faster_whisper import WhisperModel, download_model
@@ -267,22 +257,22 @@ class SpeechRecognizer:
     def __init__(
         self,
         events: EventManager | None = None,
-        sample_rate=cfg["audio"]["sample_rate"],
-        preroll_blocks=cfg["vad"]["preroll_blocks"],
-        min_command_ms=cfg["stt"]["min_command_ms"],
+        stt: SttConfig = stt_cfg,
+        vad_cfg: VadConfig = vad_cfg,
+        audio: AudioConfig = general_cfg.audio,
     ) -> None:
         self.events = events or EventManager()
 
         self.vad = VAD(self.events)
         self.whisper = Whisper(self.events)
 
-        self.preroll = deque(maxlen=preroll_blocks)
+        self.preroll = deque(maxlen=vad_cfg.preroll_blocks)
         self.buffer: list[np.ndarray] = []
         self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
         self._recording = False
-        self.sample_rate = sample_rate
-        self.min_command_ms = min_command_ms
+        self.sample_rate = audio.sample_rate
+        self.min_command_ms = stt.min_command_ms
 
         self.stt_worker_thread = Thread(
             target=self._stt_worker, name="STT_WORKER_THREAD", daemon=True

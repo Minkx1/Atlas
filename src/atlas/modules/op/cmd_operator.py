@@ -12,28 +12,32 @@ from pathlib import Path
 import numpy as np
 
 from atlas.core.events import EventManager
-from atlas.utils.config import CONFIG_DIR, DATA_DIR, PLUGINS_DIR, Config
+from atlas.utils.config import (
+    CONFIG_DIR,
+    DATA_DIR,
+    PLUGINS_DIR,
+    Config,
+    IdentityConfig,
+    general_cfg,
+)
 
+from .config import OpConfig, op_cfg
 from .plugins import Plugin, PluginManifest
 from .sentence_transformer import ONNXSentenceTransformer
 
 log = logging.getLogger(__name__)
-
-CONFIG_EXAMPLE = Path(__file__).parent / "op_example.toml"
-cfg = Config.load_config("op.toml", CONFIG_EXAMPLE.read_text())["op"]
 
 
 class CommandOperator:
     def __init__(
         self,
         events: EventManager | None = None,
-        username: str = cfg["username"],
-        name: str = cfg["name"],
+        cfg: OpConfig = op_cfg,
+        identity: IdentityConfig = general_cfg.identity,
     ) -> None:
         self.events = events or EventManager()
 
-        self.username = username
-        self.name = name
+        self.identity = identity
 
         self.history: list[str] = []
         self.commands: dict[str, dict[str, list[dict[str, str]] | list[str]]] = {}
@@ -41,8 +45,8 @@ class CommandOperator:
 
         self.triggers: dict[str, list[str]] = {}
 
-        self.intent_threshold = 0.60
-        self.margin = 0.05
+        self.intent_threshold = cfg.intent_threshold
+        self.margin = cfg.margin
 
     def load(self):
         self.model = ONNXSentenceTransformer(  # embedding model
@@ -93,7 +97,9 @@ class CommandOperator:
         def _format_triggers(triggers: list[str]) -> list[str]:
             res = []
             for trig in triggers:
-                new = trig.format(username=self.username, name=self.name)
+                new = trig.format(
+                    username=self.identity.username, name=self.identity.name
+                )
                 res.append(new)
             return res
 

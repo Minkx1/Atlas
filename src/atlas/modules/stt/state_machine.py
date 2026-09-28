@@ -7,10 +7,8 @@ import time
 from enum import StrEnum
 
 from atlas.core.events import EventManager
-from atlas.utils.config import Config, Path
 
-CONFIG_EXAMPLE = Path(__file__).parent / "stt_example.toml"
-cfg = Config.load_config("stt.toml", CONFIG_EXAMPLE.read_text())["stt"]
+from .config import SttConfig, stt_cfg
 
 
 class State(StrEnum):
@@ -24,15 +22,14 @@ class StateMachine:
     def __init__(
         self,
         events: EventManager | None = None,
-        start_state=cfg["start_state"],
-        awake_timeout=cfg["awake_timeout"],
+        cfg: SttConfig = stt_cfg,
     ) -> None:
         self.events = events or EventManager()
 
         self.state = State.SLEEPING
-        self.awake_timeout = awake_timeout
+        self.awake_timeout = cfg.awake_timeout
 
-        if start_state == "AWAKE":
+        if cfg.start_state == "AWAKE":
             self.state = State.AWAKE
         else:
             self.state = State.SLEEPING
