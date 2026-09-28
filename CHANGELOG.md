@@ -1,3 +1,23 @@
+## v0.6.9 (2026-09-28)
+
+### Fix
+
+- BASE_DIR now corectly found in noneditable pip installation and any installation
+- loging and better lifecycle for modules
+- EventManager pushes task_done to early fixed
+- multithreading textual & ctranslate2 issues fixed with disabling textual temporarilly
+- fixed core.terminate bug with execution thread joining itself
+- fixed bugs, import errors and tests
+
+### Refactor
+
+- improved config interface
+- all configurations are now a parameters for object's constructors
+- ui now is a module + style changes
+- config now managed by modules themselves
+- **core**: Added and tested proper module system
+- **core**: remake EventAPI with new event types and refactor event handling
+
 ## v0.6.8 (2026-09-08)
 
 ### Refactor
