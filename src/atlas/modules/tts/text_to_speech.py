@@ -16,8 +16,10 @@ import sounddevice as sd
 import soundfile as sf
 from piper import PiperVoice, SynthesisConfig
 
-from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+from atlas.utils.config import DATA_DIR
+
+from .config import TtsConfig, tts_cfg
 
 log = logging.getLogger(__name__)
 
@@ -29,25 +31,21 @@ class TextToSpeech:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_path=cfg.tts.model_path,
-        volume=cfg.tts.volume,
-        length_scale=cfg.tts.length_scale,
-        noise_scale=cfg.tts.noise_scale,
-        noise_w_scale=cfg.tts.noise_w_scale,
-        normalize_audio=cfg.tts.normalize_audio,
+        cfg: TtsConfig = tts_cfg,
     ) -> None:
         self.events = events or EventManager()
+        self.cfg = cfg
 
-        self.path = DATA_DIR / model_path
+        self.path = DATA_DIR / cfg.model_path
         if not self.path.exists():
             self._download_model()
 
         self.syn_config = SynthesisConfig(
-            volume=volume,  # half as loud
-            length_scale=length_scale,  # twice as slow
-            noise_scale=noise_scale,  # more audio variation
-            noise_w_scale=noise_w_scale,  # more speaking variation
-            normalize_audio=normalize_audio,  # use raw audio from voice
+            volume=cfg.volume,
+            length_scale=cfg.length_scale,  # twice as slow
+            noise_scale=cfg.noise_scale,  # more audio variation
+            noise_w_scale=cfg.noise_w_scale,  # more speaking variation
+            normalize_audio=cfg.normalize_audio,  # use raw audio from voice
         )
 
         self.queue: queue.Queue[str | None] = queue.Queue()
@@ -58,8 +56,8 @@ class TextToSpeech:
         self._busy_lock = threading.Lock()
         self._healthy = False
 
-        self.silence_duration = cfg.tts.silence_duration
-        self.use_cuda = cfg.tts.use_cuda
+        self.silence_duration = cfg.silence_duration
+        self.use_cuda = cfg.use_cuda
 
     def load(self):
         self.voice = PiperVoice.load(
@@ -68,7 +66,6 @@ class TextToSpeech:
         # self._generate_basic_sounds()
         self._healthy = True
         log.info("TTS model loaded")
-        self.events.emit(EventType.TTS_LOADED, {})
 
     def start(self):
         if not hasattr(self, "voice"):
@@ -157,7 +154,7 @@ class TextToSpeech:
         self._set_busy(False)
 
     def _set_busy(self, value: bool) -> None:
-        self.events.emit(EventType.TTS_BUSY if value else EventType.TTS_FREE, {})
+        self.events.emit("tts.busy" if value else "tts.free", {})
         with self._busy_lock:
             self._busy = value
 

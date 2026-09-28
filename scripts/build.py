@@ -199,7 +199,7 @@ def generate_build_info(cpu_only: bool) -> dict:
     return {
         "version": VERSION,
         "commit": git_hash,
-        "build_date": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "build_date": datetime.datetime.now(datetime.UTC).isoformat(),
         "platform": f"{SYS_NAME}-{MACHINE}",
         "python_version": platform.python_version(),
         "cpu_only": cpu_only,

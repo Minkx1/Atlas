@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from atlas.core.events import EventManager
@@ -7,9 +9,14 @@ from atlas.core.events import EventManager
 def clean_event_manager():
     manager = EventManager()
     yield
-    manager.flush_and_stop()
+    manager.close()
+    time.sleep(0.01)  # Ensure threads have time to clean up
 
 
 @pytest.fixture
 def event_manager():
-    return EventManager()
+    manager = EventManager()
+    manager.start()
+    yield manager
+    manager.close()
+    time.sleep(0.01)  # Ensure threads have time to clean up

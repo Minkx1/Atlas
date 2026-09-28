@@ -1,0 +1,9 @@
+[op]
+
+# Cosine-similarity score a built-in/plugin trigger must reach to be
+# accepted as the matched intent. Anything below falls through to the LLM.
+intent_threshold = 0.60
+
+# Minimum lead the best-scoring intent must have over the second-best one to
+# be accepted with confidence. Prevents ambiguous matches from firing.
+margin = 0.05

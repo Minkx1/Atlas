@@ -8,14 +8,15 @@ import logging
 import os
 import queue
 from collections import deque
-from pathlib import Path
 from threading import Thread
 from typing import Literal
 
 import numpy as np
 
-from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+from atlas.utils.config import DATA_DIR, AudioConfig, general_cfg
+
+from .config import SttConfig, VadConfig, stt_cfg, vad_cfg
 
 log = logging.getLogger(__name__)
 
@@ -24,11 +25,20 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
 
 class VAD:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        cfg: VadConfig = vad_cfg,
+        audio: AudioConfig = general_cfg.audio,
+    ) -> None:
         self.events = events or EventManager()
 
+        self.sample_rate = audio.sample_rate
+        self.threshold = cfg.threshold
+        self.min_silence_duration = cfg.min_silence_duration_ms
+
         self.is_speaking = False
-        self.model_path: Path = DATA_DIR / cfg.vad.model_path
+        self.model_path = DATA_DIR / cfg.model_path
 
         self.triggered = False
         self.temp_end = 0
@@ -76,16 +86,13 @@ class VAD:
                 str(self.model_path), providers=["CPUExecutionProvider"]
             )
 
-            self.sample_rate = cfg.audio.sample_rate
-            self.threshold = cfg.vad.threshold
             self.min_silence_samples = (
-                self.sample_rate * cfg.vad.min_silence_duration_ms
+                self.sample_rate * self.min_silence_duration
             ) / 1000
 
             self.reset_state()
 
             log.info("VAD model loaded")
-            self.events.emit(EventType.VAD_LOADED, {})
         except Exception:
             log.exception("Error loading VAD model")
             raise
@@ -157,38 +164,58 @@ class VAD:
 
 
 class Whisper:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        cfg: SttConfig = stt_cfg,
+    ) -> None:
         self.events = events or EventManager()
 
         # should make downloading Whisper models from HF faster
         os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 
-        w = cfg.stt
-        self.model_dir: Path = DATA_DIR / w.download_root
+        self.model_dir = DATA_DIR / cfg.download_root
+        self.model_size = cfg.model_size
+        self.device = cfg.device
+        self.cpu_threads = cfg.cpu_threads
+        self.beam_size = cfg.beam_size
+        self.language = cfg.language
+        self.initial_prompt = cfg.initial_prompt
 
     def load(self):
-        from faster_whisper import WhisperModel
+        from faster_whisper import WhisperModel, download_model
 
         try:
-            w = cfg.stt
-            if not self.model_dir.exists():
-                log.info(
-                    "Faster-Whisper model not found at %s; downloading", self.model_dir
+            try:
+                model_path = download_model(
+                    self.model_size,
+                    cache_dir=str(self.model_dir),
+                    local_files_only=True,
                 )
-            else:
-                log.debug("Using Whisper model from %s", self.model_dir)
+                log.debug("Using cached Whisper model from %s", model_path)
 
-            log.info("Loading Whisper model: %s", w.model_size)
+            except Exception:
+                log.info(
+                    "Faster-Whisper model '%s' not found locally; downloading...",
+                    self.model_size,
+                )
+                model_path = download_model(
+                    self.model_size,
+                    cache_dir=str(self.model_dir),
+                    local_files_only=False,
+                )
+                log.info("Download complete.")
+
             self.model = WhisperModel(
-                w.model_size,
-                device=w.device,
+                model_path,
+                device=self.device,
                 compute_type="int8",
-                cpu_threads=w.cpu_threads,
+                cpu_threads=self.cpu_threads,
                 num_workers=1,
-                download_root=str(self.model_dir),
+                local_files_only=True,
             )
             log.info("Whisper model loaded")
-            self.events.emit(EventType.WHISPER_LOADED, {})
+
         except Exception:
             log.exception("Error loading Whisper model")
             raise
@@ -198,32 +225,54 @@ class Whisper:
         if not hasattr(self, "model"):
             raise RuntimeError("Whisper was used before whisper.load()")
 
-        w = cfg.stt
-        segments, _ = self.model.transcribe(
-            audio=audio_array,
-            beam_size=w.beam_size,
-            language=w.language,
-            initial_prompt=w.initial_prompt,
-            condition_on_previous_text=False,
-        )
-        text = " ".join([segment.text for segment in segments]).strip()
-        return text
+        try:
+            log.debug("Initializing Whisper generator...")
+            segments, _ = self.model.transcribe(
+                audio=audio_array,
+                beam_size=self.beam_size,
+                language=self.language,
+                initial_prompt=self.initial_prompt,
+                condition_on_previous_text=False,
+                log_progress=False,
+            )
+
+            text_parts = []
+            log.debug("Starting to iterate over segments...")
+
+            for segment in segments:
+                log.debug(f"Decoded segment: {segment.text}")
+                text_parts.append(segment.text)
+
+            text = " ".join(text_parts).strip()
+            return text
+
+        except Exception as e:
+            log.exception(
+                f"CRITICAL: Whisper crashed during transcription! Error: {e!r}"
+            )
+            return ""
 
 
 class SpeechRecognizer:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        stt: SttConfig = stt_cfg,
+        vad_cfg: VadConfig = vad_cfg,
+        audio: AudioConfig = general_cfg.audio,
+    ) -> None:
         self.events = events or EventManager()
 
         self.vad = VAD(self.events)
         self.whisper = Whisper(self.events)
 
-        self.preroll = deque(maxlen=cfg.vad.preroll_blocks)
+        self.preroll = deque(maxlen=vad_cfg.preroll_blocks)
         self.buffer: list[np.ndarray] = []
         self.audio_queue = queue.Queue()  # Queue containg (audio_array, listen_ms)
 
         self._recording = False
-        self.sample_rate = cfg.audio.sample_rate
-        self.min_command_ms = cfg.stt.min_command_ms
+        self.sample_rate = audio.sample_rate
+        self.min_command_ms = stt.min_command_ms
 
         self.stt_worker_thread = Thread(
             target=self._stt_worker, name="STT_WORKER_THREAD", daemon=True
@@ -257,14 +306,7 @@ class SpeechRecognizer:
             text = text.strip()
 
             if text:
-                self.events.emit(
-                    EventType.UI_TRANSCRIPTION,
-                    {
-                        "text": text,
-                    },
-                )
-
-                self.events.emit(EventType.STT_TRANSCRIBED, {"text": text})
+                self.events.emit("stt.transcribed", {"text": text})
                 log.info(f"Recognized: {text}")
 
             self.audio_queue.task_done()
@@ -284,7 +326,7 @@ class SpeechRecognizer:
         if vad_state == "start":
             self._recording = True
             self.buffer = list(self.preroll)
-            self.events.emit(EventType.VAD_START, {})
+            self.events.emit("stt.vad.start", {})
 
         elif vad_state == "speaking" and self._recording:
             self.buffer.append(chunk)
@@ -300,6 +342,6 @@ class SpeechRecognizer:
                     self.audio_queue.put((full_audio, listen_ms))
 
             self.buffer.clear()
-            self.events.emit(EventType.VAD_END, {})
+            self.events.emit("stt.vad.end", {})
 
         return vad_state

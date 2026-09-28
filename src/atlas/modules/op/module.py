@@ -8,7 +8,7 @@ import queue
 import re
 import threading
 
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 from atlas.core.module import Module, on_event
 
 from .cmd_operator import CommandOperator
@@ -19,8 +19,7 @@ class OpModule(Module):
     name = "op"
 
     def __init__(self, events: EventManager | None = None) -> None:
-        self.events = events or EventManager()
-        self._register_events(self.events)
+        super().__init__(events)
 
         self._running = False
         self.cmd = CommandOperator(self.events)
@@ -73,37 +72,24 @@ class OpModule(Module):
 
             full_response_text += sentence + " "
 
-            self.events.emit(EventType.OP_LLM_CHUNK, {"text": sentence})
-
             self.events.emit(
-                EventType.UI_LLM_CHUNK,
-                {"text": sentence, "is_first": is_first_chunk},
+                "op.llm_chunk", {"text": sentence, "is_first": is_first_chunk}
             )
             is_first_chunk = False
 
-        self.events.emit(
-            EventType.UI_LLM_RESPONSE_DONE,
-            {
-                "text": full_response_text.strip(),
-            },
-        )
-        self.events.emit(EventType.LLM_RESPONSE, {"text": full_response_text.strip()})
         self.llm.history_add_response(full_response_text.strip())
 
     def _operate(self, text: str) -> None:
         if not text:
             return
 
-        self.events.emit(EventType.OP_START, {})
         res_type = self.cmd.operate(text)
 
         if not res_type:  # LLM
             if self.llm.no_model:  # LLM model was not load for some reason
-                self.events.emit(EventType.OP_INTENT, {"intent": "idk_cmd"})
+                self.events.emit("op.intent", {"intent": "idk_cmd"})
             else:
                 self._stream_llm_response(text)
-
-        self.events.emit(EventType.OP_FINISH, {})
 
     # Module methods
 
@@ -124,10 +110,19 @@ class OpModule(Module):
 
     # Events
 
-    @on_event(CommandType.OP_SUBMIT, EventType.STT_TRANSCRIBED)
+    @on_event("op.intent")
+    def handle_intent(self, intent: str, **kwargs):
+        self.events.emit("tts.sounds.command.play_category", {"category": intent})
+
+        if intent == "farewell":
+            self.events.emit("core.command.terminate")
+        if intent == "sleep":
+            self.events.emit("stt.command.set_state", {"state": "SLEEPING"})
+
+    @on_event("stt.transcribed")
     def submit(self, text: str = "", **kwargs):
         self.command_queue.put(text)
 
-    @on_event(EventType.OP_INTERRUPT)
+    @on_event("op.command.interrupt")
     def interrupt(self, **kwargs):
         self.interrupt_flag.set()

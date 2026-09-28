@@ -5,142 +5,128 @@
 
 import logging
 import sys
+import threading
 
-from atlas.op import OpModule
-from atlas.stt import SttModule
-from atlas.tts import TtsModule
-from atlas.utils import UI, KeyBindManager
+from atlas.core.events import EventManager
+from atlas.core.module import Module
 
-from .config import DATA_DIR, cfg
-from .events import CommandType, EventManager, EventType
-from .logging_config import configure_logging
+# utils
+from atlas.utils.config import DATA_DIR
 
+# global logger for each python-module
 log = logging.getLogger(__name__)
 
 
 class Atlas:
-    def __init__(self) -> None:
-        configure_logging(DATA_DIR / "logs", enabled=cfg.log, level=cfg.log_level)
-        # Events and Logger
+    """Module manager and entrypoint for Atlas Assistant"""
+
+    def __init__(self, *, ignored_modules: list[str] | None = None) -> None:
+        self.alive: bool = True
+        self._closed: bool = False
+        self.ignored_modules = ignored_modules or []
+
         self.events = EventManager()
-        self.alive = True
-        # Utils
-
-        self.keybinds = KeyBindManager()
-        self.keybinds.register_keybind(
-            cfg.kws.awake_keybind,
-            lambda: self.events.emit(
-                EventType.KWS_KEYWORD_DETECTED, {"keyword": "{HotKey}"}
-            ),
+        self.events.subscribe(
+            "core.command.terminate",
+            lambda e: self._handle_terminate_event(**e.content),
         )
+        self._configure_logging()
 
-        self.ui = UI(app=self, events=self.events)
+        # setting up modules
+        self.modules: dict[str, Module] = {}
+        self.init_modules()
 
-        # Modules
+    def _configure_logging(self):
+        from atlas.utils.logging_config import configure_logging
 
-        self.stt_module = SttModule(self.events)
-        self.tts_module = TtsModule(self.events)
-        self.op_module = OpModule(self.events)
+        configure_logging(DATA_DIR / "logs", enabled=True, level="DEBUG")
 
-        self._setup_subscriptions()
+    def init_modules(self):
+        """Initializes all Atlas' modules"""
+        import atlas.modules
+        from atlas.core.module import discover_modules
+
+        for name, cls in discover_modules(atlas.modules).items():
+            if name not in self.ignored_modules:
+                self.modules[name] = cls(self.events)
+
+    def load_modules(self):
+        log.info("Starting module loading")
+
+        for name, module in self.modules.items():
+            try:
+                module.load()
+            except Exception as e:
+                log.exception("Module " + name + " loaded with error: %s", e)
+                raise
+
+        log.info("All modules loaded.")
+
+    def close(self, **kwargs):
+        """Closes all atlas' modules.
+
+        Note that this doesn't automatically ends execution.
+        See: Atlas.shutdown()
+
+        Idempotent: safe to call multiple times, e.g. once from the
+        `core.terminate` handler's shutdown thread and once from `run()`'s
+        `finally` block.
+        """
+        if self._closed:
+            return
+        self._closed = True
+
+        log.info("Shutting down assistant")
+
+        for name, module in self.modules.items():
+            try:
+                module.close()
+            except Exception as e:
+                log.exception("Module " + name + " closed with error: %s", e)
+                raise
+
+        self.events.close()
+
+        log.info("Shutdown complete")
+
+    def start(self) -> None:
+        """Loads and starts all mod"""
+        log.info("Starting all modules")
+
+        self.load_modules()
+        self.events.start()
+        for module in self.modules.values():
+            try:
+                module.start()
+            except Exception as e:
+                log.exception("Error starting modules: %s", e)
+                raise
+
+        log.info("All modules started successfully.")
+
+    def _handle_terminate_event(self, **kwargs):
+        log.info("Received terminate event, starting shutdown thread")
+        threading.Thread(
+            target=self.shutdown, name="ATLAS_SHUTDOWN", daemon=True
+        ).start()
 
     def shutdown(self):
+        """Shuts Atlas down."""
         self.alive = False
-        if hasattr(self, "ui") and getattr(self.ui, "is_running", False):
-            self.ui.call_from_thread(self.ui.exit)
-
-    def load_models(self):
-        try:
-            log.info("Starting model loading")
-            # self.kws.load()
-            # self.sr.load()
-            self.stt_module.load()
-
-            self.tts_module.load()
-            # self.tts.load()
-            # self.sound_manager.load()
-
-            self.op_module.load()
-            # self.cmd.load()
-            # self.llama.load()
-
-            log.info("All models loaded successfully")
-        except Exception:
-            log.exception("Error loading models")
-            raise
-
-    def _setup_subscriptions(self):
-        """Subscribe all nececessary callbacks for events."""
-
-        def handle_intent(event):
-            intent: str = event.payload["intent"]
-            self.tts_module.play_category(intent)
-
-            if intent == "farewell":
-                self.shutdown()
-            if intent == "sleep":
-                self.events.emit_command(CommandType.SET_STATE, {"state": "SLEEPING"})
-
-        self.events.subscribe(EventType.OP_INTENT, handle_intent)
-
-    def _close(self):
-        try:
-            log.info("Shutting down assistant")
-
-            self.keybinds.close()
-
-            if getattr(self, "stt_module", None):
-                self.stt_module.close()
-                log.debug("STT closed")
-            if getattr(self, "op_module", None):
-                self.op_module.close()
-                log.debug("Operator closed")
-            if getattr(self, "tts_module", None):
-                self.tts_module.close()
-                log.debug("TTS closed")
-
-            self.shutdown()
-            self.events.flush_and_stop()
-            log.info("Shutdown complete")
-        except Exception:
-            log.exception("Error during shutdown")
-        finally:
-            import sys
-
-            sys.stdout.write(  # Textual ui fix
-                "\x1b[?1000l"
-                "\x1b[?1003l"
-                "\x1b[?1015l\x1b[?1006l"
-                "\x1b[?25h"
-                "\x1b[=0u"
-                "\x1b[<u"
-                "\x1b[>4m"
-                "\x1b[?2004l"
-            )
-            sys.stdout.flush()
 
     def _main(self):
-        self.load_models()
+        self.start()
+        while self.alive:
+            threading.Event().wait(0.1)
 
-        self.keybinds.start()
-        self.stt_module.start()
-        self.tts_module.start()
-        self.op_module.start()
-
-        self.events.emit(EventType.UI_BANNER, {})
-
-        self.ui.run()  # this blocks main thread
-
-        # from threading import Event
-        # while self.alive:
-        #     Event().wait(1.0)
-
-    def start(self):
-        """Starts Atlas Assistant."""
+    def run(self):
+        """Runs Atlas"""
         try:
             self._main()
+        except KeyboardInterrupt:
+            self.events.emit("core.command.terminate")
         except Exception as e:
-            print(f"[!] FATAL ERROR: {e}")
+            log.critical("[!] ERROR: %s", e, exc_info=True)
             sys.exit(1)
         finally:
-            self._close()
+            self.close()

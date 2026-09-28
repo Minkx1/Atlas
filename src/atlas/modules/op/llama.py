@@ -9,10 +9,13 @@ from contextlib import suppress
 
 import llama_cpp
 
-from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+from atlas.utils.config import DATA_DIR
+
+from .config import LlamaConfig, llama_cfg
 
 log = logging.getLogger(__name__)
+
 
 # Llama-cpp traceback fix
 _orig_llama_del = getattr(llama_cpp.Llama, "__del__", None)
@@ -26,7 +29,7 @@ if _orig_llama_del:
 
 
 class Llama:
-    class _LLM_Response:
+    class _LLMResponse:
         def __init__(
             self, text: str, prompt_tokens: int, completion_tokens: int
         ) -> None:
@@ -35,14 +38,18 @@ class Llama:
             self.completion_tokens = completion_tokens
             self.total_tokens = prompt_tokens + completion_tokens
 
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        cfg: LlamaConfig = llama_cfg,
+    ) -> None:
         self.events = events or EventManager()
 
-        self.model_path = DATA_DIR / cfg.llm.model_path
-        self.initial_prompt = cfg.llm.initial_prompt
-        self.context_tokens = cfg.llm.context_tokens
-        self.max_tokens = cfg.llm.max_msg_tokens
-        self.temperature = cfg.llm.temperature
+        self.model_path = DATA_DIR / cfg.model_path
+        self.initial_prompt = cfg.initial_prompt
+        self.context_tokens = cfg.context_tokens
+        self.max_tokens = cfg.max_msg_tokens
+        self.temperature = cfg.temperature
 
         self.repeat_penalty = 1.15
         self.stop = ["\nUser:", "User:", "<|im_end|>"]
@@ -67,7 +74,6 @@ class Llama:
                 n_gpu_layers=0,
                 verbose=False,
             )
-            self.events.emit(EventType.LLM_LOADED, {})
         except Exception:
             log.exception("Error loading LLM model")
             self.no_model = True
@@ -76,7 +82,7 @@ class Llama:
     def history_add_response(self, text: str) -> None:
         self.history.append({"role": "assistant", "content": text})
 
-    def get_response(self, message: str) -> _LLM_Response:
+    def get_response(self, message: str) -> _LLMResponse:
         try:
             log.debug("Getting LLM response for: %s", message)
             self.history.append({"role": "user", "content": message})
@@ -91,7 +97,7 @@ class Llama:
             text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
             usage = response["usage"]  # type: ignore
 
-            return Llama._LLM_Response(
+            return Llama._LLMResponse(
                 text=text,
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 completion_tokens=usage.get("completion_tokens", 0),
@@ -140,20 +146,3 @@ class Llama:
 
     def __del__(self):
         self.close()
-
-
-if __name__ == "__main__":
-    llm = Llama()
-    print("Loading model...")
-    llm.load()
-    print("Loading complete!")
-    while True:
-        try:
-            for tok in llm.stream_response(input("> ")):
-                print(tok, sep="", end="", flush=True)
-            print()
-        except KeyboardInterrupt:
-            print("\nQuiting...")
-            break
-
-    llm.close()

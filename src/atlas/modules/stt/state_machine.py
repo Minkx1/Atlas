@@ -6,8 +6,9 @@
 import time
 from enum import StrEnum
 
-from atlas.core.config import cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+
+from .config import SttConfig, stt_cfg
 
 
 class State(StrEnum):
@@ -18,12 +19,17 @@ class State(StrEnum):
 
 
 class StateMachine:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        cfg: SttConfig = stt_cfg,
+    ) -> None:
         self.events = events or EventManager()
 
         self.state = State.SLEEPING
+        self.awake_timeout = cfg.awake_timeout
 
-        if cfg.stt.start_state == "AWAKE":
+        if cfg.start_state == "AWAKE":
             self.state = State.AWAKE
         else:
             self.state = State.SLEEPING
@@ -32,7 +38,7 @@ class StateMachine:
 
     def update_deadline(self) -> None:
         """Updates deadline to prevent going to sleep during talking or processing."""
-        self.awake_deadline = time.monotonic() + cfg.stt.awake_timeout
+        self.awake_deadline = time.monotonic() + self.awake_timeout
 
     def is_deadline_expired(self) -> bool:
         return time.monotonic() > self.awake_deadline
@@ -43,12 +49,10 @@ class StateMachine:
             if new_state == State.AWAKE:
                 self.update_deadline()
 
-            self.events.emit(EventType.STT_CHANGED_STATE, {"state": new_state.value})
-
             payload = {"state": new_state.value}
             if detail:
                 payload["detail"] = detail
-            self.events.emit(EventType.UI_STATE_CHANGE, payload)
+            self.events.emit("stt.changed_state", payload)
 
     def update(self) -> None:
         if self.state == State.WAITING:
@@ -56,7 +60,7 @@ class StateMachine:
         elif self.state == State.AWAKE and self.is_deadline_expired():
             self.set_state(
                 State.SLEEPING,
-                detail=f"Timeout ({int(cfg.stt.awake_timeout)}s)",
+                detail=f"Timeout ({int(self.awake_timeout)}s)",
             )
         elif self.state == State.RECORDING:
             self.update_deadline()

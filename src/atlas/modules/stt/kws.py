@@ -10,8 +10,10 @@ from pathlib import Path
 
 import numpy as np
 
-from atlas.core.config import CONFIG_DIR, DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+from atlas.utils.config import CONFIG_DIR, DATA_DIR, AudioConfig, general_cfg
+
+from .config import KwsConfig, kws_cfg
 
 log = logging.getLogger(__name__)
 
@@ -32,22 +34,20 @@ class KeyWordSpotter:
     def __init__(
         self,
         events: EventManager | None = None,
-        model_dir: str = cfg.kws.model_dir,
-        keywords_file: Path = CONFIG_DIR / cfg.kws.keywords_file,
-        num_threads: int = cfg.kws.num_threads,
-        keywords_threshold: float = cfg.kws.score_threshold,
+        cfg: KwsConfig = kws_cfg,
+        audio: AudioConfig = general_cfg.audio,
     ):
         self.events = events or EventManager()
+        self.cfg = cfg
 
-        path: Path = DATA_DIR / model_dir
+        path: Path = DATA_DIR / cfg.model_dir
         self.tokens = str(path / "tokens.txt")
         self.encoder = str(path / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
         self.decoder = str(path / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx")
         self.joiner = str(path / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx")
 
-        self.num_threads: int = num_threads
-        self.keywords_threshold: float = keywords_threshold
-        self.keywords_file: str = str(keywords_file)
+        self.keywords_file: str = str(CONFIG_DIR / cfg.keywords_file)
+        self.sample_rate: int = audio.sample_rate
 
         if not os.path.exists(self.tokens):
             log.warning("No Sherpa model in %s; downloading", path)
@@ -64,15 +64,13 @@ class KeyWordSpotter:
                 decoder=self.decoder,
                 joiner=self.joiner,
                 keywords_file=f"{self.keywords_file}",
-                num_threads=self.num_threads,
-                keywords_threshold=self.keywords_threshold,
+                num_threads=self.cfg.num_threads,
+                keywords_threshold=self.cfg.score_threshold,
                 feature_dim=80,
             )
 
             self.stream = self.kws.create_stream()
-
             log.info("KWS model loaded")
-            self.events.emit(EventType.KWS_LOADED, {})
         except Exception:
             log.exception("Error loading KWS model")
             raise
@@ -136,7 +134,7 @@ class KeyWordSpotter:
             raise RuntimeError("KWS was used before kws.load()")
 
         chunk_np = chunk_np.squeeze(1) if chunk_np.ndim > 1 else chunk_np
-        self.stream.accept_waveform(cfg.audio.sample_rate, chunk_np)
+        self.stream.accept_waveform(self.sample_rate, chunk_np)
         while self.kws.is_ready(self.stream):
             self.kws.decode_stream(self.stream)
             result = self.kws.get_result(self.stream)

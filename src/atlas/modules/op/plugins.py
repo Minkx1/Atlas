@@ -7,12 +7,11 @@ import json
 import logging
 import subprocess
 import threading
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import tomllib
-
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 
 log = logging.getLogger(__name__)
 
@@ -153,12 +152,8 @@ class Plugin:
         match msg.get("type"):
             case "say":
                 # mimics originally-designed event to call `tts.speak(...)`
-                self.events.emit_command(
-                    CommandType.TTS_SPEAK, {"text": msg.get("text", "")}
-                )
-                self.events.emit(
-                    EventType.UI_ASSISTANT_SAY, {"text": msg.get("text", "")}
-                )
+                self.events.emit("tts.command.speak", {"text": msg.get("text", "")})
+                self.events.emit("ui.say", {"text": msg.get("text", "")})
             case "event":
                 self._forward_event(msg)
             case "done":
@@ -173,6 +168,6 @@ class Plugin:
     def _forward_event(self, msg: dict):
         name = msg.get("name")
         try:
-            self.events.emit(EventType(name), msg.get("content") or {})
+            self.events.emit(str(name), msg.get("content") or {})
         except ValueError:
             log.warning("Plugin '%s' emitted unknown event: %s", self.manifest.id, name)

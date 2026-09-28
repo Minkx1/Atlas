@@ -3,15 +3,25 @@
 # Loads and manipulaties commands and plugins
 #
 
+import json
 import logging
 import re
 import threading
+from pathlib import Path
 
 import numpy as np
 
-from atlas.core.config import DATA_DIR, PLUGINS_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+from atlas.utils.config import (
+    CONFIG_DIR,
+    DATA_DIR,
+    PLUGINS_DIR,
+    Config,
+    IdentityConfig,
+    general_cfg,
+)
 
+from .config import OpConfig, op_cfg
 from .plugins import Plugin, PluginManifest
 from .sentence_transformer import ONNXSentenceTransformer
 
@@ -22,8 +32,12 @@ class CommandOperator:
     def __init__(
         self,
         events: EventManager | None = None,
+        cfg: OpConfig = op_cfg,
+        identity: IdentityConfig = general_cfg.identity,
     ) -> None:
         self.events = events or EventManager()
+
+        self.identity = identity
 
         self.history: list[str] = []
         self.commands: dict[str, dict[str, list[dict[str, str]] | list[str]]] = {}
@@ -31,8 +45,8 @@ class CommandOperator:
 
         self.triggers: dict[str, list[str]] = {}
 
-        self.intent_threshold = 0.60
-        self.margin = 0.05
+        self.intent_threshold = cfg.intent_threshold
+        self.margin = cfg.margin
 
     def load(self):
         self.model = ONNXSentenceTransformer(  # embedding model
@@ -48,16 +62,44 @@ class CommandOperator:
 
         log.info("Embeddings and commands loaded")
 
+    @staticmethod
+    def load_commands() -> dict[str, dict[str, str | list[str] | None]]:
+        path = CONFIG_DIR / "commands.json"
+        if not path.exists():
+            Config.write_from_example(
+                path, Path(__file__).parent / "commands_example.json"
+            )
+
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        if not isinstance(payload, dict):
+            return {}
+
+        commands: dict[str, dict[str, str | list[str] | None]] = {}
+        for intent, values in payload.items():
+            if not isinstance(values, dict):
+                continue
+
+            commands[str(intent)] = {
+                "sounds": values.get("sounds", []),
+                "triggers": values.get("triggers", []),
+            }
+
+        return commands
+
     def _load_commands(self) -> None:
         """Loads all triggers and intents from commands config."""
-        self.commands = cfg.op.load_commands() or {}  # type: ignore
+        self.commands = self.load_commands() or {}  # type: ignore
 
         log.debug("Loaded intents: %s", list(self.commands.keys()))
 
         def _format_triggers(triggers: list[str]) -> list[str]:
             res = []
             for trig in triggers:
-                new = trig.format(username=cfg.username, name=cfg.name)
+                new = trig.format(
+                    username=self.identity.username, name=self.identity.name
+                )
                 res.append(new)
             return res
 
@@ -218,5 +260,5 @@ class CommandOperator:
             ).start()
             return None
 
-        self.events.emit(EventType.OP_INTENT, {"intent": intent})
+        self.events.emit("op.intent", {"intent": intent})
         log.info(f"Intent: {intent}")

@@ -68,29 +68,29 @@ Atlas keeps runtime data below `data/`:
 | Sentence transformer | `data/models/sentence-transformer/` |
 | Optional LLM | `data/models/llm_models/*.gguf` |
 
-Some speech models download on first use when absent. The LLM is manual: place a compatible `.gguf` file in `data/models/llm_models/` and set `llm.model_path` in `config/config.toml`.
+Some speech models download on first use when absent. The LLM is manual: place a compatible `.gguf` file in `data/models/llm_models/` and set `model_path` in `config/llama.toml`.
 
 !!! warning "First launch can require internet"
     Model acquisition is an installation concern. Once the files are present, Atlas can run without network access. Keep model licenses and redistribution terms with any build you share.
 
-## Configuration loop
+## Configuration
 
-```mermaid
-flowchart LR
-    A[config/config.toml] --> B[Load AppConfig]
-    B --> C[Construct components]
-    C --> D[Load local models]
-    D --> E[Start workers]
-    E --> F[Run Atlas]
-```
+Each module owns its own settings, in its own file under `config/` —
+`stt.toml`, `tts.toml`, `op.toml`, `llama.toml` — plus one shared
+`general.toml` for settings more than one module needs (the assistant's
+identity, the audio capture format). Every file is generated with sensible
+defaults the first time Atlas runs, so there's nothing to create by hand.
 
-The most useful first settings are:
+See the full [Config reference](config-reference.md) for every field, or
+[Architecture → Config](architecture/config.md) for how the loading mechanism
+works. The settings you're most likely to touch first:
 
-- `stt.start_state`: usually `SLEEPING`;
-- `stt.model_size` and `stt.device`;
-- `tts.model_path` and `tts.length_scale`;
-- `llm.model_path`;
-- `kws.awake_keybind` for keyboard wake-up.
+- `general.toml` → `[identity].name`/`username` — how the assistant refers to itself and to you;
+- `stt.toml` → `[stt].start_state` — usually `SLEEPING`;
+- `stt.toml` → `[stt].model_size` and `[stt].device`;
+- `tts.toml` → `[tts].model_path` and `[tts].length_scale`;
+- `llama.toml` → `[llama].model_path`;
+- `keybinds.cfg` — the global hotkey for keyboard wake-up.
 
 ## Verify the development setup
 

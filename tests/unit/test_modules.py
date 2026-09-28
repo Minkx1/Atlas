@@ -1,6 +1,6 @@
 import pytest
 
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
 from atlas.core.module import Module, on_event
 
 
@@ -16,7 +16,7 @@ class ProbeModule(Module):
         self.received = []
         self._register_events(events)
 
-    @on_event(EventType.UI_BANNER)
+    @on_event("ui.banner")
     def receive(self, value: int = 0, **kwargs):
         self.received.append(value)
 
@@ -24,16 +24,16 @@ class ProbeModule(Module):
 def test_on_event_registers_method_on_the_supplied_manager(event_manager):
     probe = ProbeModule(event_manager)
 
-    event_manager.emit(EventType.UI_BANNER, {"value": 42})
-    event_manager.queue.join()
+    event_manager.emit("ui.banner", {"value": 42})
+    event_manager._queue.join()
 
     assert probe.received == [42]
 
 
 def test_op_module_passes_manager_to_child_components(monkeypatch, event_manager):
     require_importable("onnxruntime")
-    from atlas.op import module as op_module
-    from atlas.op.module import OpModule
+    from atlas.modules.op import module as op_module
+    from atlas.modules.op.module import OpModule
 
     class FakeCommandOperator:
         def __init__(self, events):
@@ -54,8 +54,8 @@ def test_op_module_passes_manager_to_child_components(monkeypatch, event_manager
 
 def test_stt_module_passes_manager_to_child_components(monkeypatch, event_manager):
     require_importable("sounddevice")
-    from atlas.stt import module as stt_module
-    from atlas.stt.module import SttModule
+    from atlas.modules.stt import module as stt_module
+    from atlas.modules.stt.module import SttModule
 
     class FakeKws:
         def __init__(self, events):

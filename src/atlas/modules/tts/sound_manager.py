@@ -14,22 +14,58 @@ import scipy.signal
 import sounddevice as sd
 import soundfile as sf
 
-from atlas.core.config import DATA_DIR, cfg
-from atlas.core.events import EventManager, EventType
+from atlas.core.events import EventManager
+from atlas.utils.config import CONFIG_DIR, DATA_DIR, Config, IdentityConfig, general_cfg
+
+from .config import TtsConfig, tts_cfg
 
 log = logging.getLogger(__name__)
 
 
 class SoundManager:
-    def __init__(self, events: EventManager | None = None) -> None:
+    def __init__(
+        self,
+        events: EventManager | None = None,
+        cfg: TtsConfig = tts_cfg,
+        identity: IdentityConfig = general_cfg.identity,
+    ) -> None:
         self.events = events or EventManager()
 
-        self.commands = cfg.op.load_commands() or {}
-        self.silence_duration = cfg.tts.silence_duration
+        self.cfg = cfg
+        self.identity = identity
+        self.silence_duration = cfg.silence_duration
+
+        self.commands = self.load_commands() or {}
         self._healthy = False
 
+    @staticmethod
+    def load_commands() -> dict[str, dict[str, str | list[str] | None]]:
+        path = CONFIG_DIR / "commands.json"
+        if not path.exists():
+            Config.write_from_example(
+                path, Path(__file__).parent / "commands_example.json"
+            )
+
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        if not isinstance(payload, dict):
+            return {}
+
+        commands: dict[str, dict[str, str | list[str] | None]] = {}
+        for intent, values in payload.items():
+            if not isinstance(values, dict):
+                continue
+
+            commands[str(intent)] = {
+                "sounds": values.get("sounds", []),
+                "triggers": values.get("triggers", []),
+            }
+
+        return commands
+
     def load(self) -> None:
-        self.commands = cfg.op.load_commands()
+        self.commands = self.load_commands()
         self._generate_basic_sounds()
         self._healthy = True
 
@@ -72,7 +108,7 @@ class SoundManager:
             sd.play(padded_audio, samplerate)
             sd.wait()
 
-            self.events.emit(EventType.TTS_FREE, {})
+            self.events.emit("tts.free", {})
         except Exception:
             self._healthy = False
             log.exception("Error playing audio %s", path.name)
@@ -86,16 +122,18 @@ class SoundManager:
             path = payload.get("path") or payload.get("sound")
             text = payload.get("text")
 
-            formatted_text = str(text).format(username=cfg.username, name=cfg.name)
+            formatted_text = str(text).format(
+                username=self.identity.username, name=self.identity.name
+            )
             if formatted_text:
-                self.events.emit(EventType.UI_ASSISTANT_SAY, {"text": formatted_text})
+                self.events.emit("ui.say", {"text": formatted_text})
             if not path:
                 return
             payload = Path(path)
         elif isinstance(payload, str):
             payload = Path(payload)
 
-        self.events.emit(EventType.TTS_BUSY, {})
+        self.events.emit("tts.busy", {})
         self.play_audio(payload)
 
     def interrupt(self) -> None:
@@ -104,18 +142,17 @@ class SoundManager:
 
     def _get_current_state(self) -> dict:
         """Returns structured dict of current TTS settings and formatted sounds."""
-        c = cfg.tts
         state = {
             "settings": {
-                "name": cfg.name,
-                "username": cfg.username,
-                "model_path": cfg.tts.model_path,
-                "use_cuda": c.use_cuda,
-                "volume": c.volume,
-                "length_scale": c.length_scale,
-                "noise_scale": c.noise_scale,
-                "noise_w_scale": c.noise_w_scale,
-                "normalize_audio": c.normalize_audio,
+                "name": self.identity.name,
+                "username": self.identity.username,
+                "model_path": self.cfg.model_path,
+                "use_cuda": self.cfg.use_cuda,
+                "volume": self.cfg.volume,
+                "length_scale": self.cfg.length_scale,
+                "noise_scale": self.cfg.noise_scale,
+                "noise_w_scale": self.cfg.noise_w_scale,
+                "normalize_audio": self.cfg.normalize_audio,
             },
             "sounds": {},
         }
@@ -134,7 +171,7 @@ class SoundManager:
                 try:
                     # KeyError occurs if template has {unknown_key}
                     formatted_text = text_template.format(
-                        name=cfg.name, username=cfg.username
+                        name=self.identity.name, username=self.identity.username
                     )
                     formatted_sounds.append({"path": path_str, "text": formatted_text})
                 except KeyError:
@@ -184,7 +221,7 @@ class SoundManager:
 
                 log.info("Generating sound: %s", path_str)
                 self.events.emit(
-                    EventType.SOUNDS_GENERATE_SOUND,
+                    "tts.sounds.command.generate_sound",
                     {"text": formatted_text.strip(), "path": full_path},
                 )
 
@@ -224,7 +261,9 @@ class SoundManager:
 
             if text_str:
                 try:
-                    text_str = text_str.format(username=cfg.username, name=cfg.name)
+                    text_str = text_str.format(
+                        username=self.identity.username, name=self.identity.name
+                    )
                 except KeyError:
                     log.exception("Formatting text failed for '%s'", text_str)
 

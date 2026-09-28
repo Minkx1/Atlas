@@ -39,9 +39,13 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"atlas.modules.op" = ["commands_example.json"]
+"atlas.modules.tts" = ["commands_example.json"]
+
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "DTZ", "RUF"]

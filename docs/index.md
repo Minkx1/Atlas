@@ -13,7 +13,7 @@ Atlas turns local audio into useful actions and spoken responses. Wake-word dete
 <div class="hero-actions" markdown>
 
 [Install Atlas](installation.md){ .md-button .md-button--primary }
-[Read the architecture](architecture.md){ .md-button }
+[Read the architecture](architecture/overview.md){ .md-button }
 
 </div>
 </div>
@@ -47,7 +47,7 @@ flowchart LR
 | Extensions | Isolated JSON-lines plugin processes |
 | Conversation fallback | Local GGUF model through `llama-cpp-python` |
 | Voice output | Piper TTS and cached sound assets |
-| Interface | Textual terminal UI |
+| Interface | Textual terminal UI (disabled by default, see [Architecture](architecture/overview.md)) |
 
 !!! note "Offline means local models still need setup"
     Atlas does not require a cloud account at runtime. Initial model downloads and manually supplied LLM files are described in [Installation](installation.md).
@@ -60,13 +60,17 @@ flowchart LR
 
     Requirements, source setup, model locations and the first launch checklist.
 
-- :material-transit-connection-variant: **[Understand the pipeline](architecture.md)**
+- :material-transit-connection-variant: **[Understand the pipeline](architecture/overview.md)**
 
-    Lifecycle, event/command contracts, concurrency and output flow.
+    Modules, events, config and lifecycle.
 
 - :material-puzzle-outline: **[Build a plugin](plugins.md)**
 
     Manifest format, process isolation, stdin/stdout messages and examples.
+
+- :material-toy-brick-outline: **[Build a module](modules-api.md)**
+
+    Add a built-in capability that runs inside Atlas's own process.
 
 - :material-github: **[Open the repository](https://github.com/Minkx1/Atlas)**
 
@@ -86,4 +90,4 @@ flowchart LR
     Plugins are external processes. They can be written independently and communicate through a small IPC surface.
 
 !!! warning "The API is evolving"
-    Atlas is in the v0.6 stabilization phase. The [Plugin API](plugins.md) and event contracts describe the current implementation, not a frozen long-term protocol.
+    Atlas is in the v0.6 stabilization phase. The [Plugin API](plugins.md) and event names describe the current implementation, not a frozen long-term protocol.

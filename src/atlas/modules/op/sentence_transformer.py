@@ -11,7 +11,7 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from atlas.core.config import DATA_DIR
+from atlas.utils.config import DATA_DIR
 
 log = logging.getLogger(__name__)
 

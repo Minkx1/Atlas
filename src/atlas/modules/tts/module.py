@@ -4,7 +4,7 @@
 
 from pathlib import Path
 
-from atlas.core.events import CommandType, EventManager, EventType
+from atlas.core.events import EventManager
 from atlas.core.module import Module, on_event
 
 from .sound_manager import SoundManager
@@ -15,14 +15,10 @@ class TtsModule(Module):
     name = "tts"
 
     def __init__(self, events: EventManager | None = None) -> None:
-        self.events = events or EventManager()
-        self._register_events(self.events)
+        super().__init__(events)
 
         self.piper = TextToSpeech(self.events)
         self.sound = SoundManager(self.events)
-
-    def play_category(self, category: str):
-        return self.sound.play_category(category)
 
     # Module methods
 
@@ -38,20 +34,24 @@ class TtsModule(Module):
 
     # Events
 
-    @on_event(EventType.SOUNDS_GENERATE_SOUND)
+    @on_event("tts.sounds.command.play_category")
+    def play_category(self, category: str, **kwargs):
+        return self.sound.play_category(category)
+
+    @on_event("tts.sounds.command.generate_sound")
     def generate_sound(self, text: str = "", path: Path = Path(), **kwargs):
         self.piper._text_to_file(text, path)
 
-    @on_event(EventType.OP_INTERRUPT)
+    @on_event("op.command.interrupt")
     def interrupt(self, **kwargs) -> None:
         self.piper.interrupt()
         self.sound.interrupt()
 
-    @on_event(CommandType.TTS_SPEAK, EventType.OP_LLM_CHUNK)
+    @on_event("tts.command.speak", "op.llm_chunk")
     def speak(self, text="", **kwargs):
         self.piper.speak(text)
 
-    @on_event(CommandType.TTS_PLAY_SOUND)
+    @on_event("tts.sounds.command.play")
     def play_sound(self, payload: Path | dict[str, str | Path | None] | None, **kwargs):
         if payload:
             self.sound.play_sound(payload)
