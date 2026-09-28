@@ -40,9 +40,15 @@ nav:
       - Overview: index.md
       - Installation: installation.md
   - Understand:
-      - Architecture: architecture.md
+      - Overview: architecture/overview.md
+      - Events: architecture/events.md
+      - Config: architecture/config.md
+      - Lifecycle: architecture/lifecycle.md
   - Extend:
+      - Modules API: modules-api.md
       - Plugin API: plugins.md
+  - Reference:
+      - Config: config-reference.md
 
 markdown_extensions:
   - pymdownx.highlight:

@@ -24,3 +24,5 @@ htmlcov/
 
 .trash/
 artifacts/
+
+site/
