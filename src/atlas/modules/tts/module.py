@@ -34,24 +34,24 @@ class TtsModule(Module):
 
     # Events
 
-    @on_event("tts.sounds.play_category")
+    @on_event("tts.sounds.command.play_category")
     def play_category(self, category: str, **kwargs):
         return self.sound.play_category(category)
 
-    @on_event("tts.sounds.generate_sound")
+    @on_event("tts.sounds.command.generate_sound")
     def generate_sound(self, text: str = "", path: Path = Path(), **kwargs):
         self.piper._text_to_file(text, path)
 
-    @on_event("op.interrupt")
+    @on_event("op.command.interrupt")
     def interrupt(self, **kwargs) -> None:
         self.piper.interrupt()
         self.sound.interrupt()
 
-    @on_event("tts.speak", "op.llm_chunk")
+    @on_event("tts.command.speak", "op.llm_chunk")
     def speak(self, text="", **kwargs):
         self.piper.speak(text)
 
-    @on_event("tts.sounds.play")
+    @on_event("tts.sounds.command.play")
     def play_sound(self, payload: Path | dict[str, str | Path | None] | None, **kwargs):
         if payload:
             self.sound.play_sound(payload)

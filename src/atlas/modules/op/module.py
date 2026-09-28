@@ -72,21 +72,11 @@ class OpModule(Module):
 
             full_response_text += sentence + " "
 
-            self.events.emit("op.llm_chunk", {"text": sentence})
-
             self.events.emit(
-                "ui.llm_chunk",
-                {"text": sentence, "is_first": is_first_chunk},
+                "op.llm_chunk", {"text": sentence, "is_first": is_first_chunk}
             )
             is_first_chunk = False
 
-        self.events.emit(
-            "ui.llm_response_done",
-            {
-                "text": full_response_text.strip(),
-            },
-        )
-        self.events.emit("op.llm_response", {"text": full_response_text.strip()})
         self.llm.history_add_response(full_response_text.strip())
 
     def _operate(self, text: str) -> None:
@@ -122,17 +112,17 @@ class OpModule(Module):
 
     @on_event("op.intent")
     def handle_intent(self, intent: str, **kwargs):
-        self.events.emit("tts.sounds.play_category", {"category": intent})
+        self.events.emit("tts.sounds.command.play_category", {"category": intent})
 
         if intent == "farewell":
-            self.events.emit("core.terminate")
+            self.events.emit("core.command.terminate")
         if intent == "sleep":
-            self.events.emit("stt.command_set_state", {"state": "SLEEPING"})
+            self.events.emit("stt.command.set_state", {"state": "SLEEPING"})
 
-    @on_event("op.submit", "stt.transcribed")
+    @on_event("stt.transcribed")
     def submit(self, text: str = "", **kwargs):
         self.command_queue.put(text)
 
-    @on_event("op.interrupt")
+    @on_event("op.command.interrupt")
     def interrupt(self, **kwargs):
         self.interrupt_flag.set()

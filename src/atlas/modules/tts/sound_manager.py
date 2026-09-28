@@ -42,7 +42,7 @@ class SoundManager:
     def load_commands() -> dict[str, dict[str, str | list[str] | None]]:
         path = CONFIG_DIR / "commands.json"
         if not path.exists():
-            Config.write_from_eample(
+            Config.write_from_example(
                 path, Path(__file__).parent / "commands_example.json"
             )
 
@@ -221,7 +221,7 @@ class SoundManager:
 
                 log.info("Generating sound: %s", path_str)
                 self.events.emit(
-                    "tts.sounds.generate_sound",
+                    "tts.sounds.command.generate_sound",
                     {"text": formatted_text.strip(), "path": full_path},
                 )
 

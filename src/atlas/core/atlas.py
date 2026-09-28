@@ -27,7 +27,8 @@ class Atlas:
 
         self.events = EventManager()
         self.events.subscribe(
-            "core.terminate", lambda e: self._handle_terminate_event(**e.content)
+            "core.command.terminate",
+            lambda e: self._handle_terminate_event(**e.content),
         )
         self._configure_logging()
 
@@ -58,7 +59,8 @@ class Atlas:
             except Exception as e:
                 log.exception("Module " + name + " loaded with error: %s", e)
                 raise
-            log.info("All modules loaded.")
+
+        log.info("All modules loaded.")
 
     def close(self, **kwargs):
         """Closes all atlas' modules.
@@ -100,7 +102,7 @@ class Atlas:
                 log.exception("Error starting modules: %s", e)
                 raise
 
-            log.info("All modules started successfully.")
+        log.info("All modules started successfully.")
 
     def _handle_terminate_event(self, **kwargs):
         log.info("Received terminate event, starting shutdown thread")
@@ -122,7 +124,7 @@ class Atlas:
         try:
             self._main()
         except KeyboardInterrupt:
-            self.events.emit("core.terminate")
+            self.events.emit("core.command.terminate")
         except Exception as e:
             log.critical("[!] ERROR: %s", e, exc_info=True)
             sys.exit(1)

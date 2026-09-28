@@ -371,7 +371,7 @@ class UI(App):
 
     def action_quit(self) -> None:
         """Emit Atlas termination event instead of exiting directly."""
-        self.events.emit("core.terminate", {})
+        self.events.emit("core.command.terminate", {})
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Submit text entered into the UI."""

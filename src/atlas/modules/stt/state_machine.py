@@ -49,12 +49,10 @@ class StateMachine:
             if new_state == State.AWAKE:
                 self.update_deadline()
 
-            self.events.emit("stt.changed_state", {"state": new_state.value})
-
             payload = {"state": new_state.value}
             if detail:
                 payload["detail"] = detail
-            self.events.emit("ui.state_change", payload)
+            self.events.emit("stt.changed_state", payload)
 
     def update(self) -> None:
         if self.state == State.WAITING:

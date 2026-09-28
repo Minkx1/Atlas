@@ -3,7 +3,7 @@ utils / config.py
 
 Config API has two layers:
 
-- `Config.load_raw` / `Config.write_from_eample` -- the low-level escape
+- `Config.load_raw` / `Config.write_from_example` -- the low-level escape
   hatch. Reads/writes a file under CONFIG_DIR verbatim (toml/json/txt/cfg),
   generating it from an "origin" string if missing. Use this directly for
   files that don't have a fixed schema (commands.json's intents are
@@ -105,15 +105,15 @@ class Config:
         file.write_text(origin, encoding="utf-8")
 
     @classmethod
-    def load_raw(cls, id: str = "null", origin: str = "") -> dict:
+    def load_raw(cls, name: str = "null", origin: str = "") -> dict:
         """Read config file by **id** and returns its content.
 
         If file is missing, generates it from **origin**.
         """
 
-        file = CONFIG_DIR / id
+        file = CONFIG_DIR / name
 
-        if id != "null" and not file.exists():
+        if name != "null" and not file.exists():
             cls._write_file(file, origin)
 
         if file.exists() and file.is_file():
@@ -122,7 +122,7 @@ class Config:
         return {}
 
     @classmethod
-    def write_from_eample(cls, path: Path, example: Path) -> str:
+    def write_from_example(cls, path: Path, example: Path) -> str:
         origin: str = example.read_text("utf-8")
         path.write_text(origin)
         return origin

@@ -63,12 +63,12 @@ class SttModule(Module):
 
     # Events
 
-    @on_event("tts.busy", "op.start")
+    @on_event("tts.busy")
     def waiting_state(self, **kwargs) -> None:
         """Waiting when the TTS is speaking"""
         self.state.set_state(SMState.WAITING)
 
-    @on_event("stt.command_set_state")
+    @on_event("stt.command.set_state")
     def set_state(self, state: str = "", detail: str | None = None, **kwargs) -> None:
         self.state.set_state(SMState(state), detail)
 
@@ -93,7 +93,7 @@ class SttModule(Module):
     @on_event("stt.kws.keyword_detected")
     def handle_kw_detected(self, keyword: str = "", **kwargs):
         if self.state.state == SMState.WAITING:
-            self.events.emit("op.interrupt", {})
+            self.events.emit("op.command.interrupt", {})
             self.state.set_state(SMState.AWAKE, f"Interrupted: {keyword}")
         else:
             # app.operator.submit("!EVENT_KEYWORD_DETECTED")

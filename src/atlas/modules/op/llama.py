@@ -29,7 +29,7 @@ if _orig_llama_del:
 
 
 class Llama:
-    class _LLM_Response:
+    class _LLMResponse:
         def __init__(
             self, text: str, prompt_tokens: int, completion_tokens: int
         ) -> None:
@@ -82,7 +82,7 @@ class Llama:
     def history_add_response(self, text: str) -> None:
         self.history.append({"role": "assistant", "content": text})
 
-    def get_response(self, message: str) -> _LLM_Response:
+    def get_response(self, message: str) -> _LLMResponse:
         try:
             log.debug("Getting LLM response for: %s", message)
             self.history.append({"role": "user", "content": message})
@@ -97,7 +97,7 @@ class Llama:
             text: str = str(response["choices"][0]["message"]["content"])  # type: ignore
             usage = response["usage"]  # type: ignore
 
-            return Llama._LLM_Response(
+            return Llama._LLMResponse(
                 text=text,
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 completion_tokens=usage.get("completion_tokens", 0),

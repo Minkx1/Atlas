@@ -111,7 +111,7 @@ def test_core_terminate_event_stops_the_run_loop_and_close_still_cleans_up(
     closed on this -- the normal -- shutdown path.
     """
     atlas_app.start()
-    atlas_app.events.emit("core.terminate")
+    atlas_app.events.emit("core.command.terminate")
 
     deadline = time.monotonic() + 2.0
     while atlas_app.alive and time.monotonic() < deadline:

@@ -1,5 +1,5 @@
 #
-# keybins.py
+# keybinds.py
 #
 
 import logging

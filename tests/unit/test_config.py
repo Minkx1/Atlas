@@ -59,12 +59,12 @@ def test_load_config_null_id_returns_empty_without_touching_disk(isolated_config
     assert list(isolated_config_dir.iterdir()) == []
 
 
-def test_write_from_eample_copies_content_and_returns_it(tmp_path):
+def test_write_from_example_copies_content_and_returns_it(tmp_path):
     example = tmp_path / "example.toml"
     example.write_text('[op]\nname = "Atlas"\n', encoding="utf-8")
     target = tmp_path / "op.toml"
 
-    result = Config.write_from_eample(target, example)
+    result = Config.write_from_example(target, example)
 
     assert target.read_text(encoding="utf-8") == example.read_text(encoding="utf-8")
     assert result == example.read_text(encoding="utf-8")

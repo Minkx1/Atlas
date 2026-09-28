@@ -62,7 +62,7 @@ class UiModule(Module):
         """Display an assistant message."""
         self.ui.add_assistant_message(text)
 
-    @on_event("core.terminate")
+    @on_event("core.command.terminate")
     def on_terminate(self, **kwargs) -> None:
         """Close the UI when Atlas is terminating."""
         self.ui.exit()

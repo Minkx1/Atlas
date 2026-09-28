@@ -66,7 +66,7 @@ class CommandOperator:
     def load_commands() -> dict[str, dict[str, str | list[str] | None]]:
         path = CONFIG_DIR / "commands.json"
         if not path.exists():
-            Config.write_from_eample(
+            Config.write_from_example(
                 path, Path(__file__).parent / "commands_example.json"
             )
 
